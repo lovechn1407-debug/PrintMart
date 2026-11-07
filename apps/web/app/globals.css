@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "@heroui/styles/themes/default";
+@import "@heroui/styles/css";
+
+:root {
+  color-scheme: light;
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-foreground);
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}

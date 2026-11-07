@@ -1,0 +1,61 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "admins": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "machines": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "machineCapabilities": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "machinePrinterStatus": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "documents": {
+      "$docId": {
+        ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || root.child('admins').child(auth.uid).exists())",
+        ".write": false
+      }
+    },
+    "printJobs": {
+      ".indexOn": ["userId", "machineId", "preparation/status", "printing/status"],
+      "$jobId": {
+        ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('admins').child(auth.uid).exists())",
+        ".write": false
+      }
+    },
+    "pricing": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "offers": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "referrals": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "overlays": {
+      ".read": true,
+      ".write": false
+    },
+    "errorLogs": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": false
+    }
+  }
+}

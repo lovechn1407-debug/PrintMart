@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@heroui/styles/css";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+

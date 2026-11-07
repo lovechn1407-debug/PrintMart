@@ -1,0 +1,36 @@
+{
+  "name": "@printmart/kiosk",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev:ui": "vite",
+    "dev:electron": "electron .",
+    "build:ui": "node build-ui.js",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "node build-ui.js && tsc -p tsconfig.electron.json",
+    "package": "electron-builder --win"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.2.7",
+    "@heroui/styles": "^3.2.7",
+    "@printmart/shared": "file:../../packages/shared",
+    "firebase": "^11.4.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.4.5",
+    "vite": "^6.2.0"
+  }
+}

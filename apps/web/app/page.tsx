@@ -9,63 +9,96 @@ export default function HomePage() {
   const [cartCount, setCartCount] = useState<number>(3);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-24 font-sans">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-28 font-sans relative overflow-x-hidden">
       <AppNavbar />
 
-      {/* Main Print Store Container */}
-      <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-3.5 sm:px-4 pt-4 sm:pt-6 pb-12 relative">
-        
-        {/* Subtle Warm Top Aura & Concentric Watermark Arcs */}
-        <div className="absolute top-0 inset-x-0 h-48 pointer-events-none overflow-hidden flex items-center justify-center -z-10">
-          <div className="w-96 h-96 rounded-full bg-gradient-to-b from-[#fde047]/30 via-[#fef08a]/20 to-transparent blur-2xl" />
-          <svg
-            className="absolute top-2 w-[340px] h-32 opacity-25 text-amber-500 pointer-events-none"
-            viewBox="0 0 340 120"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M10 100 C 90 20, 250 20, 330 100" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-            <path d="M30 110 C 100 40, 240 40, 310 110" stroke="currentColor" strokeWidth="1" />
-            <path d="M50 120 C 110 60, 230 60, 290 120" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-          </svg>
-        </div>
+      {/* ─────────────────────────────────────────────────────────────
+          TOP AURA & FINE GUILLOCHÉ WAVY CONTOUR TEXTURE
+          Matches the banknote security & fingerprint lines in screenshot
+          ───────────────────────────────────────────────────────────── */}
+      <div className="absolute top-0 inset-x-0 h-96 pointer-events-none select-none overflow-hidden z-0">
+        {/* Soft Golden Radial Glow */}
+        <div className="absolute top-0 inset-x-0 h-72 bg-gradient-to-b from-[#fde047]/45 via-[#fef08a]/20 to-transparent" />
 
-        {/* Section Header */}
-        <div className="text-center pt-2 pb-5">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1c1c1c] tracking-tight">
+        {/* Left Delicate Contour Guilloché Waves */}
+        <svg
+          className="absolute -top-6 -left-12 w-80 h-96 opacity-35 text-[#d9b44a] pointer-events-none"
+          viewBox="0 0 320 380"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {Array.from({ length: 18 }).map((_, i) => (
+            <path
+              key={`left-arc-${i}`}
+              d={`M -20 ${20 + i * 16} C 120 ${10 + i * 16}, 210 ${90 + i * 16}, 260 ${240 + i * 16}`}
+              stroke="currentColor"
+              strokeWidth="0.85"
+              strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+            />
+          ))}
+        </svg>
+
+        {/* Right Delicate Contour Guilloché Waves */}
+        <svg
+          className="absolute -top-6 -right-12 w-80 h-96 opacity-35 text-[#d9b44a] pointer-events-none"
+          viewBox="0 0 320 380"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {Array.from({ length: 18 }).map((_, i) => (
+            <path
+              key={`right-arc-${i}`}
+              d={`M 340 ${20 + i * 16} C 200 ${10 + i * 16}, 110 ${90 + i * 16}, 60 ${240 + i * 16}`}
+              stroke="currentColor"
+              strokeWidth="0.85"
+              strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+            />
+          ))}
+        </svg>
+
+        {/* Center Golden Halo */}
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-80 h-44 bg-radial from-[#fde68a]/35 via-transparent to-transparent blur-xl" />
+      </div>
+
+      {/* Main Print Store Container */}
+      <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-3.5 sm:px-4 z-10 relative">
+        
+        {/* Generous Breathing Room at Top as in Screenshot */}
+        <div className="text-center pt-14 sm:pt-20 pb-9 sm:pb-11">
+          <h1 className="text-3xl sm:text-[2.65rem] font-black text-[#1c1c1c] tracking-[-0.035em] leading-tight">
             Print Store
           </h1>
-          <p className="text-xs sm:text-sm text-neutral-600 mt-1.5 font-normal tracking-wide">
+          <p className="text-xs sm:text-[13.5px] text-[#5c6874] mt-2 font-medium tracking-[-0.01em]">
             Blinkit ensures secure prints at every stage
           </p>
         </div>
 
         {/* Cards Stack */}
-        <div className="space-y-3.5">
+        <div className="space-y-4">
           
           {/* CARD 1: Documents */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
                 Documents
               </h2>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Price starting at ₹3/page</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Paper quality: 70 GSM</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Single side prints</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=documents"
-                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
               >
                 Upload Files
               </Link>
@@ -96,7 +129,7 @@ export default function HomePage() {
 
               {/* Front Page with 'Lorem' Header */}
               <div className="absolute w-22 h-28 bg-white border border-slate-200/90 rounded-sm shadow-md rotate-2 p-2 flex flex-col z-10">
-                <div className="bg-[#7e22ce] text-white font-bold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
+                <div className="bg-[#7e22ce] text-white font-extrabold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
                   <span>Lorem</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
                 </div>
@@ -115,26 +148,26 @@ export default function HomePage() {
           {/* CARD 2: Passport Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
                 Passport photos
               </h2>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on Kodak glossy paper</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Photo sets available: 8, 16, 32</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=passport"
-                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
               >
                 Upload Photos
               </Link>
@@ -161,19 +194,13 @@ export default function HomePage() {
               {/* Front Main Passport Portrait */}
               <div className="absolute w-18 h-24 bg-white p-1 border border-slate-200/90 rounded-sm shadow-md z-10 flex flex-col items-center">
                 <div className="w-full h-full bg-gradient-to-b from-[#e0f2fe] to-[#bae6fd] rounded-xs relative overflow-hidden flex flex-col items-center justify-end">
-                  {/* Portrait silhouette / hair & face */}
                   <svg className="w-14 h-20 text-slate-700" viewBox="0 0 60 70" fill="none">
-                    {/* Hair */}
                     <path d="M16 35 C 14 12, 46 12, 44 35 C 48 48, 52 65, 52 70 L 8 70 C 8 65, 12 48, 16 35 Z" fill="#1e293b" />
-                    {/* Face */}
                     <ellipse cx="30" cy="30" rx="10" ry="12" fill="#d97706" opacity="0.4" />
                     <ellipse cx="30" cy="30" rx="9" ry="11" fill="#fde68a" />
-                    {/* Smile */}
                     <path d="M26 34 Q 30 38 34 34" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" />
-                    {/* Eyes */}
                     <circle cx="26" cy="28" r="1.2" fill="#1e293b" />
                     <circle cx="34" cy="28" r="1.2" fill="#1e293b" />
-                    {/* Blue Shirt collar */}
                     <path d="M12 70 L 22 46 L 30 52 L 38 46 L 48 70 Z" fill="#2563eb" />
                     <path d="M26 48 L 30 54 L 34 48" stroke="#ffffff" strokeWidth="1.5" />
                   </svg>
@@ -185,26 +212,26 @@ export default function HomePage() {
           {/* CARD 3: Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
                 Photos
               </h2>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on Kodak glossy paper</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Cropping & Editing available</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=photos"
-                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
               >
                 Upload Photos
               </Link>
@@ -214,9 +241,8 @@ export default function HomePage() {
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex flex-col justify-between p-1 select-none pointer-events-none">
               {/* Top Horizontal Photo */}
               <div className="w-full h-11 rounded-md bg-[#38bdf8] border border-white shadow-xs overflow-hidden relative flex items-center justify-around px-1">
-                {/* Yellow Sunflowers */}
                 <div className="relative w-8 h-8 flex items-center justify-center">
-                  <div className="absolute w-7 h-7 rounded-full bg-yellow-400 animate-spin-slow" />
+                  <div className="absolute w-7 h-7 rounded-full bg-yellow-400" />
                   <div className="absolute w-3.5 h-3.5 rounded-full bg-[#78350f]" />
                 </div>
                 <div className="relative w-7 h-7 flex items-center justify-center">
@@ -238,7 +264,7 @@ export default function HomePage() {
                   <div className="flex-1 bg-[#38bdf8] rounded-xs flex items-center justify-center overflow-hidden">
                     <div className="relative w-5 h-5 flex items-center justify-center">
                       <div className="absolute w-4.5 h-4.5 rounded-full bg-yellow-400" />
-                      <div className="absolute w-2 h-2 rounded-full bg-[#78350f]" />
+                      <div className="absolute w-2.5 h-2.5 rounded-full bg-[#78350f]" />
                     </div>
                   </div>
                   <div className="h-1.5 bg-white" />
@@ -250,26 +276,26 @@ export default function HomePage() {
           {/* CARD 4: Aartis */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
                 Aartis
               </h2>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on laminated thick card</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Sacred hymns & daily prayer formats</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>High vibrancy devotional prints</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=aarti"
-                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
               >
                 Explore Aartis
               </Link>
@@ -278,16 +304,14 @@ export default function HomePage() {
             {/* Graphic: Ornate Devotional Aarti Frame */}
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
               <div className="w-24 h-26 bg-[#fffbeb] border-2 border-[#f59e0b] rounded-sm p-1 shadow-sm flex flex-col items-center justify-between relative overflow-hidden">
-                {/* Traditional Temple Arch */}
                 <div className="w-full h-4 bg-[#dc2626] rounded-b-xl flex items-center justify-center">
                   <div className="w-2 h-2 rounded-full bg-yellow-300" />
                 </div>
-                {/* Glowing Diya / Sacred Motif */}
                 <div className="relative my-auto flex flex-col items-center">
                   <div className="w-2 h-3 bg-gradient-to-t from-orange-500 to-yellow-300 rounded-full animate-pulse" />
                   <div className="w-6 h-2 bg-[#b45309] rounded-b-full border-t border-yellow-400" />
                 </div>
-                <div className="w-full text-center text-[7px] font-bold text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
+                <div className="w-full text-center text-[7px] font-black text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
                   श्री आरती
                 </div>
               </div>
@@ -296,7 +320,7 @@ export default function HomePage() {
 
         </div>
 
-        {/* Floating "View Cart" Pill (Exact match from screenshot) */}
+        {/* Floating "View Cart" Pill */}
         <div className="fixed bottom-4 inset-x-4 max-w-xs sm:max-w-sm mx-auto z-50">
           <Link
             href="/user/print"
@@ -317,8 +341,8 @@ export default function HomePage() {
 
             {/* Center: Title & Item Count */}
             <div className="flex-1 text-left px-3">
-              <span className="font-bold text-sm block leading-tight">View cart</span>
-              <span className="text-[11px] font-normal opacity-90 block leading-tight">
+              <span className="font-extrabold text-sm block leading-tight">View cart</span>
+              <span className="text-[11px] font-medium opacity-90 block leading-tight">
                 {cartCount} items
               </span>
             </div>

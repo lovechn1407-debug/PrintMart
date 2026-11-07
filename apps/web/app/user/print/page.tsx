@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Modal,
   ModalContent,
@@ -34,23 +35,19 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
+import {
+  PrintDraftItem,
+  UploadedDocumentRecord,
+  getStoredDrafts,
+  getDraftById,
+  saveOrUpdateDraft,
+  removeDraftById,
+  clearAllDrafts,
+} from "@/lib/draftStorage";
 
 // Types
 type ColorMode = "bw" | "color";
 type Orientation = "portrait" | "landscape";
-
-interface UploadedDocumentRecord {
-  fileId: string;
-  originalFilename: string;
-  fileSizeBytes: number;
-  mimeType: string;
-  pageCount: number;
-  isColorDocument: boolean;
-  telegramFileId: string;
-  telegramMessageId?: number;
-  previewUrl?: string;
-  blobUrl?: string;
-}
 
 interface PrintJobConfiguration {
   colorMode: ColorMode;
@@ -241,6 +238,12 @@ function RealDocumentViewer({
 
 function UserPrintContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const isNewUpload = searchParams.get("new") === "1" || searchParams.get("mode") === "new";
+  const requestedDraftId = searchParams.get("draftId");
+
+  // State: Active Draft ID tracking
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
 
   // State: Documents & Workflow Step
   const [documents, setDocuments] = useState<UploadedDocumentRecord[]>([]);
@@ -300,37 +303,52 @@ function UserPrintContent() {
   const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Restore draft from localStorage on client mount
+  // Restore draft or initialize clean upload based on URL query
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("printmart_draft");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed) {
-          if (Array.isArray(parsed.documents) && parsed.documents.length > 0) {
-            setDocuments(parsed.documents);
-            setStep("studio");
-          } else if (parsed.fileId || parsed.originalFilename) {
-            const singleDoc: UploadedDocumentRecord = {
-              fileId: parsed.fileId || "doc_preview",
-              originalFilename: parsed.originalFilename || parsed.filename || "Document.pdf",
-              fileSizeBytes: parsed.fileSizeBytes || 1024000,
-              mimeType: parsed.mimeType || "application/pdf",
-              pageCount: parsed.pageCount || 1,
-              isColorDocument: parsed.isColorDocument || false,
-              telegramFileId: parsed.telegramFileId || "tg_vault",
-              previewUrl: parsed.previewUrl,
-            };
-            setDocuments([singleDoc]);
-            setStep("studio");
-          }
-        }
-      }
-    } catch {}
-  }, []);
+    // Requirement 1: If user clicked "Upload Files" on homepage (isNewUpload),
+    // NEVER load draft files into print studio; show clean upload panel!
+    if (isNewUpload) {
+      setDocuments([]);
+      setStep("upload");
+      setActiveDraftId(null);
+      return;
+    }
 
-  // Save Draft to localStorage
-  const saveDraft = (docs: UploadedDocumentRecord[]) => {
+    // If a specific draft was chosen from the cart popup
+    if (requestedDraftId) {
+      const draft = getDraftById(requestedDraftId);
+      if (draft && draft.documents && draft.documents.length > 0) {
+        setDocuments(draft.documents);
+        setActiveDraftId(draft.id);
+        if (draft.config) {
+          setColorMode(draft.config.colorMode || "bw");
+          setOrientation(draft.config.orientation || "portrait");
+          setCopies(draft.config.copies || 1);
+          setPageRangeType(draft.config.pageRangeType || "all");
+          setCustomRange(draft.config.customRange || "");
+        }
+        setStep("studio");
+        return;
+      }
+    }
+
+    // Default: clean upload panel to preserve draft cart intact
+    setDocuments([]);
+    setStep("upload");
+    setActiveDraftId(null);
+  }, [isNewUpload, requestedDraftId]);
+
+  // Save Draft to multi-draft storage
+  const saveDraft = (
+    docs: UploadedDocumentRecord[],
+    overrideConfig?: {
+      colorMode?: ColorMode;
+      orientation?: Orientation;
+      copies?: number;
+      pageRangeType?: "all" | "custom";
+      customRange?: string;
+    }
+  ) => {
     try {
       if (docs.length > 0) {
         const totalPages = docs.reduce((acc, d) => acc + (d.pageCount || 1), 0);
@@ -338,23 +356,47 @@ function UserPrintContent() {
           docs.length === 1
             ? docs[0].originalFilename
             : `${docs[0].originalFilename} (+${docs.length - 1} more)`;
-        localStorage.setItem(
-          "printmart_draft",
-          JSON.stringify({
-            documents: docs,
-            fileId: docs[0].fileId,
-            originalFilename: title,
-            filename: title,
-            pageCount: totalPages,
-            previewUrl: docs[0].previewUrl,
-            timestamp: Date.now(),
-          })
-        );
-      } else {
-        localStorage.removeItem("printmart_draft");
+
+        const currentId =
+          activeDraftId ||
+          `draft_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        if (!activeDraftId) {
+          setActiveDraftId(currentId);
+        }
+
+        const draftItem: PrintDraftItem = {
+          id: currentId,
+          title,
+          documents: docs,
+          pageCount: totalPages,
+          previewUrl: docs[0].previewUrl,
+          mimeType: docs[0].mimeType,
+          createdAt: Date.now(),
+          config: {
+            colorMode: overrideConfig?.colorMode ?? colorMode,
+            orientation: overrideConfig?.orientation ?? orientation,
+            copies: overrideConfig?.copies ?? copies,
+            pageRangeType: overrideConfig?.pageRangeType ?? pageRangeType,
+            customRange: overrideConfig?.customRange ?? customRange,
+          },
+        };
+
+        saveOrUpdateDraft(draftItem);
+      } else if (activeDraftId) {
+        removeDraftById(activeDraftId);
+        setActiveDraftId(null);
       }
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to save draft:", e);
+    }
   };
+
+  // Sync draft options automatically when configurations change in studio
+  useEffect(() => {
+    if (documents.length > 0 && activeDraftId) {
+      saveDraft(documents);
+    }
+  }, [colorMode, orientation, copies, pageRangeType, customRange]);
 
   // Upload Multiple Files
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,6 +469,10 @@ function UserPrintContent() {
       const updated = prev.filter((_, idx) => idx !== indexToRemove);
       saveDraft(updated);
       if (updated.length === 0) {
+        if (activeDraftId) {
+          removeDraftById(activeDraftId);
+          setActiveDraftId(null);
+        }
         setStep("upload");
       }
       return updated;
@@ -440,8 +486,11 @@ function UserPrintContent() {
 
   // Clear all documents
   const handleClearAll = () => {
+    if (activeDraftId) {
+      removeDraftById(activeDraftId);
+      setActiveDraftId(null);
+    }
     setDocuments([]);
-    saveDraft([]);
     setStep("upload");
     setPreviewDocIndex(0);
     setPreviewPageIndex(1);
@@ -600,9 +649,10 @@ function UserPrintContent() {
       if (simData.success && simData.otp) {
         setGeneratedOtp(simData.otp);
         setIsOtpModalOpen(true);
-        try {
-          localStorage.removeItem("printmart_draft");
-        } catch {}
+        if (activeDraftId) {
+          removeDraftById(activeDraftId);
+          setActiveDraftId(null);
+        }
       }
     } catch (err: any) {
       console.error("Payment error:", err);

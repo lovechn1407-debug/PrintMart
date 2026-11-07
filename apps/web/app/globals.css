@@ -6,47 +6,131 @@
   color-scheme: light;
   --primary: var(--accent);
   --primary-foreground: var(--accent-foreground);
+  --radius: 0.5rem; /* Sleek, modern 8px radius instead of bulky bubbles */
 }
 
 body {
   min-height: 100vh;
-  background-color: var(--background);
+  background-color: #f8fafc; /* Crisp slate-50 background */
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  letter-spacing: -0.011em;
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HEROUI V3 RADIO CONTROLS: Guaranteed Crisp Circles
-   Overriding --radius and border to make all radio indicators 
-   100% round circles with clear borders across all viewports
+   CLEAN MODERN CORNER RADII (Refined 8px - 10px, no bulky bubbles)
+   ───────────────────────────────────────────────────────────── */
+.card,
+[data-slot="card"] {
+  border-radius: 0.625rem !important; /* 10px */
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+  background-color: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SEGMENTED CONTROLS (Zero "boxes in boxes", sleek Apple/Linear style)
+   ───────────────────────────────────────────────────────────── */
+.segmented-track {
+  display: flex;
+  background-color: #f1f5f9; /* slate-100 */
+  padding: 0.25rem;
+  border-radius: 0.5rem; /* 8px */
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.segmented-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  border-radius: 0.375rem; /* 6px */
+  color: #64748b; /* slate-500 */
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 140ms ease-out;
+  user-select: none;
+  text-align: center;
+}
+
+.segmented-btn:hover {
+  color: #0f172a;
+}
+
+.segmented-btn[data-active="true"] {
+  background-color: #ffffff;
+  color: #0f172a; /* slate-900 */
+  font-weight: 600;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+}
+
+.segmented-btn .subtext {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 400;
+  color: #94a3b8;
+  margin-top: 0.125rem;
+}
+
+.segmented-btn[data-active="true"] .subtext {
+  color: #0284c7; /* primary sky-600 */
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CLEAN SELECTION LIST ITEMS (Eliminates nested boxed borders)
+   ───────────────────────────────────────────────────────────── */
+.clean-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.5rem; /* 8px */
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.clean-select-item:hover {
+  background-color: #f8fafc;
+}
+
+.clean-select-item[data-selected="true"] {
+  background-color: #f0f9ff; /* sky-50 */
+  border-color: #bae6fd; /* sky-200 */
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HEROUI V3 RADIO CONTROLS: Crisp 18px Circles
    ───────────────────────────────────────────────────────────── */
 .radio__control,
 [data-slot="control"] {
-  width: 1.25rem !important; /* 20px */
-  height: 1.25rem !important;
+  width: 1.125rem !important; /* 18px */
+  height: 1.125rem !important;
   border-radius: 9999px !important;
-  border-width: 2px !important;
-  border-style: solid !important;
-  border-color: #94a3b8 !important; /* slate-400 crisp border */
+  border: 1.5px solid #cbd5e1 !important; /* slate-300 */
   background-color: #ffffff !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
-  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-  position: relative !important;
+  transition: all 120ms ease !important;
 }
 
 .radio__control:hover,
 [data-slot="control"]:hover {
-  border-color: var(--primary) !important;
+  border-color: #0284c7 !important;
 }
 
-/* Radio Indicator Dot */
 .radio__indicator,
 [data-slot="indicator"] {
   display: flex !important;
@@ -55,58 +139,29 @@ body {
   width: 100% !important;
   height: 100% !important;
   border-radius: 9999px !important;
-  position: absolute !important;
-  inset: 0 !important;
 }
 
 .radio__indicator:empty::before,
 [data-slot="indicator"]:empty::before {
   content: "" !important;
-  width: 0.5rem !important; /* 8px inner dot */
-  height: 0.5rem !important;
+  width: 0.4375rem !important; /* 7px */
+  height: 0.4375rem !important;
   border-radius: 9999px !important;
   background-color: transparent !important;
-  transition: all 150ms ease-out !important;
+  transition: all 120ms ease !important;
 }
 
-/* Checked state */
 .radio[data-selected="true"] .radio__control,
 .radio:has(input:checked) .radio__control,
-.radio[data-selected] .radio__control,
 [data-slot="radio"][data-selected="true"] [data-slot="control"],
 [data-slot="radio"]:has(input:checked) [data-slot="control"] {
-  border-color: #0284c7 !important; /* sky-600 */
+  border-color: #0284c7 !important;
   background-color: #ffffff !important;
 }
 
 .radio[data-selected="true"] .radio__indicator:empty::before,
 .radio:has(input:checked) .radio__indicator:empty::before,
-.radio[data-selected] .radio__indicator:empty::before,
 [data-slot="radio"][data-selected="true"] [data-slot="indicator"]:empty::before,
 [data-slot="radio"]:has(input:checked) [data-slot="indicator"]:empty::before {
   background-color: #0284c7 !important;
-}
-
-/* Custom selectable option card styling */
-.option-card-radio {
-  transition: all 150ms ease-in-out;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 0.875rem;
-  padding: 0.875rem 1rem;
-  background-color: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.option-card-radio:hover {
-  border-color: #93c5fd;
-  background-color: #f8fafc;
-}
-
-.option-card-radio.selected {
-  border-color: #0284c7;
-  background-color: #f0f9ff;
-  box-shadow: 0 0 0 1px #0284c7;
 }

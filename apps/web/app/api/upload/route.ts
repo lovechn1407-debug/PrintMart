@@ -81,20 +81,14 @@ export async function POST(req: NextRequest) {
     // Save to Firebase RTDB
     await adminDb.ref(`documents/${documentId}`).set(docMetadata);
 
-    // Save copy to local uploads cache for instant client previews across reloads
+    // Save copy to temporary cache for instant client previews across reloads
     try {
-      const candidateDirs = [
-        path.join(process.cwd(), ".uploads_cache"),
-        path.join(process.cwd(), "apps", "web", ".uploads_cache"),
-      ];
-      const safeFilename = path.basename(file.name || "document.pdf");
-      const ext = path.extname(safeFilename) || (file.type === "application/pdf" ? ".pdf" : ".jpg");
-      for (const cDir of candidateDirs) {
-        try {
-          if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
-          fs.writeFileSync(path.join(cDir, `${documentId}${ext}`), buffer);
-        } catch {}
+      const os = await import("os");
+      const tmpDir = path.join(os.tmpdir(), "printmart_cache");
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
       }
+      fs.writeFileSync(path.join(tmpDir, documentId), buffer);
     } catch (cacheErr) {
       console.warn("Could not cache file locally:", cacheErr);
     }

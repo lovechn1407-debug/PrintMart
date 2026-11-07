@@ -98,26 +98,13 @@ function RealDocumentViewer({
     ? `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`
     : "";
 
-  // Prioritize live in-memory blob URL for instant zero-latency preview when just uploaded in this session.
-  // When loaded from persistent drafts (where blobUrl is undefined), falls back to permanent server API preview.
-  const resolvedUrl =
-    doc?.blobUrl ||
-    permanentApiUrl ||
-    (doc?.previewUrl && !doc.previewUrl.startsWith("blob:") ? doc.previewUrl : "");
-
-  const [activeUrl, setActiveUrl] = useState<string>(resolvedUrl);
-
-  useEffect(() => {
-    setActiveUrl(resolvedUrl);
-  }, [resolvedUrl, doc?.blobUrl, doc?.fileId, (doc as any)?.documentId, doc?.originalFilename]);
-
-  const docUrl = activeUrl || resolvedUrl || permanentApiUrl;
   const isImage =
     doc?.mimeType?.startsWith("image/") ||
     (doc?.originalFilename && /\.(jpg|jpeg|png|webp|bmp|svg)$/i.test(doc.originalFilename));
 
   useEffect(() => {
-    if (!docUrl && !permanentApiUrl) {
+    // If no document URL is available at all
+    if (!doc?.blobUrl && !permanentApiUrl && !doc?.previewUrl) {
       setLoading(false);
       return;
     }
@@ -133,7 +120,14 @@ function RealDocumentViewer({
     let cancelled = false;
 
     const renderPdf = async () => {
-      let loadUrl = docUrl || permanentApiUrl;
+      // Prioritize local in-memory blobUrl (fastest, zero-latency)
+      // If blobUrl fails or does not exist (e.g. reload or across devices), fall back to permanent server preview API
+      let loadUrl = doc?.blobUrl || permanentApiUrl || doc?.previewUrl || "";
+      if (!loadUrl) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
       try {
         // Load PDF.js from CDN dynamically if not present
         if (!(window as any).pdfjsLib) {
@@ -173,23 +167,17 @@ function RealDocumentViewer({
           const loadingTask = pdfjsLib.getDocument(loadUrl);
           pdf = await loadingTask.promise;
         } catch (firstErr) {
-          // If initial URL failed, fallback to permanent server preview API or filename lookup
+          // If in-memory blob URL was revoked (after page reload), fall back to permanent server preview API without loop
           if (permanentApiUrl && loadUrl !== permanentApiUrl) {
-            console.warn("Initial PDF load failed, switching to permanent API preview:", permanentApiUrl);
+            console.warn("Initial PDF source unavailable, falling back to permanent server preview:", permanentApiUrl);
             loadUrl = permanentApiUrl;
-            setActiveUrl(permanentApiUrl);
             const retryTask = pdfjsLib.getDocument(permanentApiUrl);
-            pdf = await retryTask.promise;
-          } else if (doc?.originalFilename) {
-            const fnUrl = `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`;
-            loadUrl = fnUrl;
-            setActiveUrl(fnUrl);
-            const retryTask = pdfjsLib.getDocument(fnUrl);
             pdf = await retryTask.promise;
           } else {
             throw firstErr;
           }
         }
+
         if (cancelled) return;
 
         const safePageNum = Math.min(Math.max(1, pageIndex), pdf.numPages);
@@ -219,7 +207,7 @@ function RealDocumentViewer({
           setLoading(false);
         }
       } catch (err) {
-        console.warn("Canvas render failed, using fallback frame:", err);
+        console.warn("PDF render failed, falling back to frame:", err);
         if (!cancelled) {
           setRenderError(true);
           setLoading(false);
@@ -232,10 +220,10 @@ function RealDocumentViewer({
     return () => {
       cancelled = true;
     };
-  }, [docUrl, permanentApiUrl, pageIndex, orientation, isImage]);
+  }, [docId, doc?.blobUrl, permanentApiUrl, pageIndex, orientation, isImage]);
 
   if (isImage) {
-    const imgSrc = docUrl || permanentApiUrl;
+    const imgSrc = doc?.blobUrl || permanentApiUrl || doc?.previewUrl;
     return (
       <div className="w-full h-full flex items-center justify-center p-2 bg-white overflow-hidden">
         {imgSrc ? (
@@ -246,13 +234,6 @@ function RealDocumentViewer({
             onError={(e) => {
               if (permanentApiUrl && (e.target as HTMLImageElement).src !== permanentApiUrl) {
                 (e.target as HTMLImageElement).src = permanentApiUrl;
-              } else if (doc?.originalFilename) {
-                const fnUrl = `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`;
-                if ((e.target as HTMLImageElement).src !== fnUrl) {
-                  (e.target as HTMLImageElement).src = fnUrl;
-                } else {
-                  setRenderError(true);
-                }
               } else {
                 setRenderError(true);
               }
@@ -279,10 +260,10 @@ function RealDocumentViewer({
       )}
 
       {renderError ? (
-        (docUrl || permanentApiUrl) ? (
+        permanentApiUrl ? (
           <iframe
-            key={`${docUrl || permanentApiUrl}-${pageIndex}`}
-            src={`${docUrl || permanentApiUrl}#page=${pageIndex}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+            key={`${permanentApiUrl}-${pageIndex}`}
+            src={`${permanentApiUrl}#page=${pageIndex}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
             title={doc?.originalFilename || "PDF Preview"}
             className="w-full h-full border-none pointer-events-none"
           />

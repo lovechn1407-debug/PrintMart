@@ -5,32 +5,34 @@ import os from "os";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { getTelegramFileDownloadUrl } from "@/lib/telegram";
 
-function getCacheDirs(): string[] {
-  const dirs = [
-    path.join(process.cwd(), ".uploads_cache"),
-    path.join(process.cwd(), "apps", "web", ".uploads_cache"),
-    path.join(os.tmpdir(), "printmart_uploads_cache"),
-  ];
-  return dirs;
+// On Vercel / AWS Lambda, only /tmp is writable. NEVER write to process.cwd()!
+const TMP_CACHE_DIR = path.join(os.tmpdir(), "printmart_cache");
+
+function tryReadFromCache(filename: string): Buffer | null {
+  try {
+    const safeName = path.basename(filename);
+    const filePath = path.join(TMP_CACHE_DIR, safeName);
+    if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile() && stat.size > 0) {
+        return fs.readFileSync(filePath);
+      }
+    }
+  } catch {
+    // Disk cache is strictly optional; never throw
+  }
+  return null;
 }
 
-function ensurePrimaryCacheDir(): string {
-  const primary = path.join(process.cwd(), ".uploads_cache");
+function trySaveToCache(filename: string, buffer: Buffer): void {
   try {
-    if (!fs.existsSync(primary)) {
-      fs.mkdirSync(primary, { recursive: true });
+    const safeName = path.basename(filename);
+    if (!fs.existsSync(TMP_CACHE_DIR)) {
+      fs.mkdirSync(TMP_CACHE_DIR, { recursive: true });
     }
-    return primary;
+    fs.writeFileSync(path.join(TMP_CACHE_DIR, safeName), buffer);
   } catch {
-    const fallback = path.join(os.tmpdir(), "printmart_uploads_cache");
-    try {
-      if (!fs.existsSync(fallback)) {
-        fs.mkdirSync(fallback, { recursive: true });
-      }
-      return fallback;
-    } catch {
-      return primary;
-    }
+    // Disk cache is strictly optional; never throw
   }
 }
 
@@ -57,49 +59,19 @@ export async function GET(req: NextRequest) {
     const queryKey = (documentId || fileId || "").trim();
     const cleanFilename = filename ? path.basename(filename.trim()) : "";
 
-    const primaryCacheDir = ensurePrimaryCacheDir();
-    const allCacheDirs = getCacheDirs();
-
-    // 1. Check local server disk cache across all possible candidate directories
-    for (const cacheDir of allCacheDirs) {
-      try {
-        if (!fs.existsSync(cacheDir)) continue;
-
-        const localFiles = fs.readdirSync(cacheDir);
-
-        let matchingFile: string | undefined;
-        if (queryKey) {
-          matchingFile = localFiles.find((f) => f.startsWith(queryKey));
-        }
-        if (!matchingFile && cleanFilename) {
-          matchingFile = localFiles.find(
-            (f) =>
-              f.toLowerCase() === cleanFilename.toLowerCase() ||
-              f.toLowerCase().endsWith(cleanFilename.toLowerCase())
-          );
-        }
-
-        if (matchingFile) {
-          const filePath = path.join(cacheDir, matchingFile);
-          if (fs.existsSync(filePath)) {
-            const stat = fs.statSync(filePath);
-            if (stat.isFile() && stat.size > 0) {
-              const fileBuffer = fs.readFileSync(filePath);
-              const mime = getMimeType(matchingFile, fileBuffer);
-
-              return new NextResponse(fileBuffer, {
-                status: 200,
-                headers: {
-                  "Content-Type": mime,
-                  "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-                  "Content-Disposition": `inline; filename="${encodeURIComponent(matchingFile)}"`,
-                },
-              });
-            }
-          }
-        }
-      } catch (cacheErr) {
-        console.warn("Disk cache lookup warning (will continue to cloud vault):", cacheErr);
+    // 1. Try reading from temporary cache (optional, zero-latency)
+    if (queryKey) {
+      const cached = tryReadFromCache(queryKey);
+      if (cached) {
+        const mime = getMimeType(cleanFilename || queryKey, cached);
+        return new NextResponse(new Uint8Array(cached), {
+          status: 200,
+          headers: {
+            "Content-Type": mime,
+            "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+            "Content-Disposition": `inline; filename="${encodeURIComponent(cleanFilename || queryKey)}"`,
+          },
+        });
       }
     }
 
@@ -168,25 +140,16 @@ export async function GET(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const finalMime = resolvedMime || getMimeType(resolvedFilename, buffer);
 
-    // Save copy to local cache across candidate directories
-    try {
-      const ext = path.extname(resolvedFilename) || (finalMime.includes("pdf") ? ".pdf" : ".jpg");
-      const safeBase = queryKey ? `${queryKey}${ext}` : `${Date.now()}_${resolvedFilename}`;
-      for (const dir of allCacheDirs) {
-        try {
-          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(path.join(dir, safeBase), buffer);
-        } catch {}
-      }
-    } catch (writeErr) {
-      console.warn("Failed to write to uploads cache:", writeErr);
+    // Cache in /tmp for subsequent requests within the same lambda instance
+    if (queryKey) {
+      trySaveToCache(queryKey, buffer);
     }
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": finalMime,
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
         "Content-Disposition": `inline; filename="${encodeURIComponent(resolvedFilename)}"`,
       },
     });

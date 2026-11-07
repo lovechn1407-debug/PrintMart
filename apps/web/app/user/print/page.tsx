@@ -98,19 +98,20 @@ function RealDocumentViewer({
     ? `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`
     : "";
 
-  // Prioritize permanent API URL to prevent dead blob: URLs across reloads and devices
+  // Prioritize live in-memory blob URL for instant zero-latency preview when just uploaded in this session.
+  // When loaded from persistent drafts (where blobUrl is undefined), falls back to permanent server API preview.
   const resolvedUrl =
+    doc?.blobUrl ||
     permanentApiUrl ||
-    (doc?.previewUrl && !doc.previewUrl.startsWith("blob:") ? doc.previewUrl : "") ||
-    (doc?.blobUrl && !doc.blobUrl.startsWith("blob:") ? doc.blobUrl : "");
+    (doc?.previewUrl && !doc.previewUrl.startsWith("blob:") ? doc.previewUrl : "");
 
   const [activeUrl, setActiveUrl] = useState<string>(resolvedUrl);
 
   useEffect(() => {
     setActiveUrl(resolvedUrl);
-  }, [resolvedUrl, doc?.fileId, (doc as any)?.documentId, doc?.originalFilename]);
+  }, [resolvedUrl, doc?.blobUrl, doc?.fileId, (doc as any)?.documentId, doc?.originalFilename]);
 
-  const docUrl = activeUrl || resolvedUrl;
+  const docUrl = activeUrl || resolvedUrl || permanentApiUrl;
   const isImage =
     doc?.mimeType?.startsWith("image/") ||
     (doc?.originalFilename && /\.(jpg|jpeg|png|webp|bmp|svg)$/i.test(doc.originalFilename));

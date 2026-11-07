@@ -1,14 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { getTelegramFileDownloadUrl } from "@/lib/telegram";
 
-const CACHE_DIR = path.join(process.cwd(), ".uploads_cache");
+function getCacheDirs(): string[] {
+  const dirs = [
+    path.join(process.cwd(), ".uploads_cache"),
+    path.join(process.cwd(), "apps", "web", ".uploads_cache"),
+    path.join(os.tmpdir(), "printmart_uploads_cache"),
+  ];
+  return dirs;
+}
 
-function ensureCacheDir() {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
+function ensurePrimaryCacheDir(): string {
+  const primary = path.join(process.cwd(), ".uploads_cache");
+  try {
+    if (!fs.existsSync(primary)) {
+      fs.mkdirSync(primary, { recursive: true });
+    }
+    return primary;
+  } catch {
+    const fallback = path.join(os.tmpdir(), "printmart_uploads_cache");
+    try {
+      if (!fs.existsSync(fallback)) {
+        fs.mkdirSync(fallback, { recursive: true });
+      }
+      return fallback;
+    } catch {
+      return primary;
+    }
   }
 }
 
@@ -32,81 +54,105 @@ export async function GET(req: NextRequest) {
     const fileId = searchParams.get("fileId");
     const filename = searchParams.get("filename");
 
-    const queryKey = documentId || fileId;
+    const queryKey = (documentId || fileId || "").trim();
+    const cleanFilename = filename ? path.basename(filename.trim()) : "";
 
-    ensureCacheDir();
+    const primaryCacheDir = ensurePrimaryCacheDir();
+    const allCacheDirs = getCacheDirs();
 
-    // 1. Check local server disk cache first (fastest, zero-latency)
-    const localFiles = fs.readdirSync(CACHE_DIR);
+    // 1. Check local server disk cache across all possible candidate directories
+    for (const cacheDir of allCacheDirs) {
+      try {
+        if (!fs.existsSync(cacheDir)) continue;
 
-    // Exact or prefix match on cached files
-    let matchingFile: string | undefined;
-    if (queryKey) {
-      matchingFile = localFiles.find((f) => f.startsWith(queryKey));
-    }
-    if (!matchingFile && filename) {
-      matchingFile = localFiles.find((f) => f.toLowerCase() === filename.toLowerCase() || f.toLowerCase().endsWith(filename.toLowerCase()));
-    }
+        const localFiles = fs.readdirSync(cacheDir);
 
-    if (matchingFile) {
-      const filePath = path.join(CACHE_DIR, matchingFile);
-      const fileBuffer = fs.readFileSync(filePath);
-      const mime = getMimeType(matchingFile, fileBuffer);
+        let matchingFile: string | undefined;
+        if (queryKey) {
+          matchingFile = localFiles.find((f) => f.startsWith(queryKey));
+        }
+        if (!matchingFile && cleanFilename) {
+          matchingFile = localFiles.find(
+            (f) =>
+              f.toLowerCase() === cleanFilename.toLowerCase() ||
+              f.toLowerCase().endsWith(cleanFilename.toLowerCase())
+          );
+        }
 
-      return new NextResponse(fileBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": mime,
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-          "Content-Disposition": `inline; filename="${encodeURIComponent(matchingFile)}"`,
-        },
-      });
+        if (matchingFile) {
+          const filePath = path.join(cacheDir, matchingFile);
+          if (fs.existsSync(filePath)) {
+            const stat = fs.statSync(filePath);
+            if (stat.isFile() && stat.size > 0) {
+              const fileBuffer = fs.readFileSync(filePath);
+              const mime = getMimeType(matchingFile, fileBuffer);
+
+              return new NextResponse(fileBuffer, {
+                status: 200,
+                headers: {
+                  "Content-Type": mime,
+                  "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+                  "Content-Disposition": `inline; filename="${encodeURIComponent(matchingFile)}"`,
+                },
+              });
+            }
+          }
+        }
+      } catch (cacheErr) {
+        console.warn("Disk cache lookup warning (will continue to cloud vault):", cacheErr);
+      }
     }
 
     // 2. Query document metadata from Firebase Realtime Database
     let targetDoc: any = null;
 
     if (queryKey && !queryKey.startsWith("BQAC")) {
-      const docSnap = await adminDb.ref(`documents/${queryKey}`).get();
-      if (docSnap.exists()) {
-        targetDoc = docSnap.val();
+      try {
+        const docSnap = await adminDb.ref(`documents/${queryKey}`).get();
+        if (docSnap.exists()) {
+          targetDoc = docSnap.val();
+        }
+      } catch (dbErr) {
+        console.warn("RTDB direct lookup error:", dbErr);
       }
     }
 
     // If queryKey wasn't found directly, search RTDB documents by filename or telegramFileId
     if (!targetDoc) {
-      const allDocsSnap = await adminDb.ref("documents").get();
-      const allDocs = allDocsSnap.val() || {};
+      try {
+        const allDocsSnap = await adminDb.ref("documents").get();
+        const allDocs = allDocsSnap.val() || {};
 
-      for (const [key, d] of Object.entries(allDocs)) {
-        const item = d as any;
-        if (queryKey && (key === queryKey || item.documentId === queryKey || item.telegramFileId === queryKey)) {
-          targetDoc = item;
-          break;
+        for (const [key, d] of Object.entries(allDocs)) {
+          const item = d as any;
+          if (queryKey && (key === queryKey || item.documentId === queryKey || item.telegramFileId === queryKey)) {
+            targetDoc = item;
+            break;
+          }
+          if (cleanFilename && item.originalFilename && item.originalFilename.toLowerCase() === cleanFilename.toLowerCase()) {
+            targetDoc = item;
+          }
         }
-        if (filename && item.originalFilename && item.originalFilename.toLowerCase() === filename.toLowerCase()) {
-          targetDoc = item;
-          // Keep iterating to find the most recent matching document
-        }
+      } catch (dbErr) {
+        console.warn("RTDB collection scan warning:", dbErr);
       }
     }
 
     let resolvedTelegramFileId: string | null = null;
-    let resolvedFilename = filename || "document.pdf";
+    let resolvedFilename = cleanFilename || "document.pdf";
     let resolvedMime = "application/pdf";
 
     if (targetDoc) {
       resolvedTelegramFileId = targetDoc.telegramFileId;
-      resolvedFilename = targetDoc.originalFilename || resolvedFilename;
+      resolvedFilename = path.basename(targetDoc.originalFilename || resolvedFilename);
       resolvedMime = targetDoc.mimeType || getMimeType(resolvedFilename);
     } else if (queryKey && queryKey.startsWith("BQAC")) {
-      // Direct Telegram file ID
       resolvedTelegramFileId = queryKey;
     }
 
     if (!resolvedTelegramFileId) {
       return NextResponse.json(
-        { error: `Document not found for key: ${queryKey || filename}` },
+        { error: `Document not found for key: ${queryKey || cleanFilename}` },
         { status: 404 }
       );
     }
@@ -115,20 +161,25 @@ export async function GET(req: NextRequest) {
     const downloadUrl = await getTelegramFileDownloadUrl(resolvedTelegramFileId);
     const fileRes = await fetch(downloadUrl);
     if (!fileRes.ok) {
-      throw new Error(`Failed to fetch file from Telegram: ${fileRes.statusText}`);
+      throw new Error(`Failed to fetch file from Telegram storage: ${fileRes.statusText}`);
     }
 
     const arrayBuffer = await fileRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const finalMime = resolvedMime || getMimeType(resolvedFilename, buffer);
 
-    // Save to local cache for rapid subsequent requests
+    // Save copy to local cache across candidate directories
     try {
       const ext = path.extname(resolvedFilename) || (finalMime.includes("pdf") ? ".pdf" : ".jpg");
-      const cacheBaseName = queryKey ? `${queryKey}${ext}` : `${Date.now()}_${resolvedFilename}`;
-      fs.writeFileSync(path.join(CACHE_DIR, cacheBaseName), buffer);
+      const safeBase = queryKey ? `${queryKey}${ext}` : `${Date.now()}_${resolvedFilename}`;
+      for (const dir of allCacheDirs) {
+        try {
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, safeBase), buffer);
+        } catch {}
+      }
     } catch (writeErr) {
-      console.warn("Failed to write to local uploads cache:", writeErr);
+      console.warn("Failed to write to uploads cache:", writeErr);
     }
 
     return new NextResponse(buffer, {

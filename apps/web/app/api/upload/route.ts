@@ -83,12 +83,18 @@ export async function POST(req: NextRequest) {
 
     // Save copy to local uploads cache for instant client previews across reloads
     try {
-      const cacheDir = path.join(process.cwd(), ".uploads_cache");
-      if (!fs.existsSync(cacheDir)) {
-        fs.mkdirSync(cacheDir, { recursive: true });
+      const candidateDirs = [
+        path.join(process.cwd(), ".uploads_cache"),
+        path.join(process.cwd(), "apps", "web", ".uploads_cache"),
+      ];
+      const safeFilename = path.basename(file.name || "document.pdf");
+      const ext = path.extname(safeFilename) || (file.type === "application/pdf" ? ".pdf" : ".jpg");
+      for (const cDir of candidateDirs) {
+        try {
+          if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
+          fs.writeFileSync(path.join(cDir, `${documentId}${ext}`), buffer);
+        } catch {}
       }
-      const ext = path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : "");
-      fs.writeFileSync(path.join(cacheDir, `${documentId}${ext}`), buffer);
     } catch (cacheErr) {
       console.warn("Could not cache file locally:", cacheErr);
     }

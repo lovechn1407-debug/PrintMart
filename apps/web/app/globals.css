@@ -15,4 +15,98 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HEROUI V3 RADIO CONTROLS: Guaranteed Crisp Circles
+   Overriding --radius and border to make all radio indicators 
+   100% round circles with clear borders across all viewports
+   ───────────────────────────────────────────────────────────── */
+.radio__control,
+[data-slot="control"] {
+  width: 1.25rem !important; /* 20px */
+  height: 1.25rem !important;
+  border-radius: 9999px !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: #94a3b8 !important; /* slate-400 crisp border */
+  background-color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  position: relative !important;
+}
+
+.radio__control:hover,
+[data-slot="control"]:hover {
+  border-color: var(--primary) !important;
+}
+
+/* Radio Indicator Dot */
+.radio__indicator,
+[data-slot="indicator"] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 9999px !important;
+  position: absolute !important;
+  inset: 0 !important;
+}
+
+.radio__indicator:empty::before,
+[data-slot="indicator"]:empty::before {
+  content: "" !important;
+  width: 0.5rem !important; /* 8px inner dot */
+  height: 0.5rem !important;
+  border-radius: 9999px !important;
+  background-color: transparent !important;
+  transition: all 150ms ease-out !important;
+}
+
+/* Checked state */
+.radio[data-selected="true"] .radio__control,
+.radio:has(input:checked) .radio__control,
+.radio[data-selected] .radio__control,
+[data-slot="radio"][data-selected="true"] [data-slot="control"],
+[data-slot="radio"]:has(input:checked) [data-slot="control"] {
+  border-color: #0284c7 !important; /* sky-600 */
+  background-color: #ffffff !important;
+}
+
+.radio[data-selected="true"] .radio__indicator:empty::before,
+.radio:has(input:checked) .radio__indicator:empty::before,
+.radio[data-selected] .radio__indicator:empty::before,
+[data-slot="radio"][data-selected="true"] [data-slot="indicator"]:empty::before,
+[data-slot="radio"]:has(input:checked) [data-slot="indicator"]:empty::before {
+  background-color: #0284c7 !important;
+}
+
+/* Custom selectable option card styling */
+.option-card-radio {
+  transition: all 150ms ease-in-out;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 0.875rem;
+  padding: 0.875rem 1rem;
+  background-color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.option-card-radio:hover {
+  border-color: #93c5fd;
+  background-color: #f8fafc;
+}
+
+.option-card-radio.selected {
+  border-color: #0284c7;
+  background-color: #f0f9ff;
+  box-shadow: 0 0 0 1px #0284c7;
 }

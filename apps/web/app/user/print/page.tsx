@@ -4,118 +4,135 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Button,
   Card,
   CardHeader,
   CardBody,
   CardFooter,
-  Input,
+  Button,
   RadioGroup,
   Radio,
+  Input,
   Chip,
   Divider,
-  Progress,
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
+  ModalFooter,
   Alert,
+  Progress,
 } from "@heroui/react";
 import {
-  UploadCloud,
   FileText,
   Printer,
-  CheckCircle2,
   Sparkles,
   CreditCard,
-  Lock,
+  CheckCircle2,
   Copy,
   Check,
   RotateCw,
-  ArrowLeft,
   Minus,
   Plus,
-  ShieldCheck,
-  Clock,
-  Layers,
+  UploadCloud,
+  Lock,
 } from "lucide-react";
-import { AppNavbar } from "@/components/AppNavbar";
+import { database, ref, onValue } from "@/lib/firebase";
 import { useAuth } from "@/lib/authContext";
-import { ref, onValue, database } from "@/lib/firebase";
-import {
-  ColorMode,
-  DocumentMetadata,
-  formatRupees,
-  MachineRecord,
-  PricingBreakdown,
-  PrintJobConfiguration,
-  SimplexDuplex,
-} from "@printmart/shared";
+import { AppNavbar } from "@/components/AppNavbar";
+
+// Types
+type ColorMode = "bw" | "color";
+type SimplexDuplex = "simplex" | "duplex";
+
+interface UploadedDocumentRecord {
+  fileId: string;
+  originalFilename: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  pageCount: number;
+  isColorDocument: boolean;
+  telegramFileId: string;
+  telegramMessageId?: number;
+}
+
+interface MachineRecord {
+  machineId: string;
+  name: string;
+  location: string;
+  status: "ONLINE" | "BUSY" | "OFFLINE";
+  pricingPerBwPagePaise?: number;
+  pricingPerColorPagePaise?: number;
+}
+
+interface PrintJobConfiguration {
+  colorMode: ColorMode;
+  simplexDuplex: SimplexDuplex;
+  paperSize: string;
+  copies: number;
+  pageRange: string;
+  selectedPages: number[];
+  totalPagesToPrint: number;
+}
+
+interface PricingBreakdown {
+  baseRatePaise: number;
+  subtotalPaise: number;
+  discountPaise: number;
+  taxPaise: number;
+  finalPayablePaise: number;
+  offerCode?: string | null;
+}
 
 const DEFAULT_MACHINES: MachineRecord[] = [
   {
-    machineId: "MCH-CAMPUS-01",
+    machineId: "kiosk_lib_01",
     name: "Central Library Kiosk A",
     location: "Academic Block - Floor 1",
     status: "ONLINE",
-    pairedAt: Date.now(),
-    pairingStatus: "paired",
-    lastHeartbeat: Date.now(),
-    agentVersion: "1.0.0",
   },
   {
-    machineId: "MCH-CAMPUS-02",
+    machineId: "kiosk_sc_02",
     name: "Student Center Kiosk B",
     location: "Student Union Hall - Ground Floor",
     status: "ONLINE",
-    pairedAt: Date.now(),
-    pairingStatus: "paired",
-    lastHeartbeat: Date.now(),
-    agentVersion: "1.0.0",
   },
   {
-    machineId: "MCH-CAMPUS-03",
+    machineId: "kiosk_eng_03",
     name: "Engineering Block Kiosk C",
     location: "Tech Annex - Room 104",
     status: "ONLINE",
-    pairedAt: Date.now(),
-    pairingStatus: "paired",
-    lastHeartbeat: Date.now(),
-    agentVersion: "1.0.0",
   },
 ];
 
-const SAMPLE_DOC: DocumentMetadata = {
-  documentId: "DOC_SAMPLE_001",
-  ownerUid: "demo_user",
+const SAMPLE_DOC: UploadedDocumentRecord = {
+  fileId: "doc_demo_preview",
   originalFilename: "PrintMart_Project_Documentation.pdf",
-  telegramFileId: "TELEGRAM_MOCK_FILE_ID",
-  telegramMessageId: 101,
-  fileSizeBytes: 2450000,
-  sha256: "MOCK_SHA256_HASH",
+  fileSizeBytes: 2451000,
   mimeType: "application/pdf",
   pageCount: 5,
-  retentionExpiresAt: Date.now() + 86400000,
-  createdAt: Date.now(),
+  isColorDocument: false,
+  telegramFileId: "tg_mock_vault_file",
 };
 
 function UserPrintContent() {
-  const { user, signInWithGoogle } = useAuth();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
-  const machineParam = searchParams.get("machineId") || "";
+  const machineParam = searchParams.get("machine");
 
-  // Document State - Starts null so user is prompted to upload or test
-  const [activeDoc, setActiveDoc] = useState<DocumentMetadata | null>(null);
+  // State: Document & Upload
+  const [activeDoc, setActiveDoc] = useState<UploadedDocumentRecord | null>(SAMPLE_DOC);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadStatusText, setUploadStatusText] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Machine Selection
+  // State: Kiosks
   const [machines, setMachines] = useState<MachineRecord[]>(DEFAULT_MACHINES);
-  const [selectedMachineId, setSelectedMachineId] = useState<string>(machineParam || "MCH-CAMPUS-01");
+  const [selectedMachineId, setSelectedMachineId] = useState<string>(
+    machineParam || DEFAULT_MACHINES[0].machineId
+  );
 
-  // Print Configuration State
+  // State: Settings
   const [colorMode, setColorMode] = useState<ColorMode>("bw");
   const [simplexDuplex, setSimplexDuplex] = useState<SimplexDuplex>("simplex");
   const [paperSize, setPaperSize] = useState<string>("A4");
@@ -252,67 +269,74 @@ function UserPrintContent() {
 
       const formData = new FormData();
       formData.append("file", selected);
-      formData.append("ownerUid", user?.uid || "guest");
 
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/upload");
+      xhr.open("POST", "/api/upload", true);
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 75);
-          setUploadProgress(Math.max(15, percentComplete));
-          setUploadStatusText(`Uploading to vault (${Math.max(15, percentComplete)}%)...`);
+          const percent = Math.round((event.loaded / event.total) * 75);
+          setUploadProgress(Math.max(15, percent));
+          setUploadStatusText(`Uploading ${percent}%...`);
         }
       };
 
       xhr.onload = () => {
-        setUploadProgress(95);
-        setUploadStatusText("Finalizing document encryption & pages...");
+        setUploadProgress(90);
+        setUploadStatusText("Analyzing document specs & pages...");
+
         try {
-          const data = JSON.parse(xhr.responseText);
-          if (xhr.status >= 200 && xhr.status < 300 && data.success) {
-            setUploadProgress(100);
-            setUploadStatusText("Done!");
-            setTimeout(() => {
-              setActiveDoc(data.document);
-              setUploading(false);
-            }, 300);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success && data.document) {
+              setUploadProgress(100);
+              setUploadStatusText("Upload complete!");
+              setTimeout(() => {
+                setActiveDoc(data.document);
+                setUploading(false);
+                setUploadProgress(0);
+                setUploadStatusText("");
+              }, 400);
+              return;
+            } else {
+              throw new Error(data.error || "Upload failed");
+            }
           } else {
-            throw new Error(data.error || `Upload failed with status ${xhr.status}`);
+            throw new Error(`Upload server responded with status ${xhr.status}`);
           }
-        } catch (parseErr: any) {
-          setErrorMessage(parseErr.message || "Failed to process upload response");
+        } catch (err: any) {
+          console.error("Upload error:", err);
+          setErrorMessage(err.message || "Failed to process document");
           setUploading(false);
+          setUploadProgress(0);
+          setUploadStatusText("");
         }
       };
 
       xhr.onerror = () => {
-        setErrorMessage("Network error during document upload");
+        setErrorMessage("Network error during file upload");
         setUploading(false);
+        setUploadProgress(0);
+        setUploadStatusText("");
       };
 
       xhr.send(formData);
     } catch (err: any) {
-      console.error("Upload error:", err);
-      setErrorMessage(err.message || "Failed to upload file");
+      console.error("Upload preparation error:", err);
+      setErrorMessage(err.message || "Failed to process document");
       setUploading(false);
-    } finally {
-      // Clear file input so selecting the same file again triggers onChange
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setUploadProgress(0);
+      setUploadStatusText("");
     }
   };
 
-  // Payment Checkout
+  const formatRupees = (paise: number) => {
+    return `₹${(paise / 100).toFixed(2)}`;
+  };
+
   const handleProceedToPayment = async () => {
     if (!activeDoc) {
-      setErrorMessage("Please upload or select a document first");
-      return;
-    }
-
-    if (!user) {
-      await signInWithGoogle();
+      setErrorMessage("Please upload a document before proceeding.");
       return;
     }
 
@@ -328,7 +352,7 @@ function UserPrintContent() {
         selectedPages = [1];
       }
 
-      const configuration: PrintJobConfiguration = {
+      const config: PrintJobConfiguration = {
         colorMode,
         simplexDuplex,
         paperSize,
@@ -342,13 +366,15 @@ function UserPrintContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.uid,
-          documentId: activeDoc.documentId,
+          userId: user?.uid || "guest_user",
           machineId: selectedMachineId,
-          configuration,
+          documentId: activeDoc.fileId,
+          documentTitle: activeDoc.originalFilename,
+          config,
           offerCode: appliedOffer || undefined,
-          customerName: user.displayName || "Customer",
-          customerEmail: user.email || "user@printmart.com",
+          customerPhone: "9999999999",
+          customerName: user?.displayName || "Customer",
+          customerEmail: user?.email || "user@printmart.com",
         }),
       });
 
@@ -386,36 +412,13 @@ function UserPrintContent() {
   const selectedMachine = machines.find((m) => m.machineId === selectedMachineId);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background pb-28 lg:pb-12">
+    <div className="min-h-screen flex flex-col bg-slate-50/60 pb-32 lg:pb-12">
       <AppNavbar />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        {/* Navigation Breadcrumb / Back Link */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <Button
-            as={Link}
-            href="/"
-            variant="light"
-            size="sm"
-            startContent={<ArrowLeft className="w-4 h-4" />}
-            className="text-neutral-600 hover:text-neutral-900 font-medium"
-          >
-            Back to Home
-          </Button>
-
-          <div className="flex items-center gap-2">
-            <Chip size="sm" color="primary" variant="flat">
-              Paise-Precision
-            </Chip>
-            <Chip size="sm" color="success" variant="flat">
-              Preload Engine
-            </Chip>
-          </div>
-        </div>
-
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Global Error Alert */}
         {errorMessage && (
-          <Alert color="danger" className="mb-6">
+          <Alert color="danger" className="mb-4">
             {errorMessage}
           </Alert>
         )}
@@ -429,34 +432,34 @@ function UserPrintContent() {
           onChange={handleFileSelect}
         />
 
-        {/* STEP 1: If No Document Uploaded Yet -> Show Upload Screen */}
+        {/* STEP 1: Upload Screen */}
         {!activeDoc ? (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <div className="text-center space-y-2 mb-8">
+          <div className="max-w-2xl mx-auto space-y-6 pt-2 sm:pt-4">
+            <div className="text-center space-y-1.5 mb-6">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight">
                 Upload Your Document
               </h1>
-              <p className="text-sm text-neutral-500 max-w-md mx-auto">
-                Select your document to configure print preferences, view live pricing, and print instantly at any campus kiosk.
+              <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto">
+                Select your document to configure print preferences and release your prints instantly at any campus kiosk.
               </p>
             </div>
 
             <Card>
-              <CardBody className="py-10 px-6 sm:px-10 text-center">
+              <CardBody className="py-8 px-5 sm:px-10 text-center">
                 {uploading ? (
-                  <div className="border-2 border-dashed border-primary/40 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center bg-primary/5 space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
-                      <UploadCloud className="w-8 h-8 animate-bounce" />
+                  <div className="border-2 border-dashed border-primary/40 rounded-2xl p-8 flex flex-col items-center justify-center bg-primary/5 space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+                      <UploadCloud className="w-7 h-7 animate-bounce" />
                     </div>
                     <div className="space-y-1 w-full max-w-md">
-                      <h3 className="font-bold text-base sm:text-lg text-neutral-900">
+                      <h3 className="font-bold text-sm sm:text-base text-neutral-900">
                         {uploadStatusText || "Uploading document..."}
                       </h3>
                       <p className="text-xs text-neutral-500">
                         Transferring to private cloud vault & analyzing print specifications
                       </p>
                     </div>
-                    <div className="w-full max-w-md pt-2 space-y-2">
+                    <div className="w-full max-w-md pt-2 space-y-1.5">
                       <Progress
                         value={uploadProgress}
                         color="primary"
@@ -470,99 +473,74 @@ function UserPrintContent() {
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-neutral-300 hover:border-primary rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-primary/5"
+                    className="border-2 border-dashed border-neutral-300 hover:border-primary rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-colors bg-white hover:bg-primary/5"
                   >
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                      <UploadCloud className="w-8 h-8" />
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+                      <UploadCloud className="w-7 h-7" />
                     </div>
                     <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1">
                       Tap to upload or drag & drop
                     </h3>
-                    <p className="text-xs sm:text-sm text-neutral-500 max-w-xs sm:max-w-sm mb-6">
+                    <p className="text-xs sm:text-sm text-neutral-500 max-w-xs sm:max-w-sm mb-5">
                       Supports PDF, Word (.docx), PowerPoint (.pptx), and Images up to 25 MB
                     </p>
                     <Button
                       color="primary"
                       size="md"
                       startContent={<UploadCloud className="w-4 h-4" />}
-                      className="font-semibold shadow-md pointer-events-none"
+                      className="font-semibold shadow-sm pointer-events-none"
                     >
                       Select File from Device
                     </Button>
                   </div>
                 )}
 
-                <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-neutral-100/70 border border-neutral-200/60">
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-100/70 border border-neutral-200/60">
                   <div className="flex items-center gap-3 text-left">
-                    <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shadow-xs text-primary shrink-0">
-                      <FileText className="w-5 h-5" />
+                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-xs text-primary shrink-0">
+                      <FileText className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-neutral-900">Want to test without a file?</p>
-                      <p className="text-xs text-neutral-500">Quickly load our 5-page sample project documentation</p>
+                      <p className="text-[11px] text-neutral-500">Quickly load our 5-page sample document</p>
                     </div>
                   </div>
                   <Button
                     size="sm"
                     variant="flat"
-                    color="secondary"
-                    className="font-medium shrink-0 w-full sm:w-auto"
+                    color="primary"
+                    className="font-medium shrink-0 w-full sm:w-auto text-xs"
                     onPress={() => setActiveDoc(SAMPLE_DOC)}
                   >
-                    Use Sample Document
+                    Use Sample Doc
                   </Button>
                 </div>
               </CardBody>
             </Card>
-
-            {/* Quick Feature Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-neutral-100 shadow-xs">
-                <Lock className="w-5 h-5 text-primary shrink-0" />
-                <div className="text-left">
-                  <span className="text-xs font-bold block text-neutral-900">Encrypted Cloud Vault</span>
-                  <span className="text-[11px] text-neutral-500">Stored privately in Telegram</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-neutral-100 shadow-xs">
-                <Sparkles className="w-5 h-5 text-primary shrink-0" />
-                <div className="text-left">
-                  <span className="text-xs font-bold block text-neutral-900">Preload Engine</span>
-                  <span className="text-[11px] text-neutral-500">Ready before you reach kiosk</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-neutral-100 shadow-xs">
-                <CreditCard className="w-5 h-5 text-primary shrink-0" />
-                <div className="text-left">
-                  <span className="text-xs font-bold block text-neutral-900">Paise Precision</span>
-                  <span className="text-[11px] text-neutral-500">From ₹1.50 per page</span>
-                </div>
-              </div>
-            </div>
           </div>
         ) : (
-          /* STEP 2: Document Config & Checkout Screen */
+          /* STEP 2: Modern Print Studio */
           <div>
-            {/* Title & Document Status Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Print Studio</h1>
-                <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-                  Configure print settings, pick your kiosk, and release your document instantly.
-                </p>
-              </div>
+            <div className="mb-5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
+                Print Studio
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+                Configure print settings, pick your kiosk, and release your document instantly.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
               {/* Left 2 Columns: Settings & Fleet */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-2 space-y-5">
+                
                 {/* 1. Document to Print */}
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="pb-3 border-b border-neutral-100">
                     <div className="flex flex-row items-center justify-between w-full">
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="w-5 h-5 text-primary" />
-                        <span className="font-semibold text-base text-neutral-900">Document to Print</span>
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <span className="font-bold text-sm text-neutral-900">Document to Print</span>
                       </div>
                       <Button
                         size="sm"
@@ -570,13 +548,14 @@ function UserPrintContent() {
                         color="primary"
                         startContent={<RotateCw className="w-3.5 h-3.5" />}
                         onPress={() => setActiveDoc(null)}
+                        className="text-xs font-semibold h-8"
                       >
                         Change File
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardBody>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <CardBody className="py-3.5">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                           <FileText className="w-5 h-5" />
@@ -585,138 +564,189 @@ function UserPrintContent() {
                           <h3 className="font-bold text-sm text-neutral-900 truncate">
                             {activeDoc.originalFilename}
                           </h3>
-                          <p className="text-xs text-neutral-500 mt-0.5">
+                          <p className="text-[11px] text-neutral-500 mt-0.5">
                             {activeDoc.pageCount} Pages • {(activeDoc.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB • Cloud Vault
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Chip color="primary" variant="flat" size="sm">
-                          {activeDoc.pageCount} {activeDoc.pageCount === 1 ? "Page" : "Pages"}
-                        </Chip>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="primary"
-                          isLoading={uploading}
-                          startContent={<UploadCloud className="w-3.5 h-3.5" />}
-                          onPress={() => fileInputRef.current?.click()}
-                        >
-                          Replace
-                        </Button>
-                      </div>
+                      <Chip color="primary" variant="flat" size="sm" className="font-semibold shrink-0">
+                        {activeDoc.pageCount} {activeDoc.pageCount === 1 ? "Page" : "Pages"}
+                      </Chip>
                     </div>
                   </CardBody>
                 </Card>
 
                 {/* 2. Select Vending Machine */}
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="pb-3 border-b border-neutral-100">
                     <div className="flex flex-row items-center justify-between w-full">
-                      <div className="flex items-center gap-2.5">
-                        <Printer className="w-5 h-5 text-primary" />
-                        <span className="font-semibold text-base text-neutral-900">Select Vending Machine</span>
+                      <div className="flex items-center gap-2">
+                        <Printer className="w-4 h-4 text-primary" />
+                        <span className="font-bold text-sm text-neutral-900">Select Vending Machine</span>
                       </div>
-                      <Chip size="sm" variant="flat" color="success">
+                      <Chip size="sm" variant="flat" color="success" className="text-xs">
                         {machines.filter((m) => m.status === "ONLINE").length} Online
                       </Chip>
                     </div>
                   </CardHeader>
-                  <CardBody>
+                  <CardBody className="py-3.5 space-y-2.5">
                     <RadioGroup
                       value={selectedMachineId}
                       onValueChange={setSelectedMachineId}
-                      className="space-y-2"
+                      className="space-y-2.5"
                     >
-                      {machines.map((m) => (
-                        <Radio key={m.machineId} value={m.machineId} className="w-full">
-                          <div className="flex items-center justify-between gap-4 w-full py-1">
-                            <div>
-                              <span className="font-semibold text-sm text-neutral-900">{m.name}</span>
-                              <span className="block text-xs text-neutral-500 mt-0.5">{m.location}</span>
+                      {machines.map((m) => {
+                        const isSelected = selectedMachineId === m.machineId;
+                        return (
+                          <div
+                            key={m.machineId}
+                            onClick={() => setSelectedMachineId(m.machineId)}
+                            className={`option-card-radio ${isSelected ? "selected" : ""}`}
+                          >
+                            <Radio value={m.machineId} />
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-sm text-neutral-900 block leading-tight">
+                                {m.name}
+                              </span>
+                              <span className="text-xs text-neutral-500 block mt-0.5">
+                                {m.location}
+                              </span>
                             </div>
                             <Chip
                               size="sm"
                               color={m.status === "ONLINE" ? "success" : "danger"}
                               variant="flat"
+                              className="text-[11px] font-semibold shrink-0"
                             >
                               {m.status}
                             </Chip>
                           </div>
-                        </Radio>
-                      ))}
+                        );
+                      })}
                     </RadioGroup>
                   </CardBody>
                 </Card>
 
                 {/* 3. Print Settings */}
                 <Card>
-                  <CardHeader>
-                    <div className="flex flex-row items-center justify-between w-full">
-                      <div className="flex items-center gap-2.5">
-                        <Sparkles className="w-5 h-5 text-primary" />
-                        <span className="font-semibold text-base text-neutral-900">Print Settings</span>
-                      </div>
+                  <CardHeader className="pb-3 border-b border-neutral-100">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <span className="font-bold text-sm text-neutral-900">Print Settings</span>
                     </div>
                   </CardHeader>
-                  <CardBody className="space-y-6">
+                  <CardBody className="py-4 space-y-5">
+                    
                     {/* Color Mode */}
                     <div>
+                      <span className="text-xs font-bold text-neutral-700 block mb-2 uppercase tracking-wide">
+                        Color Mode
+                      </span>
                       <RadioGroup
-                        label="Color Mode"
                         orientation="horizontal"
                         value={colorMode}
                         onValueChange={(val) => setColorMode(val as ColorMode)}
+                        className="grid grid-cols-1 sm:grid-cols-2 gap-2"
                       >
-                        <Radio value="bw">Black & White (₹1.50/page)</Radio>
-                        <Radio value="color">Full Color (₹5.00/page)</Radio>
+                        <div
+                          onClick={() => setColorMode("bw")}
+                          className={`option-card-radio ${colorMode === "bw" ? "selected" : ""}`}
+                        >
+                          <Radio value="bw" />
+                          <div className="flex-1">
+                            <span className="font-semibold text-sm text-neutral-900 block">Black & White</span>
+                            <span className="text-xs text-neutral-500 block">₹1.50 per page</span>
+                          </div>
+                        </div>
+
+                        <div
+                          onClick={() => setColorMode("color")}
+                          className={`option-card-radio ${colorMode === "color" ? "selected" : ""}`}
+                        >
+                          <Radio value="color" />
+                          <div className="flex-1">
+                            <span className="font-semibold text-sm text-neutral-900 block">Full Color</span>
+                            <span className="text-xs text-neutral-500 block">₹5.00 per page</span>
+                          </div>
+                        </div>
                       </RadioGroup>
                     </div>
 
                     <Divider />
 
-                    {/* Sides */}
-                    <div>
-                      <RadioGroup
-                        label="Print Sides"
-                        orientation="horizontal"
-                        value={simplexDuplex}
-                        onValueChange={(val) => setSimplexDuplex(val as SimplexDuplex)}
-                      >
-                        <Radio value="simplex">Single-Sided</Radio>
-                        <Radio value="duplex">Double-Sided (Duplex)</Radio>
-                      </RadioGroup>
-                    </div>
+                    {/* Sides & Paper Size */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Sides */}
+                      <div>
+                        <span className="text-xs font-bold text-neutral-700 block mb-2 uppercase tracking-wide">
+                          Print Sides
+                        </span>
+                        <RadioGroup
+                          value={simplexDuplex}
+                          onValueChange={(val) => setSimplexDuplex(val as SimplexDuplex)}
+                          className="space-y-2"
+                        >
+                          <div
+                            onClick={() => setSimplexDuplex("simplex")}
+                            className={`option-card-radio ${simplexDuplex === "simplex" ? "selected" : ""}`}
+                          >
+                            <Radio value="simplex" />
+                            <span className="font-semibold text-sm text-neutral-900">Single-Sided</span>
+                          </div>
+                          <div
+                            onClick={() => setSimplexDuplex("duplex")}
+                            className={`option-card-radio ${simplexDuplex === "duplex" ? "selected" : ""}`}
+                          >
+                            <Radio value="duplex" />
+                            <span className="font-semibold text-sm text-neutral-900">Double-Sided (Duplex)</span>
+                          </div>
+                        </RadioGroup>
+                      </div>
 
-                    <Divider />
-
-                    {/* Paper Size */}
-                    <div>
-                      <RadioGroup
-                        label="Paper Size"
-                        orientation="horizontal"
-                        value={paperSize}
-                        onValueChange={setPaperSize}
-                      >
-                        <Radio value="A4">Standard A4 Sheet</Radio>
-                        <Radio value="A3">A3 Sheet</Radio>
-                      </RadioGroup>
+                      {/* Paper Size */}
+                      <div>
+                        <span className="text-xs font-bold text-neutral-700 block mb-2 uppercase tracking-wide">
+                          Paper Size
+                        </span>
+                        <RadioGroup
+                          value={paperSize}
+                          onValueChange={setPaperSize}
+                          className="space-y-2"
+                        >
+                          <div
+                            onClick={() => setPaperSize("A4")}
+                            className={`option-card-radio ${paperSize === "A4" ? "selected" : ""}`}
+                          >
+                            <Radio value="A4" />
+                            <span className="font-semibold text-sm text-neutral-900">Standard A4 Sheet</span>
+                          </div>
+                          <div
+                            onClick={() => setPaperSize("A3")}
+                            className={`option-card-radio ${paperSize === "A3" ? "selected" : ""}`}
+                          >
+                            <Radio value="A3" />
+                            <span className="font-semibold text-sm text-neutral-900">A3 Sheet</span>
+                          </div>
+                        </RadioGroup>
+                      </div>
                     </div>
 
                     <Divider />
 
                     {/* Copies & Pages */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-1">
-                      {/* Copies with tap buttons for mobile */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Copies with tap buttons */}
                       <div>
-                        <label className="text-sm font-medium text-foreground block mb-2">Number of Copies</label>
+                        <span className="text-xs font-bold text-neutral-700 block mb-2 uppercase tracking-wide">
+                          Number of Copies
+                        </span>
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="flat"
                             isIconOnly
                             onPress={() => setCopies((c) => Math.max(1, c - 1))}
-                            className="h-10 w-10 shrink-0"
+                            className="h-10 w-10 shrink-0 font-bold"
                           >
                             <Minus className="w-4 h-4" />
                           </Button>
@@ -733,7 +763,7 @@ function UserPrintContent() {
                             variant="flat"
                             isIconOnly
                             onPress={() => setCopies((c) => Math.min(50, c + 1))}
-                            className="h-10 w-10 shrink-0"
+                            className="h-10 w-10 shrink-0 font-bold"
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
@@ -742,19 +772,34 @@ function UserPrintContent() {
 
                       {/* Pages to Print */}
                       <div>
+                        <span className="text-xs font-bold text-neutral-700 block mb-2 uppercase tracking-wide">
+                          Pages to Print
+                        </span>
                         <RadioGroup
-                          label="Pages to Print"
                           orientation="horizontal"
                           value={pageRangeType}
                           onValueChange={(val) => setPageRangeType(val as "all" | "custom")}
+                          className="flex gap-2"
                         >
-                          <Radio value="all">All ({activeDoc.pageCount || 1})</Radio>
-                          <Radio value="custom">Custom Range</Radio>
+                          <div
+                            onClick={() => setPageRangeType("all")}
+                            className={`option-card-radio flex-1 ${pageRangeType === "all" ? "selected" : ""}`}
+                          >
+                            <Radio value="all" />
+                            <span className="font-semibold text-xs text-neutral-900">All ({activeDoc.pageCount || 1})</span>
+                          </div>
+                          <div
+                            onClick={() => setPageRangeType("custom")}
+                            className={`option-card-radio flex-1 ${pageRangeType === "custom" ? "selected" : ""}`}
+                          >
+                            <Radio value="custom" />
+                            <span className="font-semibold text-xs text-neutral-900">Custom</span>
+                          </div>
                         </RadioGroup>
 
                         {pageRangeType === "custom" && (
                           <Input
-                            className="mt-2.5"
+                            className="mt-2"
                             placeholder="e.g. 1-3, 5"
                             value={customRange}
                             onChange={(e: any) => setCustomRange(e.target.value)}
@@ -762,44 +807,43 @@ function UserPrintContent() {
                         )}
                       </div>
                     </div>
+
                   </CardBody>
                 </Card>
               </div>
 
               {/* Right Column: Payment & Breakdown (Desktop) */}
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <Card>
-                  <CardHeader>
-                    <div className="flex flex-row items-center justify-between w-full">
-                      <div className="flex items-center gap-2.5">
-                        <CreditCard className="w-5 h-5 text-primary" />
-                        <span className="font-semibold text-base text-neutral-900">Payment Summary</span>
-                      </div>
+                  <CardHeader className="pb-3 border-b border-neutral-100">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      <span className="font-bold text-sm text-neutral-900">Payment Summary</span>
                     </div>
                   </CardHeader>
-                  <CardBody className="space-y-3.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-neutral-500">Total Pages to Print:</span>
+                  <CardBody className="py-4 space-y-3">
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-neutral-500">Total Pages:</span>
                       <span className="font-semibold text-neutral-900">
                         {(pageRangeType === "all" ? activeDoc.pageCount || 1 : 1) * Math.max(1, copies)}
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-neutral-500">Color Mode:</span>
                       <span className="font-semibold text-neutral-900">
                         {colorMode === "bw" ? "Black & White" : "Full Color"}
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-neutral-500">Base Rate:</span>
                       <span className="font-semibold text-neutral-900">
                         {formatRupees(pricing.baseRatePaise)} / side
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-neutral-500">Subtotal:</span>
                       <span className="font-semibold text-neutral-900">
                         {formatRupees(pricing.subtotalPaise)}
@@ -807,17 +851,15 @@ function UserPrintContent() {
                     </div>
 
                     {pricing.discountPaise > 0 && (
-                      <div className="flex justify-between text-sm text-emerald-600">
-                        <span>Discount Applied:</span>
-                        <span className="font-semibold">
-                          -{formatRupees(pricing.discountPaise)}
-                        </span>
+                      <div className="flex justify-between text-xs sm:text-sm text-emerald-600 font-semibold">
+                        <span>Discount:</span>
+                        <span>-{formatRupees(pricing.discountPaise)}</span>
                       </div>
                     )}
 
-                    {/* Promo Code Input with dedicated Apply button */}
+                    {/* Promo Code Input */}
                     <div className="pt-2">
-                      <label className="text-xs font-medium text-neutral-500 block mb-1">Coupon / Offer Code</label>
+                      <label className="text-[11px] font-semibold text-neutral-500 block mb-1">Coupon / Offer Code</label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Enter coupon code"
@@ -828,29 +870,29 @@ function UserPrintContent() {
                           size="md"
                           color="primary"
                           variant="flat"
-                          className="shrink-0 font-semibold"
+                          className="shrink-0 font-semibold text-xs"
                           onPress={() => setAppliedOffer(offerCode.trim())}
                         >
                           Apply
                         </Button>
                       </div>
                       {appliedOffer && (
-                        <Chip size="sm" color="success" variant="flat" className="mt-2">
+                        <Chip size="sm" color="success" variant="flat" className="mt-1.5 text-xs">
                           Applied: {appliedOffer}
                         </Chip>
                       )}
                     </div>
 
-                    <Divider className="my-2" />
+                    <Divider className="my-1.5" />
 
                     <div className="flex justify-between items-baseline pt-1">
-                      <span className="text-base font-bold text-neutral-900">Payable Amount:</span>
-                      <span className="text-3xl font-extrabold text-primary">
+                      <span className="text-sm font-bold text-neutral-900">Payable Amount:</span>
+                      <span className="text-2xl sm:text-3xl font-extrabold text-primary">
                         {formatRupees(pricing.finalPayablePaise)}
                       </span>
                     </div>
                   </CardBody>
-                  <CardFooter>
+                  <CardFooter className="pt-0 pb-4">
                     <Button
                       color="primary"
                       size="lg"
@@ -863,37 +905,35 @@ function UserPrintContent() {
                   </CardFooter>
                 </Card>
 
-                {/* How it works card */}
+                {/* How it works */}
                 <Card>
-                  <CardBody className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-                      <Lock className="w-4 h-4 text-primary" />
+                  <CardBody className="py-3.5 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-neutral-900">
+                      <Lock className="w-3.5 h-3.5 text-primary" />
                       <span>How it works</span>
                     </div>
-                    <p className="text-xs text-neutral-600 leading-relaxed">
-                      1. Complete checkout to generate a secure 6-digit OTP.
-                      <br />
-                      2. Your document begins zero-download preloading into the selected kiosk.
-                      <br />
-                      3. Enter the OTP on the kiosk screen for instant printing.
+                    <p className="text-[11px] text-neutral-600 leading-relaxed">
+                      1. Complete checkout to generate a secure 6-digit OTP.<br />
+                      2. Your document preloads instantly into the kiosk cache.<br />
+                      3. Approach the kiosk, tap your OTP, and collect your prints.
                     </p>
                   </CardBody>
                 </Card>
               </div>
             </div>
 
-            {/* Mobile Sticky Checkout Bar (Fixed at bottom on phones) */}
-            <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-neutral-200 p-3 sm:p-4 flex items-center justify-between z-40 lg:hidden shadow-xl">
+            {/* Mobile Bottom Floating Checkout Bar (Fixed above bottom navbar) */}
+            <div className="fixed bottom-12 inset-x-0 bg-white/95 backdrop-blur-md border-t border-neutral-200/90 px-4 py-2.5 flex items-center justify-between z-40 sm:hidden shadow-lg">
               <div>
-                <span className="text-xs text-neutral-500 block">Total Payable</span>
-                <span className="text-xl font-extrabold text-primary">
+                <span className="text-[11px] text-neutral-500 block leading-tight">Total Payable</span>
+                <span className="text-lg font-extrabold text-primary">
                   {formatRupees(pricing.finalPayablePaise)}
                 </span>
               </div>
               <Button
                 color="primary"
-                size="md"
-                className="font-bold px-6 shadow-md"
+                size="sm"
+                className="font-bold px-5 h-9 shadow-md text-xs"
                 isLoading={paying || calculatingPrice}
                 onPress={handleProceedToPayment}
               >
@@ -903,7 +943,7 @@ function UserPrintContent() {
           </div>
         )}
 
-        {/* Modal: OTP Release Dialog (Clean HeroUI Portal Overlay) */}
+        {/* Modal: OTP Release Dialog */}
         <Modal isOpen={isOtpModalOpen} onOpenChange={setIsOtpModalOpen}>
           <ModalContent>
             <ModalHeader className="text-center items-center">
@@ -913,51 +953,39 @@ function UserPrintContent() {
                 Document is preloaded and ready at {selectedMachine?.name}
               </p>
             </ModalHeader>
-            <ModalBody className="space-y-4">
-              <Card>
-                <CardBody className="flex flex-col items-center gap-1.5 text-center py-4">
-                  <span className="text-xs uppercase tracking-widest text-primary font-bold">
-                    Your 6-Digit Kiosk OTP
-                  </span>
-                  <span className="text-4xl font-mono font-black tracking-widest text-primary my-1">
-                    {generatedOtp || "------"}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    color="primary"
-                    className="mt-1"
-                    startContent={copiedOtp ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    onPress={copyOtpToClipboard}
-                  >
-                    {copiedOtp ? "Copied" : "Copy OTP"}
-                  </Button>
-                </CardBody>
-              </Card>
-
-              <div className="space-y-2 text-xs text-neutral-600 px-1">
-                <div className="flex justify-between">
-                  <span>Vending Machine:</span>
-                  <span className="font-semibold text-neutral-900">{selectedMachine?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Kiosk Location:</span>
-                  <span className="font-semibold text-neutral-900">{selectedMachine?.location}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>OTP Expiration:</span>
-                  <span className="font-semibold text-neutral-900">15 Minutes</span>
-                </div>
+            <ModalBody className="text-center py-6">
+              <span className="text-xs font-semibold tracking-wider text-muted uppercase">
+                Your 6-Digit Kiosk OTP
+              </span>
+              <div className="my-4 py-4 px-6 bg-primary/10 rounded-2xl flex items-center justify-center gap-3 border border-primary/20">
+                <span className="text-4xl font-black tracking-widest text-primary font-mono">
+                  {generatedOtp}
+                </span>
               </div>
-
+              <p className="text-xs text-muted max-w-xs mx-auto">
+                Walk up to the kiosk screen, tap <span className="font-semibold text-foreground">"Enter OTP"</span>, and your print job will release immediately.
+              </p>
+            </ModalBody>
+            <ModalFooter className="flex flex-col sm:flex-row gap-2">
               <Button
+                variant="flat"
                 color="primary"
-                className="w-full mt-2 font-bold"
+                className="w-full font-semibold"
+                startContent={copiedOtp ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+                onPress={copyOtpToClipboard}
+              >
+                {copiedOtp ? "Copied OTP!" : "Copy OTP"}
+              </Button>
+              <Button
+                as={Link}
+                href="/user/history"
+                color="primary"
+                className="w-full font-semibold"
                 onPress={() => setIsOtpModalOpen(false)}
               >
-                Done
+                View in My Print Jobs
               </Button>
-            </ModalBody>
+            </ModalFooter>
           </ModalContent>
         </Modal>
       </main>
@@ -967,7 +995,7 @@ function UserPrintContent() {
 
 export default function UserPrintPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-neutral-500">Loading Print Studio...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-8 text-sm text-neutral-500">Loading Print Studio...</div>}>
       <UserPrintContent />
     </Suspense>
   );

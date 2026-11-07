@@ -7,6 +7,18 @@ import * as HeroUI from "@heroui/react-original";
 // Re-export all original HeroUI v3 components directly
 export * from "@heroui/react-original";
 
+// Explicit exports for TypeScript resolution
+export const Card: any = HeroUI.Card;
+export const CardHeader: any = HeroUI.CardHeader;
+export const CardFooter: any = HeroUI.CardFooter;
+export const Button: any = HeroUI.Button;
+export const Input: any = HeroUI.Input;
+export const Chip: any = HeroUI.Chip;
+export const Alert: any = HeroUI.Alert;
+export const RadioGroup: any = HeroUI.RadioGroup;
+export const Avatar: any = HeroUI.Avatar;
+export const Badge: any = HeroUI.Badge;
+
 // ─── CardBody ────────────────────────────────────────────────────────────────
 // HeroUI v3 renamed CardBody → CardContent
 export const CardBody = HeroUI.CardContent;

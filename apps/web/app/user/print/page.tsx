@@ -49,6 +49,7 @@ interface UploadedDocumentRecord {
   telegramFileId: string;
   telegramMessageId?: number;
   previewUrl?: string;
+  blobUrl?: string;
 }
 
 interface PrintJobConfiguration {
@@ -68,6 +69,174 @@ interface PricingBreakdown {
   taxPaise: number;
   finalPayablePaise: number;
   offerCode?: string | null;
+}
+
+/**
+ * RealDocumentViewer Component
+ * Renders the REAL uploaded PDF (all pages via PDF.js canvas with native iframe fallback)
+ * or real uploaded images.
+ */
+function RealDocumentViewer({
+  doc,
+  pageIndex,
+  colorMode,
+  orientation,
+}: {
+  doc?: UploadedDocumentRecord;
+  pageIndex: number;
+  colorMode: ColorMode;
+  orientation: Orientation;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [renderError, setRenderError] = useState<boolean>(false);
+
+  const docUrl = doc?.blobUrl || doc?.previewUrl;
+  const isImage =
+    doc?.mimeType?.startsWith("image/") ||
+    (doc?.originalFilename && /\.(jpg|jpeg|png|webp|bmp|svg)$/i.test(doc.originalFilename));
+
+  useEffect(() => {
+    if (!docUrl) {
+      setLoading(false);
+      return;
+    }
+
+    if (isImage) {
+      setLoading(false);
+      setRenderError(false);
+      return;
+    }
+
+    setLoading(true);
+    setRenderError(false);
+    let cancelled = false;
+
+    const renderPdf = async () => {
+      try {
+        // Load PDF.js from CDN dynamically if not present
+        if (!(window as any).pdfjsLib) {
+          await new Promise<void>((resolve, reject) => {
+            const existingScript = document.getElementById("pdfjs-cdn-script");
+            if (existingScript) {
+              if ((window as any).pdfjsLib) {
+                resolve();
+              } else {
+                existingScript.addEventListener("load", () => resolve());
+                existingScript.addEventListener("error", () => reject());
+              }
+              return;
+            }
+            const script = document.createElement("script");
+            script.id = "pdfjs-cdn-script";
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+            script.onload = () => {
+              try {
+                (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+                  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                resolve();
+              } catch {
+                resolve();
+              }
+            };
+            script.onerror = () => reject();
+            document.head.appendChild(script);
+          });
+        }
+
+        const pdfjsLib = (window as any).pdfjsLib;
+        if (!pdfjsLib) throw new Error("PDF.js unavailable");
+
+        const loadingTask = pdfjsLib.getDocument(docUrl);
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+
+        const safePageNum = Math.min(Math.max(1, pageIndex), pdf.numPages);
+        const page = await pdf.getPage(safePageNum);
+        if (cancelled) return;
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const targetWidth = orientation === "portrait" ? 700 : 950;
+        const scale = targetWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const context = canvas.getContext("2d");
+        if (!context) return;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+        }).promise;
+
+        if (!cancelled) {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn("Canvas render failed, using fallback frame:", err);
+        if (!cancelled) {
+          setRenderError(true);
+          setLoading(false);
+        }
+      }
+    };
+
+    renderPdf();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docUrl, pageIndex, orientation, isImage]);
+
+  if (isImage && docUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center p-2 bg-white overflow-hidden">
+        <img
+          src={docUrl}
+          alt={doc?.originalFilename || "Document preview"}
+          className="max-w-full max-h-full object-contain"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative flex items-center justify-center bg-white overflow-hidden">
+      {loading && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20 space-y-2">
+          <RotateCw className="w-6 h-6 animate-spin text-[#0c831f]" />
+          <span className="text-[11px] font-semibold text-neutral-600">
+            Rendering Page {pageIndex}...
+          </span>
+        </div>
+      )}
+
+      {renderError ? (
+        docUrl ? (
+          <iframe
+            key={`${docUrl}-${pageIndex}`}
+            src={`${docUrl}#page=${pageIndex}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+            title={doc?.originalFilename || "PDF Preview"}
+            className="w-full h-full border-none pointer-events-none"
+          />
+        ) : (
+          <div className="text-center p-4 text-xs text-neutral-400">
+            Preview unavailable
+          </div>
+        )
+      ) : (
+        <canvas
+          ref={canvasRef}
+          className="max-w-full max-h-full object-contain shadow-2xs"
+        />
+      )}
+    </div>
+  );
 }
 
 function UserPrintContent() {
@@ -93,6 +262,25 @@ function UserPrintContent() {
   // State: Page Preview
   const [previewDocIndex, setPreviewDocIndex] = useState<number>(0);
   const [previewPageIndex, setPreviewPageIndex] = useState<number>(1);
+
+  // Floating Pay Button Visibility via IntersectionObserver
+  const [isInPagePayVisible, setIsInPagePayVisible] = useState<boolean>(false);
+  const inPagePayButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const el = inPagePayButtonRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInPagePayVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [step, documents.length]);
 
   // Live Pricing Breakdown
   const [pricing, setPricing] = useState<PricingBreakdown>({
@@ -196,14 +384,13 @@ function UserPrintContent() {
           throw new Error(data.error || `Failed to process ${file.name}`);
         }
 
-        let previewUrl: string | undefined = undefined;
-        if (file.type.startsWith("image/")) {
-          previewUrl = URL.createObjectURL(file);
-        }
+        // Generate persistent blob URL for real page rendering in this session
+        const blobUrl = URL.createObjectURL(file);
 
         newDocs.push({
           ...data.document,
-          previewUrl,
+          blobUrl,
+          previewUrl: blobUrl,
         });
       } catch (err: any) {
         console.error("Upload error:", err);
@@ -269,7 +456,6 @@ function UserPrintContent() {
 
     let totalPrintPages = totalAllPages;
 
-    // Single document with custom range support
     if (documents.length === 1 && pageRangeType === "custom") {
       try {
         const totalPagesInDoc = documents[0].pageCount || 1;
@@ -421,7 +607,7 @@ function UserPrintContent() {
     setTimeout(() => setCopiedOtp(false), 2000);
   };
 
-  // Preview Document & Page
+  // Current preview document & safe page bounds
   const currentPreviewDoc = documents[previewDocIndex] || documents[0];
   const currentDocTotalPages = currentPreviewDoc?.pageCount || 1;
 
@@ -659,7 +845,7 @@ function UserPrintContent() {
           </div>
         ) : (
           /* ─────────────────────────────────────────────────────────────
-              STAGE 2: SLEEK PRINT STUDIO (With Interactive Page Preview)
+              STAGE 2: SLEEK PRINT STUDIO (With Real Document Page Preview)
               ───────────────────────────────────────────────────────────── */
           <div className="space-y-5">
             {/* Studio Header with Return to Upload Button */}
@@ -669,14 +855,14 @@ function UserPrintContent() {
                   Print Studio
                 </h1>
                 <p className="text-xs text-neutral-500">
-                  Preview pages with live config adjustments and release instantly at any campus kiosk.
+                  Preview your real document pages with live config adjustments and release at any campus kiosk.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setStep("upload")}
-                className="self-start sm:self-auto px-3 py-1.5 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
+                className="self-start sm:self-auto px-3.5 py-1.5 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
               >
                 <Layers className="w-3.5 h-3.5 text-[#0c831f]" />
                 <span>Files ({documents.length}) • Add More</span>
@@ -684,19 +870,21 @@ function UserPrintContent() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-              {/* Left Column (7 cols): Document Page Preview & Options */}
+              {/* Left Column (7 cols): Real Document Page Preview & Configuration */}
               <div className="lg:col-span-7 space-y-4">
                 
-                {/* 1. INTERACTIVE PAGE PREVIEW CARD */}
+                {/* 1. REAL DOCUMENT PAGE PREVIEW CARD */}
                 <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-3.5">
                   <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100">
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-[#0c831f]" />
-                      <span className="font-bold text-sm text-neutral-900">Live Print Preview</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Eye className="w-4 h-4 text-[#0c831f] shrink-0" />
+                      <span className="font-bold text-sm text-neutral-900 truncate">
+                        {currentPreviewDoc?.originalFilename || "Real Document Preview"}
+                      </span>
                     </div>
 
                     {/* Page navigation controls */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] font-semibold text-neutral-600">
                         Page {previewPageIndex} of {currentDocTotalPages}
                       </span>
@@ -748,93 +936,36 @@ function UserPrintContent() {
                     </div>
                   )}
 
-                  {/* The Paper Sheet Display Canvas */}
-                  <div className="bg-neutral-100/70 p-4 sm:p-6 rounded-2xl flex flex-col items-center justify-center min-h-[350px] sm:min-h-[400px] overflow-hidden border border-neutral-200/50 relative">
+                  {/* The Paper Sheet Display Canvas with Live Config Filters */}
+                  <div className="bg-neutral-100/70 p-4 sm:p-6 rounded-2xl flex flex-col items-center justify-center min-h-[360px] sm:min-h-[420px] overflow-hidden border border-neutral-200/50 relative">
                     {/* Live Config Overlay Badges */}
                     <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/90 text-neutral-800 shadow-2xs border border-neutral-200/60 uppercase">
                         {colorMode === "bw" ? "⚫ B&W" : "🎨 Color"}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/90 text-neutral-800 shadow-2xs border border-neutral-200/60 uppercase">
-                        {orientation === "portrait" ? "Vertical A4" : "Landscape A4"}
+                        {orientation === "portrait" ? "Portrait" : "Landscape"}
                       </span>
                     </div>
 
-                    {/* The Responsive Simulated A4 Sheet */}
+                    {/* Responsive Simulated Sheet that Renders the Real Document Pages */}
                     <div
                       style={{
                         filter: colorMode === "bw" ? "grayscale(100%) contrast(105%)" : "none",
                         transition: "all 250ms ease-in-out",
                       }}
-                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm p-4 sm:p-5 flex flex-col justify-between ${
+                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm overflow-hidden flex items-center justify-center ${
                         orientation === "portrait"
-                          ? "w-full max-w-[240px] sm:max-w-[280px] aspect-[210/297]"
-                          : "w-full max-w-[340px] sm:max-w-[420px] aspect-[297/210]"
+                          ? "w-full max-w-[280px] sm:max-w-[320px] aspect-[210/297]"
+                          : "w-full max-w-[400px] sm:max-w-[480px] aspect-[297/210]"
                       }`}
                     >
-                      {currentPreviewDoc?.previewUrl ? (
-                        /* Real image preview if available */
-                        <div className="w-full h-full rounded-xs overflow-hidden flex items-center justify-center bg-neutral-50">
-                          <img
-                            src={currentPreviewDoc.previewUrl}
-                            alt="Uploaded document preview"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        /* Realistic Formatted Document Layout with Live Elements */
-                        <>
-                          <div>
-                            {/* Document Header & Watermark */}
-                            <div className="flex items-center justify-between border-b border-neutral-200 pb-2 mb-3">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <FileCheck className="w-3.5 h-3.5 text-[#0c831f] shrink-0" />
-                                <span className="text-[10px] font-bold text-neutral-900 truncate">
-                                  {currentPreviewDoc?.originalFilename || "Document.pdf"}
-                                </span>
-                              </div>
-                              <span className="text-[8px] font-extrabold tracking-wider text-neutral-400 uppercase">
-                                PrintMart
-                              </span>
-                            </div>
-
-                            {/* Decorative Colored Chart/Accent Block that reacts to Color Mode */}
-                            <div className="mb-3.5 p-2 rounded-xs bg-gradient-to-r from-purple-50 via-sky-50 to-emerald-50 border border-neutral-200/80 flex items-center justify-between">
-                              <div className="space-y-1">
-                                <div className="h-2 w-20 bg-purple-500/80 rounded-xs" />
-                                <div className="h-1.5 w-14 bg-sky-500/80 rounded-xs" />
-                              </div>
-                              <div className="flex items-end gap-1 h-6">
-                                <div className="w-1.5 h-3 bg-purple-500/80 rounded-xs" />
-                                <div className="w-1.5 h-5 bg-sky-500/80 rounded-xs" />
-                                <div className="w-1.5 h-4 bg-emerald-500/80 rounded-xs" />
-                              </div>
-                            </div>
-
-                            {/* Simulated Text Skeleton Lines */}
-                            <div className="space-y-1.5">
-                              <div className="h-1.5 bg-neutral-300 rounded-xs w-full" />
-                              <div className="h-1.5 bg-neutral-200 rounded-xs w-11/12" />
-                              <div className="h-1.5 bg-neutral-200 rounded-xs w-4/5" />
-                              <div className="h-1.5 bg-neutral-200 rounded-xs w-full" />
-                              <div className="h-1.5 bg-neutral-200 rounded-xs w-3/4" />
-                            </div>
-
-                            {orientation === "landscape" && (
-                              <div className="mt-2.5 pt-2 border-t border-dashed border-neutral-200 space-y-1.5">
-                                <div className="h-1.5 bg-neutral-200 rounded-xs w-5/6" />
-                                <div className="h-1.5 bg-neutral-200 rounded-xs w-2/3" />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Footer with Page Counter */}
-                          <div className="border-t border-neutral-200 pt-1.5 mt-2 flex items-center justify-between text-[8px] text-neutral-400 font-mono">
-                            <span>Campus Kiosk Print Vault</span>
-                            <span>Page {previewPageIndex} of {currentDocTotalPages}</span>
-                          </div>
-                        </>
-                      )}
+                      <RealDocumentViewer
+                        doc={currentPreviewDoc}
+                        pageIndex={previewPageIndex}
+                        colorMode={colorMode}
+                        orientation={orientation}
+                      />
                     </div>
                   </div>
                 </div>
@@ -873,7 +1004,7 @@ function UserPrintContent() {
                     </div>
                   </div>
 
-                  {/* Orientation Option (Replacing Sides & Paper Size) */}
+                  {/* Orientation Option (Without bracket contents) */}
                   <div className="pt-1">
                     <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                       Page Orientation
@@ -885,7 +1016,7 @@ function UserPrintContent() {
                         onClick={() => setOrientation("portrait")}
                         className="segmented-btn"
                       >
-                        <span>Portrait (Vertical)</span>
+                        <span>Portrait</span>
                         <span className="subtext">Standard layout</span>
                       </button>
                       <button
@@ -894,32 +1025,32 @@ function UserPrintContent() {
                         onClick={() => setOrientation("landscape")}
                         className="segmented-btn"
                       >
-                        <span>Landscape (Horizontal)</span>
+                        <span>Landscape</span>
                         <span className="subtext">Wide layout</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Number of Copies */}
+                  {/* Number of Copies (Full Width - Zero space left on right) */}
                   <div className="pt-1">
                     <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                       Number of Copies
                     </label>
-                    <div className="flex items-center gap-2 max-w-xs">
+                    <div className="flex items-center gap-2.5 w-full">
                       <button
                         type="button"
                         onClick={() => setCopies((c) => Math.max(1, c - 1))}
-                        className="w-10 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
+                        className="w-12 h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-base shrink-0 active:scale-95"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <div className="flex-1 text-center font-bold text-base text-neutral-900 bg-neutral-50 border border-neutral-200 rounded-xl py-2">
-                        {copies}
+                      <div className="flex-1 text-center font-bold text-base text-neutral-900 bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 shadow-2xs">
+                        {copies} {copies === 1 ? "Copy" : "Copies"}
                       </div>
                       <button
                         type="button"
                         onClick={() => setCopies((c) => Math.min(50, c + 1))}
-                        className="w-10 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
+                        className="w-12 h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-base shrink-0 active:scale-95"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -961,7 +1092,6 @@ function UserPrintContent() {
                       )}
                     </div>
                   ) : (
-                    /* When multiple documents exist, pages to print is hidden and noted */
                     <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/60 text-xs text-neutral-700 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-[#0c831f] shrink-0" />
                       <span>
@@ -1064,8 +1194,9 @@ function UserPrintContent() {
                     </span>
                   </div>
 
-                  {/* Direct Pay Button in Payment Summary (No floating popup) */}
+                  {/* In-Page Pay Button (Monitored by IntersectionObserver) */}
                   <button
+                    ref={inPagePayButtonRef}
                     type="button"
                     disabled={paying || calculatingPrice}
                     onClick={handleProceedToPayment}
@@ -1096,6 +1227,30 @@ function UserPrintContent() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            FLOATING BOTTOM PAY BAR
+            Auto-hides when in-page Pay button is visible in viewport!
+            ───────────────────────────────────────────────────────────── */}
+        {step === "studio" && documents.length > 0 && !isInPagePayVisible && (
+          <div className="fixed bottom-16 sm:bottom-6 inset-x-4 max-w-sm mx-auto bg-white/95 backdrop-blur-md border border-neutral-200/90 rounded-2xl px-4 py-2.5 flex items-center justify-between z-40 shadow-xl transition-all animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div>
+              <span className="text-[11px] text-neutral-500 block leading-tight">Payable</span>
+              <span className="text-lg font-bold text-[#0c831f]">
+                {formatRupees(pricing.finalPayablePaise)}
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={paying || calculatingPrice}
+              onClick={handleProceedToPayment}
+              className="bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold px-5 h-9 rounded-xl shadow-md text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+            >
+              {paying ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : null}
+              <span>Pay & Get OTP</span>
+            </button>
           </div>
         )}
 

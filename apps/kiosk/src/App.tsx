@@ -43,7 +43,7 @@ export default function App() {
   // 2. Listen to Machine record in Firebase RTDB to keep display name in sync
   useEffect(() => {
     const machineRef = ref(database, `machines/${machineId}`);
-    const unsub = onValue(machineRef, (snap) => {
+    const unsubMachine = onValue(machineRef, (snap) => {
       if (snap.exists()) {
         const val = snap.val();
         if (val.name) {
@@ -73,8 +73,8 @@ export default function App() {
     });
 
     return () => {
-      unsubMachine();
-      unsubPrinter();
+      if (typeof unsubMachine === "function") unsubMachine();
+      if (typeof unsubPrinter === "function") unsubPrinter();
     };
   }, [machineId]);
 
@@ -96,6 +96,7 @@ export default function App() {
     const machineOverlayRef = ref(database, `overlays/machines/${machineId}`);
     const globalOverlayRef = ref(database, "overlays/global");
 
+    let unsubGlobal: (() => void) | null = null;
     const unsubMachine = onValue(machineOverlayRef, (snap) => {
       if (snap.exists() && snap.val()?.active) {
         setActiveOverlay(snap.val());
@@ -104,7 +105,8 @@ export default function App() {
         }
       } else {
         // Fallback to check global
-        onValue(globalOverlayRef, (gSnap) => {
+        if (typeof unsubGlobal === "function") unsubGlobal();
+        unsubGlobal = onValue(globalOverlayRef, (gSnap) => {
           if (gSnap.exists() && gSnap.val()?.active) {
             setActiveOverlay(gSnap.val());
             if (currentScreen !== "printing" && currentScreen !== "config") {
@@ -118,7 +120,10 @@ export default function App() {
       }
     });
 
-    return () => unsubMachine();
+    return () => {
+      if (typeof unsubMachine === "function") unsubMachine();
+      if (typeof unsubGlobal === "function") unsubGlobal();
+    };
   }, [machineId, currentScreen]);
 
   return (

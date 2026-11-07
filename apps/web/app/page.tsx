@@ -17,6 +17,7 @@ interface PrintDraft {
 
 export default function HomePage() {
   const [draft, setDraft] = useState<PrintDraft | null>(null);
+  const [previewImgError, setPreviewImgError] = useState(false);
 
   useEffect(() => {
     try {
@@ -25,6 +26,7 @@ export default function HomePage() {
         const parsed = JSON.parse(saved);
         if (parsed && (parsed.filename || parsed.originalFilename || parsed.pageCount)) {
           setDraft(parsed);
+          setPreviewImgError(false);
         }
       }
     } catch {}
@@ -322,17 +324,21 @@ export default function HomePage() {
               >
                 {/* Left: Single Circle File Preview Badge */}
                 <div className="w-10 h-10 rounded-full border-2 border-white bg-white/95 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
-                  {draft.previewUrl ? (
+                  {draft.previewUrl &&
+                  !previewImgError &&
+                  (draft.mimeType?.startsWith("image/") ||
+                    (draft.originalFilename || draft.filename || "").match(/\.(jpe?g|png|webp|gif|svg)$/i)) ? (
                     <img
                       src={draft.previewUrl}
                       alt="File preview"
                       className="w-full h-full object-cover"
+                      onError={() => setPreviewImgError(true)}
                     />
                   ) : (
                     <div className="w-full h-full bg-emerald-50 flex flex-col items-center justify-center p-0.5">
                       <FileText className="w-4 h-4 text-[#0c831f]" />
                       <span className="text-[7.5px] font-bold uppercase tracking-tight text-neutral-600 leading-none mt-0.5">
-                        {((draft.originalFilename || draft.filename || "DOC").split(".").pop() || "DOC").slice(0, 3)}
+                        {((draft.originalFilename || draft.filename || "DOC").split(".").pop() || "DOC").slice(0, 4)}
                       </span>
                     </div>
                   )}

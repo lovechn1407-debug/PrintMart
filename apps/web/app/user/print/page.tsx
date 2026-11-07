@@ -450,12 +450,8 @@ function UserPrintContent() {
   // Total pages across all documents
   const totalAllPages = documents.reduce((sum, d) => sum + (d.pageCount || 1), 0);
 
-  // Recalculate Dynamic Price
-  useEffect(() => {
-    if (documents.length === 0) return;
-
-    let totalPrintPages = totalAllPages;
-
+  // Helper: Get list of selected page numbers (1-indexed) taking custom range into account
+  const getSelectedPagesList = (): number[] => {
     if (documents.length === 1 && pageRangeType === "custom") {
       try {
         const totalPagesInDoc = documents[0].pageCount || 1;
@@ -463,6 +459,7 @@ function UserPrintContent() {
         const set = new Set<number>();
         for (const p of parts) {
           const trimmed = p.trim();
+          if (!trimmed) continue;
           if (trimmed.includes("-")) {
             const [start, end] = trimmed.split("-").map((s) => parseInt(s.trim(), 10));
             if (!isNaN(start) && !isNaN(end)) {
@@ -477,12 +474,29 @@ function UserPrintContent() {
             }
           }
         }
-        const selected = Array.from(set);
-        totalPrintPages = selected.length > 0 ? selected.length : 1;
+        const selected = Array.from(set).sort((a, b) => a - b);
+        return selected.length > 0 ? selected : [1];
       } catch {
-        totalPrintPages = 1;
+        return [1];
       }
     }
+    return Array.from({ length: totalAllPages }, (_, i) => i + 1);
+  };
+
+  // Helper: Effective count of pages to print per copy
+  const getEffectivePagesCount = (): number => {
+    if (documents.length === 1 && pageRangeType === "custom") {
+      return getSelectedPagesList().length;
+    }
+    return totalAllPages;
+  };
+
+  // Recalculate Dynamic Price
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    const selectedPages = getSelectedPagesList();
+    const totalPrintPages = selectedPages.length;
 
     const config: PrintJobConfiguration = {
       colorMode,
@@ -490,7 +504,7 @@ function UserPrintContent() {
       paperSize: "A4",
       copies: Math.max(1, copies),
       pageRange: documents.length === 1 && pageRangeType === "custom" ? customRange : `1-${totalPrintPages}`,
-      selectedPages: Array.from({ length: totalPrintPages }, (_, i) => i + 1),
+      selectedPages,
       totalPagesToPrint: totalPrintPages,
     };
 
@@ -537,10 +551,8 @@ function UserPrintContent() {
       setPaying(true);
       setErrorMessage(null);
 
-      let totalPrintPages = totalAllPages;
-      if (documents.length === 1 && pageRangeType === "custom") {
-        totalPrintPages = 1;
-      }
+      const selectedPages = getSelectedPagesList();
+      const totalPrintPages = selectedPages.length;
 
       const config: PrintJobConfiguration = {
         colorMode,
@@ -548,7 +560,7 @@ function UserPrintContent() {
         paperSize: "A4",
         copies: Math.max(1, copies),
         pageRange: documents.length === 1 && pageRangeType === "custom" ? customRange : `1-${totalPrintPages}`,
-        selectedPages: Array.from({ length: totalPrintPages }, (_, i) => i + 1),
+        selectedPages,
         totalPagesToPrint: totalPrintPages,
       };
 
@@ -1082,13 +1094,18 @@ function UserPrintContent() {
                         </button>
                       </div>
                       {pageRangeType === "custom" && (
-                        <input
-                          type="text"
-                          placeholder="e.g. 1-3, 5"
-                          value={customRange}
-                          onChange={(e) => setCustomRange(e.target.value)}
-                          className="mt-2 w-full text-xs px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white"
-                        />
+                        <div className="mt-2 space-y-1">
+                          <input
+                            type="text"
+                            placeholder="e.g. 1-3, 5"
+                            value={customRange}
+                            onChange={(e) => setCustomRange(e.target.value)}
+                            className="w-full text-xs px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white"
+                          />
+                          <p className="text-[11px] text-neutral-500">
+                            Printing {getEffectivePagesCount()} of {documents[0].pageCount || 1} pages
+                          </p>
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -1122,7 +1139,7 @@ function UserPrintContent() {
                     <div className="flex justify-between text-neutral-500">
                       <span>Total Pages to Print:</span>
                       <span className="font-semibold text-neutral-900">
-                        {totalAllPages * Math.max(1, copies)} pages
+                        {getEffectivePagesCount() * Math.max(1, copies)} {getEffectivePagesCount() * Math.max(1, copies) === 1 ? "page" : "pages"}
                       </span>
                     </div>
 
@@ -1213,8 +1230,8 @@ function UserPrintContent() {
                   </button>
                 </div>
 
-                {/* Universal OTP Campus Info Note */}
-                <div className="rounded-2xl bg-amber-50/70 border border-amber-200/60 p-4 space-y-1.5 text-xs text-neutral-700 shadow-2xs">
+                {/* Universal OTP Campus Info Note (Clean unboxed style without yellow container) */}
+                <div className="pt-2 px-1 space-y-1.5 text-xs text-neutral-600">
                   <div className="flex items-center gap-1.5 font-bold text-neutral-900">
                     <Lock className="w-3.5 h-3.5 text-[#0c831f]" />
                     <span>Universal Campus OTP</span>
@@ -1232,10 +1249,16 @@ function UserPrintContent() {
 
         {/* ─────────────────────────────────────────────────────────────
             FLOATING BOTTOM PAY BAR
-            Auto-hides when in-page Pay button is visible in viewport!
+            Smoothly auto-hides when in-page Pay button is visible in viewport!
             ───────────────────────────────────────────────────────────── */}
-        {step === "studio" && documents.length > 0 && !isInPagePayVisible && (
-          <div className="fixed bottom-16 sm:bottom-6 inset-x-4 max-w-sm mx-auto bg-white/95 backdrop-blur-md border border-neutral-200/90 rounded-2xl px-4 py-2.5 flex items-center justify-between z-40 shadow-xl transition-all animate-in fade-in slide-in-from-bottom-2 duration-200">
+        {step === "studio" && documents.length > 0 && (
+          <div
+            className={`fixed bottom-16 sm:bottom-6 inset-x-4 max-w-sm mx-auto bg-white/95 backdrop-blur-md border border-neutral-200/90 rounded-2xl px-4 py-2.5 flex items-center justify-between z-40 shadow-xl transition-all duration-300 ease-in-out ${
+              !isInPagePayVisible
+                ? "opacity-100 translate-y-0 pointer-events-auto"
+                : "opacity-0 translate-y-6 pointer-events-none"
+            }`}
+          >
             <div>
               <span className="text-[11px] text-neutral-500 block leading-tight">Payable</span>
               <span className="text-lg font-bold text-[#0c831f]">

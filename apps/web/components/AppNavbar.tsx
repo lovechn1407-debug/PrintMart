@@ -42,9 +42,9 @@ export function AppNavbar() {
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          SOFTER WARM GOLDEN HEADER (Eye-friendly, blends seamlessly)
+          WARM HONEY-GOLDEN HEADER (Yellow on bottom to match homepage)
           ───────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-gradient-to-b from-[#f8df8e]/95 via-[#fae6a3]/90 to-[#fbf9f3]/95 backdrop-blur-md border-b border-amber-200/40 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-colors shadow-xs">
+      <header className="sticky top-0 z-50 bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] backdrop-blur-md border-b border-amber-300/30 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-colors shadow-2xs">
         {/* Brand Logo & Title Tile */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 tracking-tight shrink-0 group">

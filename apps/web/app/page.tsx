@@ -335,241 +335,258 @@ export default function HomePage() {
 
         {/* ─────────────────────────────────────────────────────────────
             FLOATING "VIEW CART" DRAFT WIDGET
-            - Displays sliding text of draft document titles when multiple drafts exist
-            - Clicking on the popup transforms it into an expanded rectangle box
-            - In the rectangle box, all drafts are listed with a "Select" button to open in Print Studio
+            Bottom-to-Top Morphing Capsule:
+            The exact same capsule expands upwards into the rectangle box
             ───────────────────────────────────────────────────────────── */}
         {!isDismissed && drafts.length > 0 && (
           <>
-            {/* Backdrop for expanded rectangle box */}
-            {isExpanded && (
-              <div
-                className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] animate-in fade-in duration-200"
-                onClick={() => setIsExpanded(false)}
-              />
-            )}
-
+            {/* Smooth Backdrop */}
             <div
-              className={`fixed z-50 transition-all duration-300 ease-out inset-x-3.5 sm:inset-x-4 mx-auto ${
+              className={`fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] transition-opacity duration-300 ${
+                isExpanded ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+              }`}
+              onClick={() => setIsExpanded(false)}
+            />
+
+            {/* Persistent Morphing Capsule / Box Container */}
+            <div
+              style={{
+                transition:
+                  "max-height 360ms cubic-bezier(0.16, 1, 0.3, 1), max-width 360ms cubic-bezier(0.16, 1, 0.3, 1), border-radius 360ms cubic-bezier(0.16, 1, 0.3, 1), background-color 280ms ease, box-shadow 360ms ease",
+                transform: "translateZ(0)",
+              }}
+              className={`fixed z-50 bottom-16 sm:bottom-6 inset-x-3.5 sm:inset-x-4 mx-auto origin-bottom overflow-hidden will-change-[max-height,max-width,border-radius] ${
                 isExpanded
-                  ? "bottom-16 sm:bottom-6 max-w-sm sm:max-w-md"
-                  : "bottom-16 sm:bottom-6 max-w-xs sm:max-w-sm"
+                  ? "max-w-[420px] max-h-[520px] bg-white rounded-3xl border border-neutral-200/90 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]"
+                  : "max-w-[340px] sm:max-w-[380px] max-h-[52px] bg-[#0c831f] hover:bg-[#0a6e1a] rounded-full border border-emerald-600/30 shadow-[0_8px_30px_rgba(12,131,31,0.35)] cursor-pointer"
               }`}
             >
-              {!isExpanded ? (
-                /* ── 1. COLLAPSED FLOATING PILL WITH SLIDING TITLE TEXT ── */
-                <div className="relative flex items-center">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setIsExpanded(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") setIsExpanded(true);
-                    }}
-                    className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-full px-3.5 py-2.5 flex items-center justify-between shadow-2xl transition-all active:scale-98 cursor-pointer select-none"
-                  >
-                    {/* Left: Preview Icon / Image */}
-                    <div className="w-10 h-10 rounded-full border-2 border-white bg-white/95 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
-                      {(() => {
-                        const currentDraft = drafts[activeSlideIndex] || drafts[0];
-                        const isImg =
-                          currentDraft?.previewUrl &&
-                          !previewImgErrors[currentDraft.id] &&
-                          (currentDraft.mimeType?.startsWith("image/") ||
-                            currentDraft.title.match(/\.(jpe?g|png|webp|gif|svg)$/i));
+              {/* ── 1. COLLAPSED CAPSULE CONTENT ── */}
+              <div
+                className={`w-full h-[52px] px-3.5 flex items-center justify-between select-none transition-all duration-200 ${
+                  isExpanded
+                    ? "opacity-0 pointer-events-none absolute inset-x-0 bottom-0 h-0 overflow-hidden"
+                    : "opacity-100"
+                }`}
+                onClick={() => setIsExpanded(true)}
+              >
+                {/* Left: Thumbnail Preview Circle */}
+                <div className="w-9 h-9 rounded-full border border-white/90 bg-white flex items-center justify-center overflow-hidden shadow-2xs shrink-0">
+                  {(() => {
+                    const currentDraft = drafts[activeSlideIndex] || drafts[0];
+                    const isImg =
+                      currentDraft?.previewUrl &&
+                      !previewImgErrors[currentDraft.id] &&
+                      (currentDraft.mimeType?.startsWith("image/") ||
+                        currentDraft.title.match(/\.(jpe?g|png|webp|gif|svg)$/i));
 
-                        if (isImg) {
-                          return (
-                            <img
-                              src={currentDraft.previewUrl}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                              onError={() =>
-                                setPreviewImgErrors((prev) => ({
-                                  ...prev,
-                                  [currentDraft.id]: true,
-                                }))
-                              }
-                            />
-                          );
-                        }
+                    if (isImg) {
+                      return (
+                        <img
+                          src={currentDraft.previewUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={() =>
+                            setPreviewImgErrors((prev) => ({
+                              ...prev,
+                              [currentDraft.id]: true,
+                            }))
+                          }
+                        />
+                      );
+                    }
 
-                        return (
-                          <div className="w-full h-full bg-emerald-50 flex flex-col items-center justify-center p-0.5">
-                            <FileText className="w-4 h-4 text-[#0c831f]" />
-                            <span className="text-[7.5px] font-bold uppercase tracking-tight text-neutral-600 leading-none mt-0.5">
-                              {((currentDraft?.title || "DOC").split(".").pop() || "DOC").slice(0, 4)}
+                    return (
+                      <div className="w-full h-full bg-emerald-50 flex flex-col items-center justify-center p-0.5">
+                        <FileText className="w-4 h-4 text-[#0c831f]" />
+                        <span className="text-[7.5px] font-bold uppercase tracking-tight text-neutral-600 leading-none mt-0.5">
+                          {((currentDraft?.title || "DOC").split(".").pop() || "DOC").slice(0, 4)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Center: Sliding Title & Count Text */}
+                {drafts.length === 1 ? (
+                  <div className="flex-1 text-left px-2.5 min-w-0">
+                    <span className="font-bold text-xs sm:text-[13px] block leading-tight truncate text-white">
+                      {drafts[0].title}
+                    </span>
+                    <span className="text-[10.5px] font-normal opacity-90 block leading-tight truncate text-white/90">
+                      {drafts[0].pageCount ? `${drafts[0].pageCount} ${drafts[0].pageCount === 1 ? "page" : "pages"}` : "1 file"} • Tap to view draft
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex-1 text-left px-2.5 min-w-0 h-9 overflow-hidden relative">
+                    <div
+                      className="transition-transform duration-500 ease-in-out flex flex-col"
+                      style={{ transform: `translateY(-${activeSlideIndex * 36}px)` }}
+                    >
+                      {drafts.map((d, idx) => (
+                        <div key={d.id} className="h-9 flex flex-col justify-center">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-xs sm:text-[13px] block leading-tight truncate text-white">
+                              {d.title}
+                            </span>
+                            <span className="text-[9px] bg-white/25 text-white px-1.5 py-0.2 rounded-full font-semibold shrink-0 leading-tight">
+                              {idx + 1}/{drafts.length}
                             </span>
                           </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Center: Sliding Titles Animation */}
-                    {drafts.length === 1 ? (
-                      <div className="flex-1 text-left px-3 min-w-0">
-                        <span className="font-bold text-xs sm:text-sm block leading-tight truncate text-white">
-                          {drafts[0].title}
-                        </span>
-                        <span className="text-[11px] font-normal opacity-90 block leading-tight truncate text-white">
-                          {drafts[0].pageCount ? `${drafts[0].pageCount} ${drafts[0].pageCount === 1 ? "page" : "pages"}` : "1 file"} • Tap to view draft
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex-1 text-left px-3 min-w-0 h-9 overflow-hidden relative">
-                        <div
-                          className="transition-transform duration-500 ease-in-out flex flex-col"
-                          style={{ transform: `translateY(-${activeSlideIndex * 36}px)` }}
-                        >
-                          {drafts.map((d, idx) => (
-                            <div key={d.id} className="h-9 flex flex-col justify-center">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="font-bold text-xs sm:text-sm block leading-tight truncate text-white">
-                                  {d.title}
-                                </span>
-                                <span className="text-[9.5px] bg-white/25 text-white px-1.5 py-0.2 rounded-full font-semibold shrink-0 leading-tight">
-                                  {idx + 1}/{drafts.length}
-                                </span>
-                              </div>
-                              <span className="text-[11px] font-normal opacity-90 block leading-tight truncate text-white">
-                                {d.pageCount} {d.pageCount === 1 ? "page" : "pages"} • Tap to view all drafts
-                              </span>
-                            </div>
-                          ))}
+                          <span className="text-[10.5px] font-normal opacity-90 block leading-tight truncate text-white/90">
+                            {d.pageCount} {d.pageCount === 1 ? "page" : "pages"} • Tap to view all drafts
+                          </span>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Right: Badge or Chevron */}
-                    {drafts.length > 1 ? (
-                      <div className="bg-white/20 hover:bg-white/30 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1 shrink-0">
-                        <span>{drafts.length}</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                        <ChevronRight className="w-4 h-4 text-white" />
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
+                )}
 
-                  {/* Dismiss X button on corner */}
+                {/* Right: Badge / Indicator + Dismiss */}
+                <div className="flex items-center gap-1 shrink-0 pl-1">
+                  {drafts.length > 1 ? (
+                    <div className="bg-white/20 text-white rounded-full px-2 py-0.5 text-[11px] font-bold flex items-center gap-0.5">
+                      <span>{drafts.length}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                      <ChevronRight className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setIsDismissed(true)}
-                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-neutral-800 text-white flex items-center justify-center shadow-md hover:bg-neutral-900 transition-colors"
-                    title="Dismiss popup"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDismissed(true);
+                    }}
+                    className="w-5 h-5 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center transition-colors ml-0.5"
+                    title="Dismiss"
                   >
                     <X className="w-3 h-3 text-white" />
                   </button>
                 </div>
-              ) : (
-                /* ── 2. EXPANDED RECTANGLE BOX WITH ALL DRAFTS LIST & SELECT OPTION ── */
-                <div className="bg-white text-neutral-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.25)] border border-neutral-200/90 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                  {/* Box Header */}
-                  <div className="p-4 pb-3 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/70">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-[#0c831f]">
-                        <FileText className="w-4 h-4" />
+              </div>
+
+              {/* ── 2. EXPANDED RECTANGLE BOX CONTENT ── */}
+              <div
+                className={`w-full flex flex-col transition-opacity duration-300 ${
+                  isExpanded ? "opacity-100" : "opacity-0 pointer-events-none absolute inset-0 overflow-hidden"
+                }`}
+              >
+                {/* Box Header */}
+                <div className="p-3.5 px-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/80">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-[#0c831f] shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-sm text-neutral-900 truncate">Saved Draft Prints</h3>
+                        <span className="text-[10.5px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full shrink-0">
+                          {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
+                        </span>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-sm text-neutral-900">Saved Draft Prints</h3>
-                          <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                            {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
+                      <p className="text-[11px] text-neutral-500 truncate">
+                        Select a draft to configure and print in Studio
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(false)}
+                    className="w-7 h-7 rounded-full bg-neutral-200/70 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors shrink-0 ml-2"
+                    title="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* List of Drafts with Select Option on All */}
+                <div className="max-h-64 sm:max-h-72 overflow-y-auto divide-y divide-neutral-100 p-2.5 sm:p-3 space-y-1.5">
+                  {drafts.map((d) => (
+                    <div
+                      key={d.id}
+                      className="bg-neutral-50/70 hover:bg-neutral-100/70 border border-neutral-200/70 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-colors"
+                    >
+                      {/* File Thumbnail Badge */}
+                      <div className="w-9 h-9 rounded-xl bg-white border border-neutral-200/80 flex flex-col items-center justify-center shrink-0 shadow-2xs">
+                        <FileText className="w-4 h-4 text-[#0c831f]" />
+                        <span className="text-[7px] font-bold uppercase text-neutral-600 mt-0.5 leading-none">
+                          {((d.title || "DOC").split(".").pop() || "DOC").slice(0, 4)}
+                        </span>
+                      </div>
+
+                      {/* Draft Details: Strictly 2 separate single lines, NEVER wrapping */}
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <h4
+                          className="font-bold text-xs sm:text-[13px] text-neutral-900 truncate whitespace-nowrap block"
+                          title={d.title}
+                        >
+                          {d.title}
+                        </h4>
+                        <div className="text-[11px] text-neutral-500 mt-0.5 truncate whitespace-nowrap flex items-center gap-1.5 overflow-hidden">
+                          <span className="shrink-0 font-medium">
+                            {d.pageCount} {d.pageCount === 1 ? "page" : "pages"}
+                          </span>
+                          <span className="shrink-0 text-neutral-300">•</span>
+                          <span className="shrink-0 font-medium">
+                            {d.config?.colorMode === "color" ? "Color" : "B&W"}
+                          </span>
+                          <span className="shrink-0 text-neutral-300">•</span>
+                          <span className="shrink-0 font-medium">
+                            {d.config?.copies || 1} {(d.config?.copies || 1) === 1 ? "copy" : "copies"}
                           </span>
                         </div>
-                        <p className="text-[11px] text-neutral-500">
-                          Select a draft to configure and print in Studio
-                        </p>
+                      </div>
+
+                      {/* Actions: Select button opens in Print Studio + Delete icon */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Link
+                          href={`/user/print?draftId=${encodeURIComponent(d.id)}`}
+                          className="px-3 py-1.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-0.5 shrink-0 whitespace-nowrap"
+                        >
+                          <span>Select</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteDraft(d.id);
+                          }}
+                          className="w-7 h-7 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors shrink-0"
+                          title="Remove draft"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsExpanded(false)}
-                      className="w-7 h-7 rounded-full bg-neutral-200/60 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors"
-                      title="Close"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* List of Drafts with Select Option on All */}
-                  <div className="max-h-72 overflow-y-auto divide-y divide-neutral-100 p-3 space-y-2">
-                    {drafts.map((d) => (
-                      <div
-                        key={d.id}
-                        className="bg-neutral-50/80 hover:bg-neutral-100/80 border border-neutral-200/70 rounded-2xl p-3 flex items-center justify-between gap-3 transition-colors"
-                      >
-                        {/* File Thumbnail Badge */}
-                        <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200/80 flex flex-col items-center justify-center shrink-0 shadow-2xs">
-                          <FileText className="w-4 h-4 text-[#0c831f]" />
-                          <span className="text-[7.5px] font-bold uppercase text-neutral-600 mt-0.5">
-                            {((d.title || "DOC").split(".").pop() || "DOC").slice(0, 4)}
-                          </span>
-                        </div>
-
-                        {/* Draft Details */}
-                        <div className="flex-1 min-w-0 pr-1">
-                          <h4 className="font-bold text-xs sm:text-sm text-neutral-900 truncate" title={d.title}>
-                            {d.title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-neutral-500 mt-0.5">
-                            <span>{d.pageCount} {d.pageCount === 1 ? "page" : "pages"}</span>
-                            <span>•</span>
-                            <span className="capitalize">{d.config?.colorMode === "color" ? "Color" : "B&W"}</span>
-                            <span>•</span>
-                            <span>{d.config?.copies || 1} {(d.config?.copies || 1) === 1 ? "copy" : "copies"}</span>
-                          </div>
-                        </div>
-
-                        {/* Actions: Select button opens in Print Studio */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Link
-                            href={`/user/print?draftId=${encodeURIComponent(d.id)}`}
-                            className="px-3.5 py-1.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-1"
-                          >
-                            <span>Select</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDeleteDraft(d.id);
-                            }}
-                            className="w-7 h-7 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
-                            title="Remove draft"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer: Upload New & Clear All */}
-                  <div className="p-3 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between text-xs">
-                    <Link
-                      href="/user/print?new=1"
-                      className="text-[#0c831f] hover:text-[#0a6e1a] font-bold flex items-center gap-1.5 py-1"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Upload New Document</span>
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={handleClearAllDrafts}
-                      className="text-neutral-400 hover:text-red-600 transition-colors py-1"
-                    >
-                      Clear All Drafts
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              )}
+
+                {/* Footer: Upload New & Clear All */}
+                <div className="p-3 px-4 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between text-xs">
+                  <Link
+                    href="/user/print?new=1"
+                    className="text-[#0c831f] hover:text-[#0a6e1a] font-bold flex items-center gap-1.5 py-1 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Upload New Document</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleClearAllDrafts}
+                    className="text-neutral-400 hover:text-red-600 transition-colors py-1 text-[11px] font-medium"
+                  >
+                    Clear All Drafts
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         )}

@@ -65,11 +65,11 @@ export default function HomePage() {
         
         {/* Generous Breathing Room at Top as in Screenshot */}
         <div className="text-center pt-14 sm:pt-20 pb-9 sm:pb-11">
-          <h1 className="text-3xl sm:text-[2.65rem] font-black text-[#1c1c1c] tracking-[-0.035em] leading-tight">
+          <h1 className="text-4xl sm:text-[3.25rem] font-black text-[#111827] tracking-tight leading-none">
             Print Store
           </h1>
-          <p className="text-xs sm:text-[13.5px] text-[#5c6874] mt-2 font-medium tracking-[-0.01em]">
-            Blinkit ensures secure prints at every stage
+          <p className="text-xs sm:text-[13.5px] text-[#5c6874] mt-2.5 font-medium tracking-normal">
+            PrintMart ensures secure prints at every stage
           </p>
         </div>
 
@@ -79,10 +79,10 @@ export default function HomePage() {
           {/* CARD 1: Documents */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
                 Documents
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
                 <li className="flex items-center gap-1.5">
                   <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Price starting at ₹3/page</span>
@@ -98,7 +98,7 @@ export default function HomePage() {
               </ul>
               <Link
                 href="/user/print?type=documents"
-                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Files
               </Link>
@@ -148,10 +148,10 @@ export default function HomePage() {
           {/* CARD 2: Passport Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
                 Passport photos
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
                 <li className="flex items-center gap-1.5">
                   <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on Kodak glossy paper</span>
@@ -167,7 +167,7 @@ export default function HomePage() {
               </ul>
               <Link
                 href="/user/print?type=passport"
-                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Photos
               </Link>
@@ -212,10 +212,10 @@ export default function HomePage() {
           {/* CARD 3: Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
                 Photos
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
                 <li className="flex items-center gap-1.5">
                   <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on Kodak glossy paper</span>
@@ -231,7 +231,7 @@ export default function HomePage() {
               </ul>
               <Link
                 href="/user/print?type=photos"
-                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Photos
               </Link>
@@ -276,10 +276,10 @@ export default function HomePage() {
           {/* CARD 4: Aartis */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-[-0.03em] leading-tight">
+              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
                 Aartis
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium tracking-[-0.01em]">
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
                 <li className="flex items-center gap-1.5">
                   <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
                   <span>Printed on laminated thick card</span>
@@ -295,7 +295,7 @@ export default function HomePage() {
               </ul>
               <Link
                 href="/user/print?type=aarti"
-                className="mt-4 inline-flex items-center justify-center px-4 py-2.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-extrabold rounded-lg shadow-xs active:scale-95 transition-all"
+                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Explore Aartis
               </Link>

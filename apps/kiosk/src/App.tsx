@@ -17,7 +17,7 @@ const firebaseConfig = {
   messagingSenderId: "112273507268",
   appId: "1:112273507268:web:8119878aa05597c963da91",
   measurementId: "G-1PWQHK6307",
-  databaseURL: "https://printmart-bd9da-default-rtdb.firebaseio.com",
+  databaseURL: "https://printmart-bd9da-default-rtdb.asia-southeast1.firebasedatabase.app",
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

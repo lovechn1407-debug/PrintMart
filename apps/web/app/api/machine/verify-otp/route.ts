@@ -2,17 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { hashOTP } from "@/lib/otpService";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+function jsonResponse(data: any, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { machineId, otp } = await req.json();
 
     if (!machineId || !otp) {
-      return NextResponse.json({ error: "Machine ID and OTP are required" }, { status: 400 });
+      return jsonResponse({ error: "Machine ID and OTP are required" }, 400);
     }
 
     const cleanOtp = String(otp).trim();
     if (cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
-      return NextResponse.json({ error: "Invalid OTP format. Must be 6 digits." }, { status: 400 });
+      return jsonResponse({ error: "Invalid OTP format. Must be 6 digits." }, 400);
     }
 
     // Compute cryptographic hash
@@ -21,44 +44,41 @@ export async function POST(req: NextRequest) {
     // Read OTP record
     const otpSnap = await adminDb.ref(`otpRecords/${otpHash}`).get();
     if (!otpSnap.exists()) {
-      return NextResponse.json(
-        { error: "Invalid OTP or job not found." },
-        { status: 404 }
-      );
+      return jsonResponse({ error: "Invalid OTP or job not found." }, 404);
     }
 
     const otpRecord = otpSnap.val();
 
     // Check machine match
     if (otpRecord.machineId !== machineId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: `This OTP is assigned to vending machine ${otpRecord.machineId}, not this machine.` },
-        { status: 403 }
+        403
       );
     }
 
     // Check expiration
     if (Date.now() > otpRecord.expiresAt) {
-      return NextResponse.json({ error: "This OTP has expired. Please contact support." }, { status: 410 });
+      return jsonResponse({ error: "This OTP has expired. Please contact support." }, 410);
     }
 
     // Check already consumed
     if (otpRecord.consumed) {
-      return NextResponse.json({ error: "This OTP has already been used." }, { status: 409 });
+      return jsonResponse({ error: "This OTP has already been used." }, 409);
     }
 
     // Check failed attempts
     if (otpRecord.failedAttempts >= 3) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: "Too many failed attempts. OTP has been locked for security." },
-        { status: 429 }
+        429
       );
     }
 
     const jobId = otpRecord.jobId;
     const jobSnap = await adminDb.ref(`printJobs/${jobId}`).get();
     if (!jobSnap.exists()) {
-      return NextResponse.json({ error: "Print job record missing" }, { status: 404 });
+      return jsonResponse({ error: "Print job record missing" }, 404);
     }
     const job = jobSnap.val();
 
@@ -77,20 +97,19 @@ export async function POST(req: NextRequest) {
 
     await adminDb.ref().update(updates);
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: "Print job authorized successfully",
       jobId,
       documentName: job.documentName,
       configuration: job.configuration,
       preparationStatus: job.preparation?.status,
-    });
+    }, 200);
   } catch (error: any) {
     console.error("Verify OTP error:", error);
-    return NextResponse.json(
+    return jsonResponse(
       { error: error.message || "Failed to verify OTP" },
-      { status: 500 }
+      500
     );
   }
 }
-

@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { MachinePrinterStatus } from "@printmart/shared";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+function jsonResponse(data: any, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -19,7 +42,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!machineId) {
-      return NextResponse.json({ error: "Missing machineId" }, { status: 400 });
+      return jsonResponse({ error: "Missing machineId" }, 400);
     }
 
     const now = Date.now();
@@ -80,17 +103,16 @@ export async function POST(req: NextRequest) {
           : null;
     } catch {}
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       serverTime: now,
       activeOverlay,
     });
   } catch (error: any) {
     console.error("Machine status update error:", error);
-    return NextResponse.json(
+    return jsonResponse(
       { error: error.message || "Failed to update machine status" },
-      { status: 500 }
+      500
     );
   }
 }
-

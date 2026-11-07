@@ -1,13 +1,23 @@
 @import "tailwindcss";
+@import "@heroui/styles/themes/default";
 @import "@heroui/styles/css";
+
+@theme {
+  --color-primary: #0c831f;
+  --color-primary-hover: #0a6c1a;
+  --color-primary-foreground: #ffffff;
+}
 
 :root {
   color-scheme: light;
+  --primary: #0c831f;
+  --primary-foreground: #ffffff;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
   -webkit-user-select: none;
+  background-color: #faf7ee;
 }
 

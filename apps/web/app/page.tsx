@@ -65,10 +65,10 @@ export default function HomePage() {
         
         {/* Generous Breathing Room at Top as in Screenshot */}
         <div className="text-center pt-12 sm:pt-16 pb-7 sm:pb-9">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1c1c1c] tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-bold text-[#1c1c1c] tracking-tight leading-tight">
             Print Store
           </h1>
-          <p className="text-xs sm:text-[13px] text-[#5c6874] mt-1.5 font-normal tracking-wide">
+          <p className="text-xs sm:text-[13px] text-[#5c6874] mt-2 font-normal tracking-wide">
             PrintMart ensures secure prints at every stage
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* CARD 2: Passport Photos */}
+          {/* CARD 2: Passport Photos (Unavailable) */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
               <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
@@ -165,16 +165,17 @@ export default function HomePage() {
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
-              <Link
-                href="/user/print?type=passport"
-                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+              <button
+                type="button"
+                disabled
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#e5e7eb] text-[#9ca3af] text-xs sm:text-[13px] font-semibold rounded-lg cursor-not-allowed select-none shadow-none text-center"
               >
-                Upload Photos
-              </Link>
+                Unavailable
+              </button>
             </div>
 
             {/* Graphic: Fanned Passport Photos with Portrait */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none opacity-80">
               {/* Back Left Passport Photo */}
               <div className="absolute w-14 h-19 bg-white p-1 border border-slate-200 rounded-sm shadow-xs -rotate-12 -translate-x-4">
                 <div className="w-full h-full bg-[#bfdbfe] rounded-xs flex flex-col items-center justify-end overflow-hidden">
@@ -209,7 +210,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* CARD 3: Photos */}
+          {/* CARD 3: Photos (Unavailable) */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
               <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
@@ -229,16 +230,17 @@ export default function HomePage() {
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
-              <Link
-                href="/user/print?type=photos"
-                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+              <button
+                type="button"
+                disabled
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#e5e7eb] text-[#9ca3af] text-xs sm:text-[13px] font-semibold rounded-lg cursor-not-allowed select-none shadow-none text-center"
               >
-                Upload Photos
-              </Link>
+                Unavailable
+              </button>
             </div>
 
             {/* Graphic: Cluster of Sunflowers Photos */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex flex-col justify-between p-1 select-none pointer-events-none">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex flex-col justify-between p-1 select-none pointer-events-none opacity-80">
               {/* Top Horizontal Photo */}
               <div className="w-full h-11 rounded-md bg-[#38bdf8] border border-white shadow-xs overflow-hidden relative flex items-center justify-around px-1">
                 <div className="relative w-8 h-8 flex items-center justify-center">
@@ -268,51 +270,6 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="h-1.5 bg-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 4: Aartis */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
-            <div className="flex-1 pr-1">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
-                Aartis
-              </h2>
-              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-normal">
-                <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-neutral-400">✦</span>
-                  <span>Printed on laminated thick card</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-neutral-400">✦</span>
-                  <span>Sacred hymns & daily prayer formats</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-neutral-400">✦</span>
-                  <span>High vibrancy devotional prints</span>
-                </li>
-              </ul>
-              <Link
-                href="/user/print?type=aarti"
-                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
-              >
-                Explore Aartis
-              </Link>
-            </div>
-
-            {/* Graphic: Ornate Devotional Aarti Frame */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
-              <div className="w-24 h-26 bg-[#fffbeb] border-2 border-[#f59e0b] rounded-sm p-1 shadow-sm flex flex-col items-center justify-between relative overflow-hidden">
-                <div className="w-full h-4 bg-[#dc2626] rounded-b-xl flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-yellow-300" />
-                </div>
-                <div className="relative my-auto flex flex-col items-center">
-                  <div className="w-2 h-3 bg-gradient-to-t from-orange-500 to-yellow-300 rounded-full animate-pulse" />
-                  <div className="w-6 h-2 bg-[#b45309] rounded-b-full border-t border-yellow-400" />
-                </div>
-                <div className="w-full text-center text-[7px] font-bold text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
-                  श्री आरती
                 </div>
               </div>
             </div>

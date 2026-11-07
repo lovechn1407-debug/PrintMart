@@ -7,10 +7,11 @@
     "apps/*"
   ],
   "scripts": {
-    "dev:web": "npm run dev --workspace=@printmart/web",
-    "dev:kiosk": "npm run dev --workspace=@printmart/kiosk",
+    "build": "npm run build --workspace=@printmart/shared && npm run build --workspace=@printmart/web",
     "build:web": "npm run build --workspace=@printmart/web",
-    "build:kiosk": "npm run build --workspace=@printmart/kiosk"
+    "build:kiosk": "npm run build --workspace=@printmart/kiosk",
+    "dev:web": "npm run dev --workspace=@printmart/web",
+    "dev:kiosk": "npm run dev --workspace=@printmart/kiosk"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

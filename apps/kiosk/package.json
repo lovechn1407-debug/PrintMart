@@ -4,7 +4,8 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev:ui": "vite",
+    "start": "node serve.js",
+    "dev:ui": "node serve.js",
     "dev:electron": "electron .",
     "build:ui": "node build-ui.js",
     "build:electron": "tsc -p tsconfig.electron.json",

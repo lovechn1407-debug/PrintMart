@@ -9,7 +9,7 @@ export default function HomePage() {
   const [cartCount, setCartCount] = useState<number>(3);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-28 font-sans relative overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-28 relative overflow-x-hidden">
       <AppNavbar />
 
       {/* ─────────────────────────────────────────────────────────────

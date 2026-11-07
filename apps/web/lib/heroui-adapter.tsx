@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 // @ts-ignore
-import * as HeroUI from "../node_modules/@heroui/react/dist/index.js";
+import * as HeroUI from "@heroui/react-original";
 
 // Re-export all original HeroUI v3 components directly
-export * from "../node_modules/@heroui/react/dist/index.js";
+export * from "@heroui/react-original";
 
 // ─── CardBody ────────────────────────────────────────────────────────────────
 // HeroUI v3 renamed CardBody → CardContent

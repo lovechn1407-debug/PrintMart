@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const lookupPaths = [__dirname, path.resolve(__dirname, "../..")];
+
+function resolvePkg(name: string, fallbackSubpath: string) {
+  try {
+    return require.resolve(name, { paths: lookupPaths });
+  } catch {
+    return path.resolve(__dirname, "node_modules", fallbackSubpath);
+  }
+}
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@printmart/shared"],
   images: {
@@ -18,11 +28,11 @@ const nextConfig: NextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
+      "@heroui/react-original": resolvePkg("@heroui/react", "@heroui/react/dist/index.js"),
       "@heroui/react": path.resolve(__dirname, "lib/heroui-adapter.tsx"),
-      "firebase/app": path.resolve(__dirname, "node_modules/firebase/app/dist/esm/index.esm.js"),
-      "firebase/auth": path.resolve(__dirname, "node_modules/firebase/auth/dist/esm/index.esm.js"),
-      "firebase/database": path.resolve(__dirname, "node_modules/firebase/database/dist/esm/index.esm.js"),
-      "react-aria-components/i18n": path.resolve(__dirname, "node_modules/react-aria-components/i18n/index.mjs"),
+      "firebase/app": resolvePkg("firebase/app", "firebase/app/dist/index.cjs.js"),
+      "firebase/auth": resolvePkg("firebase/auth", "firebase/auth/dist/index.cjs.js"),
+      "firebase/database": resolvePkg("firebase/database", "firebase/database/dist/index.cjs.js"),
     };
     return config;
   },

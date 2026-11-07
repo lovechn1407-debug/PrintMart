@@ -1,241 +1,336 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { Button, Chip } from "@heroui/react";
-import {
-  Printer,
-  Zap,
-  ShieldCheck,
-  MapPin,
-  Clock,
-  ArrowRight,
-  FileText,
-  Lock,
-  Sparkles,
-  CheckCircle2,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
-import { useAuth } from "@/lib/authContext";
-import { ref, onValue } from "@/lib/firebase";
-import { database } from "@/lib/firebase";
-import { MachineRecord } from "@printmart/shared";
 
 export default function HomePage() {
-  const { user, signInWithGoogle } = useAuth();
-  const [machines, setMachines] = useState<MachineRecord[]>([]);
-
-  useEffect(() => {
-    const machinesRef = ref(database, "machines");
-    const unsubscribe = onValue(machinesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setMachines(Object.values(data));
-      } else {
-        setMachines([
-          {
-            machineId: "MCH-CAMPUS-01",
-            name: "Central Library Kiosk A",
-            location: "Academic Block - Floor 1",
-            status: "ONLINE",
-            pairedAt: Date.now(),
-            pairingStatus: "paired",
-            lastHeartbeat: Date.now(),
-            agentVersion: "1.0.0",
-          },
-          {
-            machineId: "MCH-CAMPUS-02",
-            name: "Student Center Kiosk B",
-            location: "Student Union Hall - Ground Floor",
-            status: "ONLINE",
-            pairedAt: Date.now(),
-            pairingStatus: "paired",
-            lastHeartbeat: Date.now(),
-            agentVersion: "1.0.0",
-          },
-        ]);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const onlineCount = machines.filter((m) => m.status === "ONLINE").length;
+  const [cartCount, setCartCount] = useState<number>(3);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-900 pb-20 sm:pb-0">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-24 font-sans">
       <AppNavbar />
 
-      {/* Hero Section */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-16">
-        <div className="flex flex-col items-center text-center space-y-4 max-w-3xl mx-auto">
-          {/* Subtle Live Status Pill */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-100 text-sky-700 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Zero-Wait Smart Printing Engine</span>
-          </div>
+      {/* Main Print Store Container */}
+      <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-3.5 sm:px-4 pt-4 sm:pt-6 pb-12 relative">
+        
+        {/* Subtle Warm Top Aura & Concentric Watermark Arcs */}
+        <div className="absolute top-0 inset-x-0 h-48 pointer-events-none overflow-hidden flex items-center justify-center -z-10">
+          <div className="w-96 h-96 rounded-full bg-gradient-to-b from-[#fde047]/30 via-[#fef08a]/20 to-transparent blur-2xl" />
+          <svg
+            className="absolute top-2 w-[340px] h-32 opacity-25 text-amber-500 pointer-events-none"
+            viewBox="0 0 340 120"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M10 100 C 90 20, 250 20, 330 100" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
+            <path d="M30 110 C 100 40, 240 40, 310 110" stroke="currentColor" strokeWidth="1" />
+            <path d="M50 120 C 110 60, 230 60, 290 120" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+          </svg>
+        </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
-            Self-Service Document Printing at Campus Kiosks
+        {/* Section Header */}
+        <div className="text-center pt-2 pb-5">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1c1c1c] tracking-tight">
+            Print Store
           </h1>
-
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
-            Upload documents from your phone or laptop, customize duplex & color modes in paise, and print instantly at any campus kiosk using a secure 6-digit OTP.
+          <p className="text-xs sm:text-sm text-neutral-600 mt-1.5 font-normal tracking-wide">
+            Blinkit ensures secure prints at every stage
           </p>
+        </div>
 
-          <div className="pt-2 flex flex-wrap gap-3 justify-center">
-            <Button
-              as={Link}
-              href="/user/print"
-              size="md"
-              color="primary"
-              className="font-semibold text-xs sm:text-sm px-6 h-10 rounded-md shadow-xs"
-              endContent={<ArrowRight className="w-4 h-4" />}
-            >
-              Start Printing
-            </Button>
-
-            {!user && (
-              <Button
-                size="md"
-                variant="bordered"
-                className="font-medium text-xs sm:text-sm px-5 h-10 rounded-md border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                onPress={() => signInWithGoogle()}
+        {/* Cards Stack */}
+        <div className="space-y-3.5">
+          
+          {/* CARD 1: Documents */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
+            <div className="flex-1 pr-1">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+                Documents
+              </h2>
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Price starting at ₹3/page</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Paper quality: 70 GSM</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Single side prints</span>
+                </li>
+              </ul>
+              <Link
+                href="/user/print?type=documents"
+                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
               >
-                Sign In with Google
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* 3-Step Process Flow (Single Flat Clean Surface) */}
-        <div className="mt-14 sm:mt-20 pt-8 border-t border-slate-200/80">
-          <div className="text-center mb-8">
-            <span className="text-xs font-semibold text-sky-600 uppercase tracking-wider">How It Works</span>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">Ready to print in under 60 seconds</h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-xs flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="w-8 h-8 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center font-bold text-xs">
-                  1
-                </div>
-                <h3 className="font-semibold text-sm text-slate-900">Upload & Configure</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Upload PDF, Word, or images. Choose B&W or color, single or duplex with real-time paise price previews.
-                </p>
-              </div>
+                Upload Files
+              </Link>
             </div>
 
-            <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-xs flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="w-8 h-8 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center font-bold text-xs">
-                  2
+            {/* Graphic: 3 Layered Documents */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              {/* Back Left Page */}
+              <div className="absolute w-20 h-26 bg-white border border-slate-200 rounded-sm shadow-xs -rotate-12 -translate-x-3.5 p-1.5 flex flex-col justify-between">
+                <div className="w-5 h-5 rounded-full bg-cyan-100 flex items-center justify-center text-[7px] text-cyan-700 font-bold">
+                  DOC
                 </div>
-                <h3 className="font-semibold text-sm text-slate-900">Zero-Wait Preload</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Upon sandbox checkout, encrypted file pages preload directly into the selected kiosk's local cache.
-                </p>
+                <div className="space-y-1">
+                  <div className="h-1 bg-slate-200 rounded w-full" />
+                  <div className="h-1 bg-slate-200 rounded w-4/5" />
+                  <div className="h-1 bg-slate-200 rounded w-2/3" />
+                </div>
               </div>
-            </div>
 
-            <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-xs flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="w-8 h-8 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center font-bold text-xs">
-                  3
+              {/* Back Right Page */}
+              <div className="absolute w-20 h-26 bg-white border border-slate-200 rounded-sm shadow-xs rotate-12 translate-x-3.5 p-1.5 flex flex-col justify-between">
+                <div className="h-2.5 bg-sky-100 rounded w-3/4" />
+                <div className="space-y-1">
+                  <div className="h-1 bg-slate-200 rounded w-full" />
+                  <div className="h-1 bg-slate-200 rounded w-3/4" />
                 </div>
-                <h3 className="font-semibold text-sm text-slate-900">Tap OTP & Print</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Approach the kiosk touchscreen, enter your 6-digit OTP, and collect your fresh prints immediately.
-                </p>
+              </div>
+
+              {/* Front Page with 'Lorem' Header */}
+              <div className="absolute w-22 h-28 bg-white border border-slate-200/90 rounded-sm shadow-md rotate-2 p-2 flex flex-col z-10">
+                <div className="bg-[#7e22ce] text-white font-bold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
+                  <span>Lorem</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-1 bg-slate-300 rounded w-full" />
+                  <div className="h-1 bg-slate-200 rounded w-11/12" />
+                  <div className="h-1 bg-slate-200 rounded w-4/5" />
+                  <div className="h-1 bg-slate-200 rounded w-full" />
+                  <div className="h-1 bg-slate-200 rounded w-3/4" />
+                  <div className="h-1 bg-slate-200 rounded w-5/6" />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Live Vending Stations */}
-        <div className="mt-14 sm:mt-16">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900">Campus Printing Stations</h2>
-              <p className="text-xs text-slate-500">Live availability across campus</p>
-            </div>
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
-              {onlineCount} Online
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {machines.map((machine) => (
-              <div
-                key={machine.machineId}
-                className="bg-white border border-slate-200/90 rounded-lg p-4 shadow-xs flex items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+          {/* CARD 2: Passport Photos */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
+            <div className="flex-1 pr-1">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+                Passport photos
+              </h2>
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Printed on Kodak glossy paper</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Photo sets available: 8, 16, 32</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Paper quality 210 GSM</span>
+                </li>
+              </ul>
+              <Link
+                href="/user/print?type=passport"
+                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    <h4 className="font-semibold text-sm text-slate-900 truncate">{machine.name}</h4>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                    <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                    <span className="truncate">{machine.location}</span>
+                Upload Photos
+              </Link>
+            </div>
+
+            {/* Graphic: Fanned Passport Photos with Portrait */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              {/* Back Left Passport Photo */}
+              <div className="absolute w-14 h-19 bg-white p-1 border border-slate-200 rounded-sm shadow-xs -rotate-12 -translate-x-4">
+                <div className="w-full h-full bg-[#bfdbfe] rounded-xs flex flex-col items-center justify-end overflow-hidden">
+                  <div className="w-6 h-6 rounded-full bg-[#60a5fa] mb-1" />
+                  <div className="w-10 h-6 bg-[#1d4ed8] rounded-t-lg" />
+                </div>
+              </div>
+
+              {/* Back Right Passport Photo */}
+              <div className="absolute w-14 h-19 bg-white p-1 border border-slate-200 rounded-sm shadow-xs rotate-12 translate-x-4">
+                <div className="w-full h-full bg-[#bfdbfe] rounded-xs flex flex-col items-center justify-end overflow-hidden">
+                  <div className="w-6 h-6 rounded-full bg-[#60a5fa] mb-1" />
+                  <div className="w-10 h-6 bg-[#1d4ed8] rounded-t-lg" />
+                </div>
+              </div>
+
+              {/* Front Main Passport Portrait */}
+              <div className="absolute w-18 h-24 bg-white p-1 border border-slate-200/90 rounded-sm shadow-md z-10 flex flex-col items-center">
+                <div className="w-full h-full bg-gradient-to-b from-[#e0f2fe] to-[#bae6fd] rounded-xs relative overflow-hidden flex flex-col items-center justify-end">
+                  {/* Portrait silhouette / hair & face */}
+                  <svg className="w-14 h-20 text-slate-700" viewBox="0 0 60 70" fill="none">
+                    {/* Hair */}
+                    <path d="M16 35 C 14 12, 46 12, 44 35 C 48 48, 52 65, 52 70 L 8 70 C 8 65, 12 48, 16 35 Z" fill="#1e293b" />
+                    {/* Face */}
+                    <ellipse cx="30" cy="30" rx="10" ry="12" fill="#d97706" opacity="0.4" />
+                    <ellipse cx="30" cy="30" rx="9" ry="11" fill="#fde68a" />
+                    {/* Smile */}
+                    <path d="M26 34 Q 30 38 34 34" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" />
+                    {/* Eyes */}
+                    <circle cx="26" cy="28" r="1.2" fill="#1e293b" />
+                    <circle cx="34" cy="28" r="1.2" fill="#1e293b" />
+                    {/* Blue Shirt collar */}
+                    <path d="M12 70 L 22 46 L 30 52 L 38 46 L 48 70 Z" fill="#2563eb" />
+                    <path d="M26 48 L 30 54 L 34 48" stroke="#ffffff" strokeWidth="1.5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 3: Photos */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
+            <div className="flex-1 pr-1">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+                Photos
+              </h2>
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Printed on Kodak glossy paper</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Cropping & Editing available</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Paper quality 210 GSM</span>
+                </li>
+              </ul>
+              <Link
+                href="/user/print?type=photos"
+                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+              >
+                Upload Photos
+              </Link>
+            </div>
+
+            {/* Graphic: Cluster of Sunflowers Photos */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex flex-col justify-between p-1 select-none pointer-events-none">
+              {/* Top Horizontal Photo */}
+              <div className="w-full h-11 rounded-md bg-[#38bdf8] border border-white shadow-xs overflow-hidden relative flex items-center justify-around px-1">
+                {/* Yellow Sunflowers */}
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <div className="absolute w-7 h-7 rounded-full bg-yellow-400 animate-spin-slow" />
+                  <div className="absolute w-3.5 h-3.5 rounded-full bg-[#78350f]" />
+                </div>
+                <div className="relative w-7 h-7 flex items-center justify-center">
+                  <div className="absolute w-6 h-6 rounded-full bg-yellow-400" />
+                  <div className="absolute w-3 h-3 rounded-full bg-[#78350f]" />
+                </div>
+              </div>
+
+              {/* Bottom 2 Photos */}
+              <div className="flex gap-1.5 h-13 mt-1">
+                <div className="flex-1 bg-[#0284c7] rounded-md border border-white shadow-xs overflow-hidden flex items-center justify-center p-0.5">
+                  <div className="relative w-6 h-6 flex items-center justify-center">
+                    <div className="absolute w-5.5 h-5.5 rounded-full bg-yellow-400" />
+                    <div className="absolute w-2.5 h-2.5 rounded-full bg-[#78350f]" />
                   </div>
                 </div>
 
-                <Button
-                  as={Link}
-                  href={`/user/print?machine=${machine.machineId}`}
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  className="font-semibold text-xs rounded-md h-8 shrink-0"
-                >
-                  Print Here
-                </Button>
+                <div className="flex-1 bg-white p-0.5 rounded-md border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex-1 bg-[#38bdf8] rounded-xs flex items-center justify-center overflow-hidden">
+                    <div className="relative w-5 h-5 flex items-center justify-center">
+                      <div className="absolute w-4.5 h-4.5 rounded-full bg-yellow-400" />
+                      <div className="absolute w-2 h-2 rounded-full bg-[#78350f]" />
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-white" />
+                </div>
               </div>
-            ))}
+            </div>
           </div>
+
+          {/* CARD 4: Aartis */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
+            <div className="flex-1 pr-1">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
+                Aartis
+              </h2>
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Printed on laminated thick card</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>Sacred hymns & daily prayer formats</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">✦</span>
+                  <span>High vibrancy devotional prints</span>
+                </li>
+              </ul>
+              <Link
+                href="/user/print?type=aarti"
+                className="mt-3.5 inline-flex items-center justify-center px-4 py-2 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-sm font-bold rounded-lg shadow-xs active:scale-95 transition-all"
+              >
+                Explore Aartis
+              </Link>
+            </div>
+
+            {/* Graphic: Ornate Devotional Aarti Frame */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              <div className="w-24 h-26 bg-[#fffbeb] border-2 border-[#f59e0b] rounded-sm p-1 shadow-sm flex flex-col items-center justify-between relative overflow-hidden">
+                {/* Traditional Temple Arch */}
+                <div className="w-full h-4 bg-[#dc2626] rounded-b-xl flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-yellow-300" />
+                </div>
+                {/* Glowing Diya / Sacred Motif */}
+                <div className="relative my-auto flex flex-col items-center">
+                  <div className="w-2 h-3 bg-gradient-to-t from-orange-500 to-yellow-300 rounded-full animate-pulse" />
+                  <div className="w-6 h-2 bg-[#b45309] rounded-b-full border-t border-yellow-400" />
+                </div>
+                <div className="w-full text-center text-[7px] font-bold text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
+                  श्री आरती
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        {/* Features / Guarantees */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 pt-8 border-t border-slate-200/80">
-          <div className="flex items-start gap-3 p-3">
-            <div className="w-8 h-8 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
-              <Zap className="w-4 h-4" />
+        {/* Floating "View Cart" Pill (Exact match from screenshot) */}
+        <div className="fixed bottom-4 inset-x-4 max-w-xs sm:max-w-sm mx-auto z-50">
+          <Link
+            href="/user/print"
+            className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-full px-3.5 py-2.5 flex items-center justify-between shadow-2xl transition-all active:scale-98"
+          >
+            {/* Left: 3 Overlapping Product Thumbnail Badges */}
+            <div className="flex items-center -space-x-2 shrink-0">
+              <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-200 flex items-center justify-center overflow-hidden shadow-xs">
+                <span className="text-[9px] font-black text-amber-800">DOC</span>
+              </div>
+              <div className="w-8 h-8 rounded-full border-2 border-white bg-purple-300 flex items-center justify-center overflow-hidden shadow-xs">
+                <span className="text-[9px] font-black text-purple-900">IMG</span>
+              </div>
+              <div className="w-8 h-8 rounded-full border-2 border-white bg-sky-300 flex items-center justify-center overflow-hidden shadow-xs">
+                <span className="text-[9px] font-black text-sky-900">OTP</span>
+              </div>
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">Background Preloading</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Documents stream directly to kiosk memory before you arrive.</p>
-            </div>
-          </div>
 
-          <div className="flex items-start gap-3 p-3">
-            <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-              <ShieldCheck className="w-4 h-4" />
+            {/* Center: Title & Item Count */}
+            <div className="flex-1 text-left px-3">
+              <span className="font-bold text-sm block leading-tight">View cart</span>
+              <span className="text-[11px] font-normal opacity-90 block leading-tight">
+                {cartCount} items
+              </span>
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">Cashfree Protected</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Bank-grade checkout with automatic refund on hardware errors.</p>
-            </div>
-          </div>
 
-          <div className="flex items-start gap-3 p-3">
-            <div className="w-8 h-8 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
-              <Sparkles className="w-4 h-4" />
+            {/* Right: Circle Chevron */}
+            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <ChevronRight className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">Paise Precision</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Transparent billing starting at ₹1.50 per page with offer support.</p>
-            </div>
-          </div>
+          </Link>
         </div>
+
       </main>
-
-      {/* Sleek Minimal Footer */}
-      <footer className="border-t border-slate-200/80 bg-white py-5 text-center text-xs text-slate-400">
-        <p>© 2026 PrintMart. Campus Smart Printing Network.</p>
-      </footer>
     </div>
   );
 }

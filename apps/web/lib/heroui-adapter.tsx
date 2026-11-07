@@ -30,6 +30,19 @@ export const Radio = ({ children, value, description, className, ...props }: any
 // ─── Divider ─────────────────────────────────────────────────────────────────
 export const Divider = HeroUI.Separator;
 
+// ─── Progress ────────────────────────────────────────────────────────────────
+// Official HeroUI v3 ProgressBar composition
+export const Progress = ({ value = 0, label, className = "", ...props }: any) => {
+  return (
+    <HeroUI.ProgressBar value={value} className={`w-full ${className}`} {...props}>
+      {label && <HeroUI.ProgressBar.Output>{label}</HeroUI.ProgressBar.Output>}
+      <HeroUI.ProgressBar.Track>
+        <HeroUI.ProgressBar.Fill />
+      </HeroUI.ProgressBar.Track>
+    </HeroUI.ProgressBar>
+  );
+};
+
 // ─── Modal ───────────────────────────────────────────────────────────────────
 // Context to pass isOpen/onOpenChange down to ModalContent
 const ModalControlledContext = React.createContext<{

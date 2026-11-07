@@ -14,6 +14,7 @@ import {
   Radio,
   Chip,
   Divider,
+  Progress,
   Modal,
   ModalContent,
   ModalHeader,
@@ -106,6 +107,8 @@ function UserPrintContent() {
   // Document State - Starts null so user is prompted to upload or test
   const [activeDoc, setActiveDoc] = useState<DocumentMetadata | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStatusText, setUploadStatusText] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Machine Selection
@@ -236,35 +239,68 @@ function UserPrintContent() {
     return () => clearTimeout(timer);
   }, [activeDoc, selectedMachineId, colorMode, simplexDuplex, paperSize, copies, pageRangeType, customRange, appliedOffer]);
 
-  // File Upload Handler
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Handler with real XHR Progress
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const selected = e.target.files[0];
 
     try {
       setUploading(true);
+      setUploadProgress(10);
+      setUploadStatusText(`Preparing ${selected.name}...`);
       setErrorMessage(null);
 
       const formData = new FormData();
       formData.append("file", selected);
       formData.append("ownerUid", user?.uid || "guest");
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to upload document");
-      }
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 75);
+          setUploadProgress(Math.max(15, percentComplete));
+          setUploadStatusText(`Uploading to vault (${Math.max(15, percentComplete)}%)...`);
+        }
+      };
 
-      setActiveDoc(data.document);
+      xhr.onload = () => {
+        setUploadProgress(95);
+        setUploadStatusText("Finalizing document encryption & pages...");
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+            setUploadProgress(100);
+            setUploadStatusText("Done!");
+            setTimeout(() => {
+              setActiveDoc(data.document);
+              setUploading(false);
+            }, 300);
+          } else {
+            throw new Error(data.error || `Upload failed with status ${xhr.status}`);
+          }
+        } catch (parseErr: any) {
+          setErrorMessage(parseErr.message || "Failed to process upload response");
+          setUploading(false);
+        }
+      };
+
+      xhr.onerror = () => {
+        setErrorMessage("Network error during document upload");
+        setUploading(false);
+      };
+
+      xhr.send(formData);
     } catch (err: any) {
       console.error("Upload error:", err);
       setErrorMessage(err.message || "Failed to upload file");
-    } finally {
       setUploading(false);
+    } finally {
+      // Clear file input so selecting the same file again triggers onChange
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -407,29 +443,54 @@ function UserPrintContent() {
 
             <Card>
               <CardBody className="py-10 px-6 sm:px-10 text-center">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-neutral-300 hover:border-primary rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-primary/5"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                    <UploadCloud className="w-8 h-8" />
+                {uploading ? (
+                  <div className="border-2 border-dashed border-primary/40 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center bg-primary/5 space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+                      <UploadCloud className="w-8 h-8 animate-bounce" />
+                    </div>
+                    <div className="space-y-1 w-full max-w-md">
+                      <h3 className="font-bold text-base sm:text-lg text-neutral-900">
+                        {uploadStatusText || "Uploading document..."}
+                      </h3>
+                      <p className="text-xs text-neutral-500">
+                        Transferring to private cloud vault & analyzing print specifications
+                      </p>
+                    </div>
+                    <div className="w-full max-w-md pt-2 space-y-2">
+                      <Progress
+                        value={uploadProgress}
+                        color="primary"
+                        className="w-full"
+                      />
+                      <span className="text-xs font-semibold text-primary block text-right">
+                        {uploadProgress}%
+                      </span>
+                    </div>
                   </div>
-                  <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1">
-                    Tap to upload or drag & drop
-                  </h3>
-                  <p className="text-xs sm:text-sm text-neutral-500 max-w-xs sm:max-w-sm mb-6">
-                    Supports PDF, Word (.docx), PowerPoint (.pptx), and Images up to 25 MB
-                  </p>
-                  <Button
-                    color="primary"
-                    size="md"
-                    isLoading={uploading}
-                    startContent={<UploadCloud className="w-4 h-4" />}
-                    className="font-semibold shadow-md"
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-neutral-300 hover:border-primary rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-primary/5"
                   >
-                    Select File from Device
-                  </Button>
-                </div>
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+                      <UploadCloud className="w-8 h-8" />
+                    </div>
+                    <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1">
+                      Tap to upload or drag & drop
+                    </h3>
+                    <p className="text-xs sm:text-sm text-neutral-500 max-w-xs sm:max-w-sm mb-6">
+                      Supports PDF, Word (.docx), PowerPoint (.pptx), and Images up to 25 MB
+                    </p>
+                    <Button
+                      color="primary"
+                      size="md"
+                      startContent={<UploadCloud className="w-4 h-4" />}
+                      className="font-semibold shadow-md pointer-events-none"
+                    >
+                      Select File from Device
+                    </Button>
+                  </div>
+                )}
 
                 <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-neutral-100/70 border border-neutral-200/60">
                   <div className="flex items-center gap-3 text-left">

@@ -14,15 +14,15 @@ export default function HomePage() {
 
       {/* ─────────────────────────────────────────────────────────────
           TOP AURA & FINE GUILLOCHÉ WAVY CONTOUR TEXTURE
-          Matches the banknote security & fingerprint lines in screenshot
+          Matches the subtle banknote security lines in screenshot
           ───────────────────────────────────────────────────────────── */}
       <div className="absolute top-0 inset-x-0 h-96 pointer-events-none select-none overflow-hidden z-0">
         {/* Soft Golden Radial Glow */}
-        <div className="absolute top-0 inset-x-0 h-72 bg-gradient-to-b from-[#fde047]/45 via-[#fef08a]/20 to-transparent" />
+        <div className="absolute top-0 inset-x-0 h-72 bg-gradient-to-b from-[#fde047]/40 via-[#fef08a]/15 to-transparent" />
 
         {/* Left Delicate Contour Guilloché Waves */}
         <svg
-          className="absolute -top-6 -left-12 w-80 h-96 opacity-35 text-[#d9b44a] pointer-events-none"
+          className="absolute -top-6 -left-12 w-80 h-96 opacity-30 text-[#d9b44a] pointer-events-none"
           viewBox="0 0 320 380"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +40,7 @@ export default function HomePage() {
 
         {/* Right Delicate Contour Guilloché Waves */}
         <svg
-          className="absolute -top-6 -right-12 w-80 h-96 opacity-35 text-[#d9b44a] pointer-events-none"
+          className="absolute -top-6 -right-12 w-80 h-96 opacity-30 text-[#d9b44a] pointer-events-none"
           viewBox="0 0 320 380"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -57,48 +57,48 @@ export default function HomePage() {
         </svg>
 
         {/* Center Golden Halo */}
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-80 h-44 bg-radial from-[#fde68a]/35 via-transparent to-transparent blur-xl" />
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-80 h-44 bg-radial from-[#fde68a]/30 via-transparent to-transparent blur-xl" />
       </div>
 
       {/* Main Print Store Container */}
       <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-3.5 sm:px-4 z-10 relative">
         
         {/* Generous Breathing Room at Top as in Screenshot */}
-        <div className="text-center pt-14 sm:pt-20 pb-9 sm:pb-11">
-          <h1 className="text-4xl sm:text-[3.25rem] font-black text-[#111827] tracking-tight leading-none">
+        <div className="text-center pt-12 sm:pt-16 pb-7 sm:pb-9">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1c1c1c] tracking-tight leading-tight">
             Print Store
           </h1>
-          <p className="text-xs sm:text-[13.5px] text-[#5c6874] mt-2.5 font-medium tracking-normal">
+          <p className="text-xs sm:text-[13px] text-[#5c6874] mt-1.5 font-normal tracking-wide">
             PrintMart ensures secure prints at every stage
           </p>
         </div>
 
         {/* Cards Stack */}
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           
           {/* CARD 1: Documents */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
                 Documents
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-normal">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Price starting at ₹3/page</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Paper quality: 70 GSM</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Single side prints</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=documents"
-                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Files
               </Link>
@@ -129,7 +129,7 @@ export default function HomePage() {
 
               {/* Front Page with 'Lorem' Header */}
               <div className="absolute w-22 h-28 bg-white border border-slate-200/90 rounded-sm shadow-md rotate-2 p-2 flex flex-col z-10">
-                <div className="bg-[#7e22ce] text-white font-extrabold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
+                <div className="bg-[#7e22ce] text-white font-bold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
                   <span>Lorem</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
                 </div>
@@ -148,26 +148,26 @@ export default function HomePage() {
           {/* CARD 2: Passport Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
                 Passport photos
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-normal">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Printed on Kodak glossy paper</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Photo sets available: 8, 16, 32</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=passport"
-                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Photos
               </Link>
@@ -212,26 +212,26 @@ export default function HomePage() {
           {/* CARD 3: Photos */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
                 Photos
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-normal">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Printed on Kodak glossy paper</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Cropping & Editing available</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Paper quality 210 GSM</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=photos"
-                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Photos
               </Link>
@@ -276,26 +276,26 @@ export default function HomePage() {
           {/* CARD 4: Aartis */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
             <div className="flex-1 pr-1">
-              <h2 className="text-lg sm:text-[1.2rem] font-black text-[#111827] tracking-tight leading-tight">
+              <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight">
                 Aartis
               </h2>
-              <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-[#4b5563] font-medium">
+              <ul className="mt-2 space-y-1 text-xs text-neutral-600 font-normal">
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Printed on laminated thick card</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>Sacred hymns & daily prayer formats</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#94a3b8] font-bold">✦</span>
+                  <span className="text-[10px] text-neutral-400">✦</span>
                   <span>High vibrancy devotional prints</span>
                 </li>
               </ul>
               <Link
                 href="/user/print?type=aarti"
-                className="mt-4 w-36 h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-[13px] font-bold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Explore Aartis
               </Link>
@@ -311,7 +311,7 @@ export default function HomePage() {
                   <div className="w-2 h-3 bg-gradient-to-t from-orange-500 to-yellow-300 rounded-full animate-pulse" />
                   <div className="w-6 h-2 bg-[#b45309] rounded-b-full border-t border-yellow-400" />
                 </div>
-                <div className="w-full text-center text-[7px] font-black text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
+                <div className="w-full text-center text-[7px] font-bold text-[#b45309] tracking-wider uppercase border-t border-[#fde68a] pt-0.5">
                   श्री आरती
                 </div>
               </div>
@@ -329,20 +329,20 @@ export default function HomePage() {
             {/* Left: 3 Overlapping Product Thumbnail Badges */}
             <div className="flex items-center -space-x-2 shrink-0">
               <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-200 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-black text-amber-800">DOC</span>
+                <span className="text-[9px] font-bold text-amber-800">DOC</span>
               </div>
               <div className="w-8 h-8 rounded-full border-2 border-white bg-purple-300 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-black text-purple-900">IMG</span>
+                <span className="text-[9px] font-bold text-purple-900">IMG</span>
               </div>
               <div className="w-8 h-8 rounded-full border-2 border-white bg-sky-300 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-black text-sky-900">OTP</span>
+                <span className="text-[9px] font-bold text-sky-900">OTP</span>
               </div>
             </div>
 
             {/* Center: Title & Item Count */}
             <div className="flex-1 text-left px-3">
-              <span className="font-extrabold text-sm block leading-tight">View cart</span>
-              <span className="text-[11px] font-medium opacity-90 block leading-tight">
+              <span className="font-bold text-xs sm:text-sm block leading-tight">View cart</span>
+              <span className="text-[11px] font-normal opacity-90 block leading-tight">
                 {cartCount} items
               </span>
             </div>

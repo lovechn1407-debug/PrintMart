@@ -357,8 +357,8 @@ export default function HomePage() {
               }}
               className={`fixed z-50 bottom-16 sm:bottom-6 inset-x-3.5 sm:inset-x-4 mx-auto origin-bottom overflow-hidden will-change-[max-width,border-radius,background-color] ${
                 isExpanded
-                  ? "max-w-[400px] sm:max-w-[430px] bg-white rounded-[24px] border border-neutral-200/90 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.28)]"
-                  : "max-w-[340px] sm:max-w-[370px] bg-[#0c831f] hover:bg-[#0a6e1a] rounded-[26px] border border-emerald-600/40 shadow-[0_8px_30px_rgba(12,131,31,0.35)] cursor-pointer"
+                  ? "max-w-[400px] sm:max-w-[430px] bg-white rounded-[20px] border border-neutral-200/90 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.28)]"
+                  : "max-w-[340px] sm:max-w-[370px] bg-[#0c831f] hover:bg-[#0a6e1a] rounded-[25px] border border-emerald-600/40 shadow-[0_8px_30px_rgba(12,131,31,0.35)] cursor-pointer"
               }`}
             >
               {/* ── TOP HEADER (52px) ── */}
@@ -480,9 +480,10 @@ export default function HomePage() {
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <h3 className="font-bold text-sm text-neutral-900 truncate">Saved Draft Prints</h3>
-                        <span className="text-[10.5px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full shrink-0">
+                        <span className="text-neutral-400 text-xs shrink-0">•</span>
+                        <span className="text-xs font-bold text-[#0c831f] shrink-0">
                           {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
                         </span>
                       </div>
@@ -518,7 +519,7 @@ export default function HomePage() {
                     {drafts.map((d) => (
                       <div
                         key={d.id}
-                        className="bg-neutral-50/70 hover:bg-neutral-100/70 border border-neutral-200/70 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-colors"
+                        className="bg-white hover:bg-neutral-50/60 border border-neutral-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] rounded-xl p-2.5 flex items-center justify-between gap-2.5 transition-colors"
                       >
                         {/* File Thumbnail Badge */}
                         <div className="w-9 h-9 rounded-xl bg-white border border-neutral-200/80 flex flex-col items-center justify-center shrink-0 shadow-2xs">

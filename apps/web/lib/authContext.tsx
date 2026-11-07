@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import { auth, database, googleProvider, ref, get, set, update, onValue } from "./firebase";
 import { UserProfile, UserRole } from "@printmart/shared";
+import { syncDraftsWithCloud } from "./draftStorage";
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -35,9 +36,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    let unsubscribeDraftSync = () => {};
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      unsubscribeDraftSync();
       if (fbUser) {
         setUser(fbUser);
+        // Automatically synchronize drafts across devices for this authenticated user
+        unsubscribeDraftSync = syncDraftsWithCloud(fbUser.uid);
 
         // Check if user is in /admins node
         const adminRef = ref(database, `admins/${fbUser.uid}`);
@@ -91,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       clearTimeout(timeout);
+      unsubscribeDraftSync();
       unsubscribe();
     };
   }, []);

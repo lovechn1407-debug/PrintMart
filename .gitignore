@@ -30,3 +30,5 @@ Thumbs.db
 # Testing & scratch files
 test_render.html
 apps/web/audit-heroui.js
+.uploads_cache/
+apps/web/.uploads_cache/

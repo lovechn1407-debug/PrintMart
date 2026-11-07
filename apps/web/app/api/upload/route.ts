@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import { uploadDocumentToTelegram } from "@/lib/telegram";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { DocumentMetadata, MAX_FILE_SIZE_BYTES } from "@printmart/shared";
@@ -79,9 +81,25 @@ export async function POST(req: NextRequest) {
     // Save to Firebase RTDB
     await adminDb.ref(`documents/${documentId}`).set(docMetadata);
 
+    // Save copy to local uploads cache for instant client previews across reloads
+    try {
+      const cacheDir = path.join(process.cwd(), ".uploads_cache");
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
+      const ext = path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : "");
+      fs.writeFileSync(path.join(cacheDir, `${documentId}${ext}`), buffer);
+    } catch (cacheErr) {
+      console.warn("Could not cache file locally:", cacheErr);
+    }
+
     return NextResponse.json({
       success: true,
-      document: docMetadata,
+      document: {
+        ...docMetadata,
+        fileId: documentId,
+        previewUrl: `/api/document/preview?documentId=${documentId}`,
+      },
     });
   } catch (error: any) {
     console.error("Upload error:", error);

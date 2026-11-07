@@ -3,15 +3,18 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight, X, FileText, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
 import {
   getStoredDrafts,
   removeDraftById,
   clearAllDrafts,
+  syncDraftsWithCloud,
   PrintDraftItem,
 } from "@/lib/draftStorage";
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [drafts, setDrafts] = useState<PrintDraftItem[]>([]);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
@@ -32,11 +35,19 @@ export default function HomePage() {
     const handleUpdate = () => loadDrafts();
     window.addEventListener("printmart_drafts_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+
+    // Cross-device cloud sync: listens to user's drafts in Firebase RTDB
+    let unsubscribeCloud = () => {};
+    if (user?.uid) {
+      unsubscribeCloud = syncDraftsWithCloud(user.uid);
+    }
+
     return () => {
       window.removeEventListener("printmart_drafts_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      unsubscribeCloud();
     };
-  }, []);
+  }, [user?.uid]);
 
   // Smooth cycling index for sliding titles text when multiple drafts exist
   useEffect(() => {
@@ -51,7 +62,7 @@ export default function HomePage() {
   }, [drafts.length]);
 
   const handleDeleteDraft = (id: string) => {
-    const remaining = removeDraftById(id);
+    const remaining = removeDraftById(id, user?.uid);
     setDrafts(remaining);
     if (remaining.length === 0) {
       setIsExpanded(false);
@@ -59,7 +70,7 @@ export default function HomePage() {
   };
 
   const handleClearAllDrafts = () => {
-    clearAllDrafts();
+    clearAllDrafts(user?.uid);
     setDrafts([]);
     setIsExpanded(false);
   };

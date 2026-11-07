@@ -43,6 +43,7 @@ import {
   saveOrUpdateDraft,
   removeDraftById,
   clearAllDrafts,
+  syncDraftsWithCloud,
 } from "@/lib/draftStorage";
 
 // Types
@@ -88,13 +89,34 @@ function RealDocumentViewer({
   const [loading, setLoading] = useState<boolean>(true);
   const [renderError, setRenderError] = useState<boolean>(false);
 
-  const docUrl = doc?.blobUrl || doc?.previewUrl;
+  const docId = doc?.fileId || (doc as any)?.documentId;
+  const permanentApiUrl = docId
+    ? `/api/document/preview?documentId=${encodeURIComponent(docId)}`
+    : doc?.telegramFileId
+    ? `/api/document/preview?fileId=${encodeURIComponent(doc.telegramFileId)}`
+    : doc?.originalFilename
+    ? `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`
+    : "";
+
+  // Prioritize permanent API URL to prevent dead blob: URLs across reloads and devices
+  const resolvedUrl =
+    permanentApiUrl ||
+    (doc?.previewUrl && !doc.previewUrl.startsWith("blob:") ? doc.previewUrl : "") ||
+    (doc?.blobUrl && !doc.blobUrl.startsWith("blob:") ? doc.blobUrl : "");
+
+  const [activeUrl, setActiveUrl] = useState<string>(resolvedUrl);
+
+  useEffect(() => {
+    setActiveUrl(resolvedUrl);
+  }, [resolvedUrl, doc?.fileId, (doc as any)?.documentId, doc?.originalFilename]);
+
+  const docUrl = activeUrl || resolvedUrl;
   const isImage =
     doc?.mimeType?.startsWith("image/") ||
     (doc?.originalFilename && /\.(jpg|jpeg|png|webp|bmp|svg)$/i.test(doc.originalFilename));
 
   useEffect(() => {
-    if (!docUrl) {
+    if (!docUrl && !permanentApiUrl) {
       setLoading(false);
       return;
     }
@@ -110,6 +132,7 @@ function RealDocumentViewer({
     let cancelled = false;
 
     const renderPdf = async () => {
+      let loadUrl = docUrl || permanentApiUrl;
       try {
         // Load PDF.js from CDN dynamically if not present
         if (!(window as any).pdfjsLib) {
@@ -144,8 +167,28 @@ function RealDocumentViewer({
         const pdfjsLib = (window as any).pdfjsLib;
         if (!pdfjsLib) throw new Error("PDF.js unavailable");
 
-        const loadingTask = pdfjsLib.getDocument(docUrl);
-        const pdf = await loadingTask.promise;
+        let pdf;
+        try {
+          const loadingTask = pdfjsLib.getDocument(loadUrl);
+          pdf = await loadingTask.promise;
+        } catch (firstErr) {
+          // If initial URL failed, fallback to permanent server preview API or filename lookup
+          if (permanentApiUrl && loadUrl !== permanentApiUrl) {
+            console.warn("Initial PDF load failed, switching to permanent API preview:", permanentApiUrl);
+            loadUrl = permanentApiUrl;
+            setActiveUrl(permanentApiUrl);
+            const retryTask = pdfjsLib.getDocument(permanentApiUrl);
+            pdf = await retryTask.promise;
+          } else if (doc?.originalFilename) {
+            const fnUrl = `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`;
+            loadUrl = fnUrl;
+            setActiveUrl(fnUrl);
+            const retryTask = pdfjsLib.getDocument(fnUrl);
+            pdf = await retryTask.promise;
+          } else {
+            throw firstErr;
+          }
+        }
         if (cancelled) return;
 
         const safePageNum = Math.min(Math.max(1, pageIndex), pdf.numPages);
@@ -188,16 +231,37 @@ function RealDocumentViewer({
     return () => {
       cancelled = true;
     };
-  }, [docUrl, pageIndex, orientation, isImage]);
+  }, [docUrl, permanentApiUrl, pageIndex, orientation, isImage]);
 
-  if (isImage && docUrl) {
+  if (isImage) {
+    const imgSrc = docUrl || permanentApiUrl;
     return (
       <div className="w-full h-full flex items-center justify-center p-2 bg-white overflow-hidden">
-        <img
-          src={docUrl}
-          alt={doc?.originalFilename || "Document preview"}
-          className="max-w-full max-h-full object-contain"
-        />
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={doc?.originalFilename || "Document preview"}
+            className="max-w-full max-h-full object-contain"
+            onError={(e) => {
+              if (permanentApiUrl && (e.target as HTMLImageElement).src !== permanentApiUrl) {
+                (e.target as HTMLImageElement).src = permanentApiUrl;
+              } else if (doc?.originalFilename) {
+                const fnUrl = `/api/document/preview?filename=${encodeURIComponent(doc.originalFilename)}`;
+                if ((e.target as HTMLImageElement).src !== fnUrl) {
+                  (e.target as HTMLImageElement).src = fnUrl;
+                } else {
+                  setRenderError(true);
+                }
+              } else {
+                setRenderError(true);
+              }
+            }}
+          />
+        ) : (
+          <div className="text-center p-4 text-xs text-neutral-400">
+            Preview unavailable
+          </div>
+        )}
       </div>
     );
   }
@@ -214,10 +278,10 @@ function RealDocumentViewer({
       )}
 
       {renderError ? (
-        docUrl ? (
+        (docUrl || permanentApiUrl) ? (
           <iframe
-            key={`${docUrl}-${pageIndex}`}
-            src={`${docUrl}#page=${pageIndex}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+            key={`${docUrl || permanentApiUrl}-${pageIndex}`}
+            src={`${docUrl || permanentApiUrl}#page=${pageIndex}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
             title={doc?.originalFilename || "PDF Preview"}
             className="w-full h-full border-none pointer-events-none"
           />
@@ -303,6 +367,15 @@ function UserPrintContent() {
   const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Cross-device cloud sync: keep drafts in sync while in Print Studio
+  useEffect(() => {
+    let unsubscribe = () => {};
+    if (user?.uid) {
+      unsubscribe = syncDraftsWithCloud(user.uid);
+    }
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   // Restore draft or initialize clean upload based on URL query
   useEffect(() => {
     // Requirement 1: If user clicked "Upload Files" on homepage (isNewUpload),
@@ -337,6 +410,30 @@ function UserPrintContent() {
     setStep("upload");
     setActiveDraftId(null);
   }, [isNewUpload, requestedDraftId]);
+
+  // Listener to auto-load requested draft if it was populated via cloud sync
+  useEffect(() => {
+    if (!requestedDraftId || isNewUpload) return;
+    const handleSyncUpdate = () => {
+      if (documents.length === 0) {
+        const draft = getDraftById(requestedDraftId);
+        if (draft && draft.documents && draft.documents.length > 0) {
+          setDocuments(draft.documents);
+          setActiveDraftId(draft.id);
+          if (draft.config) {
+            setColorMode(draft.config.colorMode || "bw");
+            setOrientation(draft.config.orientation || "portrait");
+            setCopies(draft.config.copies || 1);
+            setPageRangeType(draft.config.pageRangeType || "all");
+            setCustomRange(draft.config.customRange || "");
+          }
+          setStep("studio");
+        }
+      }
+    };
+    window.addEventListener("printmart_drafts_updated", handleSyncUpdate);
+    return () => window.removeEventListener("printmart_drafts_updated", handleSyncUpdate);
+  }, [requestedDraftId, isNewUpload, documents.length]);
 
   // Save Draft to multi-draft storage
   const saveDraft = (
@@ -381,9 +478,9 @@ function UserPrintContent() {
           },
         };
 
-        saveOrUpdateDraft(draftItem);
+        saveOrUpdateDraft(draftItem, user?.uid);
       } else if (activeDraftId) {
-        removeDraftById(activeDraftId);
+        removeDraftById(activeDraftId, user?.uid);
         setActiveDraftId(null);
       }
     } catch (e) {
@@ -415,6 +512,9 @@ function UserPrintContent() {
       try {
         const formData = new FormData();
         formData.append("file", file);
+        if (user?.uid) {
+          formData.append("ownerUid", user.uid);
+        }
 
         const res = await fetch("/api/upload", {
           method: "POST",
@@ -426,13 +526,16 @@ function UserPrintContent() {
           throw new Error(data.error || `Failed to process ${file.name}`);
         }
 
-        // Generate persistent blob URL for real page rendering in this session
+        // Generate blob URL for instant current-session rendering
         const blobUrl = URL.createObjectURL(file);
+        const docId = data.document.documentId || data.document.fileId;
+        const permanentPreview = `/api/document/preview?documentId=${docId}`;
 
         newDocs.push({
           ...data.document,
+          fileId: docId,
           blobUrl,
-          previewUrl: blobUrl,
+          previewUrl: permanentPreview,
         });
       } catch (err: any) {
         console.error("Upload error:", err);

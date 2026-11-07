@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, FileText } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 
 interface PrintDraft {
@@ -10,6 +10,8 @@ interface PrintDraft {
   originalFilename?: string;
   pageCount: number;
   fileId?: string;
+  previewUrl?: string;
+  mimeType?: string;
   timestamp?: number;
 }
 
@@ -318,17 +320,22 @@ export default function HomePage() {
                 href="/user/print"
                 className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-full px-3.5 py-2.5 flex items-center justify-between shadow-2xl transition-all active:scale-98"
               >
-                {/* Left: 3 Overlapping Product Badges */}
-                <div className="flex items-center -space-x-2 shrink-0">
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-200 flex items-center justify-center overflow-hidden shadow-xs">
-                    <span className="text-[9px] font-bold text-amber-800">DOC</span>
-                  </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-purple-300 flex items-center justify-center overflow-hidden shadow-xs">
-                    <span className="text-[9px] font-bold text-purple-900">PDF</span>
-                  </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-sky-300 flex items-center justify-center overflow-hidden shadow-xs">
-                    <span className="text-[9px] font-bold text-sky-900">OTP</span>
-                  </div>
+                {/* Left: Single Circle File Preview Badge */}
+                <div className="w-10 h-10 rounded-full border-2 border-white bg-white/95 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+                  {draft.previewUrl ? (
+                    <img
+                      src={draft.previewUrl}
+                      alt="File preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-emerald-50 flex flex-col items-center justify-center p-0.5">
+                      <FileText className="w-4 h-4 text-[#0c831f]" />
+                      <span className="text-[7.5px] font-bold uppercase tracking-tight text-neutral-600 leading-none mt-0.5">
+                        {((draft.originalFilename || draft.filename || "DOC").split(".").pop() || "DOC").slice(0, 3)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Center: Title & Item Count */}

@@ -100,16 +100,6 @@ const DEFAULT_MACHINES: MachineRecord[] = [
   },
 ];
 
-const SAMPLE_DOC: UploadedDocumentRecord = {
-  fileId: "doc_demo_preview",
-  originalFilename: "PrintMart_Project_Documentation.pdf",
-  fileSizeBytes: 2451000,
-  mimeType: "application/pdf",
-  pageCount: 5,
-  isColorDocument: false,
-  telegramFileId: "tg_mock_vault_file",
-};
-
 function UserPrintContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -442,13 +432,50 @@ function UserPrintContent() {
   const selectedMachine = machines.find((m) => m.machineId === selectedMachineId);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] pb-32 lg:pb-12 text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-32 lg:pb-16 relative overflow-x-hidden">
       <AppNavbar />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8">
+      {/* Top Aura & Fine Guilloché Wavy Contour Texture */}
+      <div className="absolute top-0 inset-x-0 h-96 pointer-events-none select-none overflow-hidden z-0">
+        <div className="absolute top-0 inset-x-0 h-72 bg-gradient-to-b from-[#fde047]/40 via-[#fef08a]/15 to-transparent" />
+        <svg
+          className="absolute -top-6 -left-12 w-80 h-96 opacity-30 text-[#d9b44a] pointer-events-none"
+          viewBox="0 0 320 380"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {Array.from({ length: 18 }).map((_, i) => (
+            <path
+              key={`left-arc-${i}`}
+              d={`M -20 ${20 + i * 16} C 120 ${10 + i * 16}, 210 ${90 + i * 16}, 260 ${240 + i * 16}`}
+              stroke="currentColor"
+              strokeWidth="0.85"
+              strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+            />
+          ))}
+        </svg>
+        <svg
+          className="absolute -top-6 -right-12 w-80 h-96 opacity-30 text-[#d9b44a] pointer-events-none"
+          viewBox="0 0 320 380"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {Array.from({ length: 18 }).map((_, i) => (
+            <path
+              key={`right-arc-${i}`}
+              d={`M 340 ${20 + i * 16} C 200 ${10 + i * 16}, 110 ${90 + i * 16}, 60 ${240 + i * 16}`}
+              stroke="currentColor"
+              strokeWidth="0.85"
+              strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+            />
+          ))}
+        </svg>
+      </div>
+
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 z-10 relative">
         {/* Global Error Alert */}
         {errorMessage && (
-          <Alert color="danger" className="mb-4 rounded-lg">
+          <Alert color="danger" className="mb-4 rounded-xl">
             {errorMessage}
           </Alert>
         )}
@@ -466,35 +493,35 @@ function UserPrintContent() {
         {!activeDoc ? (
           <div className="max-w-xl mx-auto space-y-5 pt-4">
             <div className="text-center space-y-1.5">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
                 Upload Document
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
+              <p className="text-xs sm:text-sm text-neutral-600 max-w-sm mx-auto">
                 Configure settings and release your prints instantly at any campus kiosk.
               </p>
             </div>
 
-            <div className="bg-white border border-slate-200/90 rounded-lg p-6 sm:p-8 shadow-xs">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
               {uploading ? (
-                <div className="border border-dashed border-sky-400 rounded-lg p-8 flex flex-col items-center justify-center bg-sky-50/40 space-y-4">
-                  <div className="w-12 h-12 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center animate-pulse">
+                <div className="border border-dashed border-emerald-400 rounded-2xl p-8 flex flex-col items-center justify-center bg-emerald-50/30 space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center animate-pulse">
                     <UploadCloud className="w-6 h-6 animate-bounce" />
                   </div>
                   <div className="space-y-1 text-center w-full max-w-sm">
-                    <h3 className="font-semibold text-sm text-slate-900">
+                    <h3 className="font-bold text-sm text-neutral-900">
                       {uploadStatusText || "Uploading document..."}
                     </h3>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-neutral-500">
                       Encrypting into cloud vault & calculating page specifications
                     </p>
                   </div>
-                  <div className="w-full max-w-sm pt-1 space-y-1">
+                  <div className="w-full max-w-sm pt-1 space-y-1.5">
                     <Progress
                       value={uploadProgress}
-                      color="primary"
+                      color="success"
                       className="w-full"
                     />
-                    <span className="text-xs font-semibold text-sky-600 block text-right">
+                    <span className="text-xs font-bold text-[#0c831f] block text-right">
                       {uploadProgress}%
                     </span>
                   </div>
@@ -502,59 +529,37 @@ function UserPrintContent() {
               ) : (
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border border-dashed border-slate-300 hover:border-sky-500 rounded-lg p-8 sm:p-10 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/40 hover:bg-sky-50/20"
+                  className="border border-dashed border-neutral-300 hover:border-[#0c831f] rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-all bg-neutral-50/50 hover:bg-emerald-50/20 group"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
-                    <UploadCloud className="w-6 h-6" />
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-[#0c831f] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-xs">
+                    <UploadCloud className="w-7 h-7" />
                   </div>
-                  <h3 className="font-semibold text-base text-slate-900 mb-0.5">
+                  <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1">
                     Click to upload or drag & drop
                   </h3>
-                  <p className="text-xs text-slate-500 max-w-xs text-center mb-4">
+                  <p className="text-xs text-neutral-500 max-w-xs text-center mb-5">
                     PDF, Word (.docx), PowerPoint (.pptx), or Images up to 25 MB
                   </p>
-                  <Button
-                    color="primary"
-                    size="sm"
-                    startContent={<UploadCloud className="w-4 h-4" />}
-                    className="font-medium rounded-md shadow-xs pointer-events-none"
+                  <button
+                    type="button"
+                    className="bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-semibold rounded-xl px-5 py-2.5 shadow-xs transition-all flex items-center gap-2 text-xs sm:text-sm"
                   >
-                    Select File from Device
-                  </Button>
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Select File from Device</span>
+                  </button>
                 </div>
               )}
-
-              <div className="mt-5 flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-md bg-white border border-slate-200/80 flex items-center justify-center text-sky-600 shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-900 truncate">Want to test without a file?</p>
-                    <p className="text-[11px] text-slate-500 truncate">Quickly load our 5-page sample document</p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  className="font-medium shrink-0 rounded-md text-xs h-8"
-                  onPress={() => updateActiveDoc(SAMPLE_DOC)}
-                >
-                  Use Sample
-                </Button>
-              </div>
             </div>
           </div>
         ) : (
-          /* STEP 2: Sleek Modern Print Studio (No nested boxes) */
+          /* STEP 2: Sleek Modern Print Studio */
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
                   Print Studio
                 </h1>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-neutral-500">
                   Select kiosk, configure print settings, and release instantly.
                 </p>
               </div>
@@ -564,41 +569,39 @@ function UserPrintContent() {
               {/* Left 2 Columns: Single-Surface Sections */}
               <div className="lg:col-span-2 space-y-4">
                 
-                {/* 1. Document Strip (Clean single flat surface) */}
-                <div className="bg-white border border-slate-200/90 rounded-lg p-4 shadow-xs flex items-center justify-between gap-3">
+                {/* 1. Document Strip */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] flex items-center justify-between gap-3 transition-all">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#0c831f] flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-sm text-slate-900 truncate">
+                      <h3 className="font-bold text-sm text-neutral-900 truncate">
                         {activeDoc.originalFilename}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-neutral-500 mt-0.5">
                         {activeDoc.pageCount} Pages • {(activeDoc.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB • Cloud Vault
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="light"
-                    color="primary"
-                    startContent={<RotateCw className="w-3.5 h-3.5" />}
-                    onPress={() => updateActiveDoc(null)}
-                    className="font-medium rounded-md text-xs h-8 shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => updateActiveDoc(null)}
+                    className="px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shrink-0"
                   >
-                    Change
-                  </Button>
+                    <RotateCw className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Change</span>
+                  </button>
                 </div>
 
-                {/* 2. Select Vending Machine (Clean List) */}
-                <div className="bg-white border border-slate-200/90 rounded-lg p-4 sm:p-5 shadow-xs">
-                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                {/* 2. Select Vending Machine */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all">
+                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-100">
                     <div className="flex items-center gap-2">
-                      <Printer className="w-4 h-4 text-sky-600" />
-                      <span className="font-semibold text-sm text-slate-900">Select Kiosk</span>
+                      <Printer className="w-4 h-4 text-[#0c831f]" />
+                      <span className="font-bold text-sm text-neutral-900">Select Kiosk</span>
                     </div>
-                    <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
                       {machines.filter((m) => m.status === "ONLINE").length} Stations Online
                     </span>
                   </div>
@@ -616,13 +619,13 @@ function UserPrintContent() {
                           <div className="flex items-center gap-3 min-w-0">
                             {/* Crisp native circular radio indicator */}
                             <div className="radio__control">
-                              {isSelected && <div className="radio__indicator" />}
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-[#0c831f]" />}
                             </div>
                             <div className="min-w-0">
-                              <span className="font-medium text-sm text-slate-900 block truncate">
+                              <span className="font-medium text-sm text-neutral-900 block truncate">
                                 {m.name}
                               </span>
-                              <span className="text-xs text-slate-500 block truncate">
+                              <span className="text-xs text-neutral-500 block truncate">
                                 {m.location}
                               </span>
                             </div>
@@ -642,16 +645,16 @@ function UserPrintContent() {
                   </div>
                 </div>
 
-                {/* 3. Print Settings (Sleek Segmented Controls) */}
-                <div className="bg-white border border-slate-200/90 rounded-lg p-4 sm:p-5 shadow-xs space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <Sparkles className="w-4 h-4 text-sky-600" />
-                    <span className="font-semibold text-sm text-slate-900">Print Configuration</span>
+                {/* 3. Print Settings */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-neutral-100">
+                    <Sparkles className="w-4 h-4 text-[#0c831f]" />
+                    <span className="font-bold text-sm text-neutral-900">Print Configuration</span>
                   </div>
 
                   {/* Color Mode Segmented Bar */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1.5 uppercase tracking-wider">
+                    <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                       Color Mode
                     </label>
                     <div className="segmented-track">
@@ -679,7 +682,7 @@ function UserPrintContent() {
                   {/* Sides & Paper Size */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1.5 uppercase tracking-wider">
+                      <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                         Sides
                       </label>
                       <div className="segmented-track">
@@ -703,7 +706,7 @@ function UserPrintContent() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1.5 uppercase tracking-wider">
+                      <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                         Paper Size
                       </label>
                       <div className="segmented-track">
@@ -731,24 +734,24 @@ function UserPrintContent() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     {/* Number of Copies */}
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1.5 uppercase tracking-wider">
+                      <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                         Number of Copies
                       </label>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setCopies((c) => Math.max(1, c - 1))}
-                          className="w-9 h-9 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
+                          className="w-9 h-9 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
-                        <div className="flex-1 text-center font-bold text-base text-slate-900 bg-slate-50 border border-slate-200 rounded-md py-1.5">
+                        <div className="flex-1 text-center font-bold text-base text-neutral-900 bg-neutral-50 border border-neutral-200 rounded-lg py-1.5">
                           {copies}
                         </div>
                         <button
                           type="button"
                           onClick={() => setCopies((c) => Math.min(50, c + 1))}
-                          className="w-9 h-9 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
+                          className="w-9 h-9 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors font-bold text-sm shrink-0"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -757,7 +760,7 @@ function UserPrintContent() {
 
                     {/* Pages to Print */}
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1.5 uppercase tracking-wider">
+                      <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider">
                         Pages to Print
                       </label>
                       <div className="segmented-track">
@@ -784,7 +787,7 @@ function UserPrintContent() {
                           placeholder="e.g. 1-3, 5"
                           value={customRange}
                           onChange={(e) => setCustomRange(e.target.value)}
-                          className="mt-2 w-full text-xs px-3 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:border-sky-500 bg-white"
+                          className="mt-2 w-full text-xs px-3 py-1.5 border border-neutral-300 rounded-lg focus:outline-none focus:border-[#0c831f] bg-white"
                         />
                       )}
                     </div>
@@ -793,45 +796,45 @@ function UserPrintContent() {
                 </div>
               </div>
 
-              {/* Right Column: Clean Receipt Summary */}
+              {/* Right Column: Receipt Summary */}
               <div className="space-y-4">
-                <div className="bg-white border border-slate-200/90 rounded-lg p-4 sm:p-5 shadow-xs space-y-3">
-                  <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
-                    <CreditCard className="w-4 h-4 text-sky-600" />
-                    <span className="font-semibold text-sm text-slate-900">Payment Summary</span>
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all space-y-3">
+                  <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100">
+                    <CreditCard className="w-4 h-4 text-[#0c831f]" />
+                    <span className="font-bold text-sm text-neutral-900">Payment Summary</span>
                   </div>
 
                   <div className="space-y-2 text-xs sm:text-sm">
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-neutral-500">
                       <span>Total Pages:</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-semibold text-neutral-900">
                         {(pageRangeType === "all" ? activeDoc.pageCount || 1 : 1) * Math.max(1, copies)}
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-neutral-500">
                       <span>Color Mode:</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-semibold text-neutral-900">
                         {colorMode === "bw" ? "Black & White" : "Full Color"}
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-neutral-500">
                       <span>Base Rate:</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-semibold text-neutral-900">
                         {formatRupees(pricing.baseRatePaise)} / side
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-neutral-500">
                       <span>Subtotal:</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-semibold text-neutral-900">
                         {formatRupees(pricing.subtotalPaise)}
                       </span>
                     </div>
 
                     {pricing.discountPaise > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-medium">
+                      <div className="flex justify-between text-emerald-600 font-semibold">
                         <span>Discount:</span>
                         <span>-{formatRupees(pricing.discountPaise)}</span>
                       </div>
@@ -846,12 +849,12 @@ function UserPrintContent() {
                         placeholder="Coupon code"
                         value={offerCode}
                         onChange={(e) => setOfferCode(e.target.value)}
-                        className="flex-1 text-xs px-3 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:border-sky-500 bg-slate-50/50"
+                        className="flex-1 text-xs px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-[#0c831f] bg-neutral-50/50"
                       />
                       <button
                         type="button"
                         onClick={() => setAppliedOffer(offerCode.trim())}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-md transition-colors"
+                        className="px-3.5 py-1.5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs font-bold rounded-lg transition-colors shadow-xs"
                       >
                         Apply
                       </button>
@@ -863,31 +866,37 @@ function UserPrintContent() {
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-baseline justify-between">
-                    <span className="text-xs font-semibold text-slate-600">Total Payable</span>
-                    <span className="text-2xl font-bold text-sky-600">
+                  <div className="pt-2.5 border-t border-neutral-100 flex items-baseline justify-between">
+                    <span className="text-xs font-semibold text-neutral-600">Total Payable</span>
+                    <span className="text-2xl font-bold text-[#0c831f]">
                       {formatRupees(pricing.finalPayablePaise)}
                     </span>
                   </div>
 
-                  <Button
-                    color="primary"
-                    size="md"
-                    className="w-full font-semibold rounded-md shadow-xs text-sm h-10 mt-2"
-                    isLoading={paying || calculatingPrice}
-                    onPress={handleProceedToPayment}
+                  <button
+                    type="button"
+                    disabled={paying || calculatingPrice}
+                    onClick={handleProceedToPayment}
+                    className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold rounded-xl py-3 px-4 shadow-md text-sm mt-3 transition-all active:scale-98 flex items-center justify-center gap-2"
                   >
-                    Pay {formatRupees(pricing.finalPayablePaise)} & Get OTP
-                  </Button>
+                    {paying || calculatingPrice ? (
+                      <span className="flex items-center gap-2">
+                        <RotateCw className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </span>
+                    ) : (
+                      <span>Pay {formatRupees(pricing.finalPayablePaise)} & Get OTP</span>
+                    )}
+                  </button>
                 </div>
 
                 {/* Clean How it works footer note */}
-                <div className="rounded-lg bg-slate-100/70 border border-slate-200/70 p-3.5 space-y-1.5 text-xs text-slate-600">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                    <Lock className="w-3.5 h-3.5 text-sky-600" />
+                <div className="rounded-2xl bg-amber-50/70 border border-amber-200/60 p-4 space-y-1.5 text-xs text-neutral-700 shadow-2xs">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-900">
+                    <Lock className="w-3.5 h-3.5 text-[#0c831f]" />
                     <span>How it works</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-slate-500">
+                  <p className="text-[11px] leading-relaxed text-neutral-600">
                     1. Instant payment via Cashfree Sandbox.<br />
                     2. Document preloads into selected kiosk memory.<br />
                     3. Walk up to kiosk, enter 6-digit OTP, print immediately.
@@ -897,22 +906,24 @@ function UserPrintContent() {
             </div>
 
             {/* Mobile Bottom Floating Checkout Bar */}
-            <div className="fixed bottom-12 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 flex items-center justify-between z-40 sm:hidden shadow-lg">
+            <div className="fixed bottom-16 inset-x-4 max-w-sm mx-auto bg-white/95 backdrop-blur-md border border-neutral-200/90 rounded-2xl px-4 py-2.5 flex items-center justify-between z-40 sm:hidden shadow-xl">
               <div>
-                <span className="text-[11px] text-slate-500 block leading-tight">Payable</span>
-                <span className="text-lg font-bold text-sky-600">
+                <span className="text-[11px] text-neutral-500 block leading-tight">Payable</span>
+                <span className="text-lg font-bold text-[#0c831f]">
                   {formatRupees(pricing.finalPayablePaise)}
                 </span>
               </div>
-              <Button
-                color="primary"
-                size="sm"
-                className="font-semibold px-5 h-9 rounded-md shadow-xs text-xs"
-                isLoading={paying || calculatingPrice}
-                onPress={handleProceedToPayment}
+              <button
+                type="button"
+                disabled={paying || calculatingPrice}
+                onClick={handleProceedToPayment}
+                className="bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold px-5 h-9 rounded-xl shadow-md text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
               >
-                Pay & Get OTP
-              </Button>
+                {paying ? (
+                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                ) : null}
+                <span>Pay & Get OTP</span>
+              </button>
             </div>
           </div>
         )}
@@ -931,34 +942,31 @@ function UserPrintContent() {
               <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
                 Your 6-Digit Kiosk OTP
               </span>
-              <div className="my-3 py-3 px-6 bg-sky-50 rounded-lg flex items-center justify-center gap-3 border border-sky-100">
-                <span className="text-3xl font-extrabold tracking-widest text-sky-600 font-mono">
+              <div className="my-3 py-3 px-6 bg-emerald-50 rounded-xl flex items-center justify-center gap-3 border border-emerald-200">
+                <span className="text-3xl font-extrabold tracking-widest text-[#0c831f] font-mono">
                   {generatedOtp}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                Walk up to the kiosk screen, tap <span className="font-semibold text-slate-800">"Enter OTP"</span>, and your print job will release immediately.
+              <p className="text-xs text-neutral-500 max-w-xs mx-auto">
+                Walk up to the kiosk screen, tap <span className="font-semibold text-neutral-800">"Enter OTP"</span>, and your print job will release immediately.
               </p>
             </ModalBody>
             <ModalFooter className="flex flex-col sm:flex-row gap-2">
-              <Button
-                variant="flat"
-                color="primary"
-                className="w-full font-medium rounded-md text-xs h-9"
-                startContent={copiedOtp ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                onPress={copyOtpToClipboard}
+              <button
+                type="button"
+                className="w-full font-semibold rounded-xl text-xs h-10 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 flex items-center justify-center gap-2 transition-colors"
+                onClick={copyOtpToClipboard}
               >
-                {copiedOtp ? "Copied OTP!" : "Copy OTP"}
-              </Button>
-              <Button
-                as={Link}
+                {copiedOtp ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedOtp ? "Copied OTP!" : "Copy OTP"}</span>
+              </button>
+              <Link
                 href="/user/history"
-                color="primary"
-                className="w-full font-medium rounded-md text-xs h-9"
-                onPress={() => setIsOtpModalOpen(false)}
+                onClick={() => setIsOtpModalOpen(false)}
+                className="w-full font-bold rounded-xl text-xs h-10 bg-[#0c831f] hover:bg-[#0a6e1a] text-white flex items-center justify-center gap-2 transition-colors shadow-xs"
               >
                 View in My Print Jobs
-              </Button>
+              </Link>
             </ModalFooter>
           </ModalContent>
         </Modal>

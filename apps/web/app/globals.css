@@ -111,7 +111,7 @@ body {
 }
 
 .segmented-btn[data-active="true"] .subtext {
-  color: #0284c7;
+  color: #0c831f;
   font-weight: 500;
 }
 
@@ -123,7 +123,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 0.875rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -135,8 +135,8 @@ body {
 }
 
 .clean-select-item[data-selected="true"] {
-  background-color: #f0f9ff;
-  border-color: #bae6fd;
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ body {
 
 .radio__control:hover,
 [data-slot="control"]:hover {
-  border-color: #0284c7 !important;
+  border-color: #0c831f !important;
 }
 
 .radio__indicator,
@@ -185,7 +185,7 @@ body {
 .radio:has(input:checked) .radio__control,
 [data-slot="radio"][data-selected="true"] [data-slot="control"],
 [data-slot="radio"]:has(input:checked) [data-slot="control"] {
-  border-color: #0284c7 !important;
+  border-color: #0c831f !important;
   background-color: #ffffff !important;
 }
 
@@ -193,5 +193,5 @@ body {
 .radio:has(input:checked) .radio__indicator:empty::before,
 [data-slot="radio"][data-selected="true"] [data-slot="indicator"]:empty::before,
 [data-slot="radio"]:has(input:checked) [data-slot="indicator"]:empty::before {
-  background-color: #0284c7 !important;
+  background-color: #0c831f !important;
 }

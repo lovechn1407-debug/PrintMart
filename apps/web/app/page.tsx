@@ -1,12 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 
+interface PrintDraft {
+  filename?: string;
+  originalFilename?: string;
+  pageCount: number;
+  fileId?: string;
+  timestamp?: number;
+}
+
 export default function HomePage() {
-  const [cartCount, setCartCount] = useState<number>(3);
+  const [draft, setDraft] = useState<PrintDraft | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("printmart_draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.filename || parsed.originalFilename || parsed.pageCount)) {
+          setDraft(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const dismissDraft = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      localStorage.removeItem("printmart_draft");
+    } catch {}
+    setDraft(null);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-28 relative overflow-x-hidden">
@@ -277,39 +306,59 @@ export default function HomePage() {
 
         </div>
 
-        {/* Floating "View Cart" Pill */}
-        <div className="fixed bottom-4 inset-x-4 max-w-xs sm:max-w-sm mx-auto z-50">
-          <Link
-            href="/user/print"
-            className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-full px-3.5 py-2.5 flex items-center justify-between shadow-2xl transition-all active:scale-98"
-          >
-            {/* Left: 3 Overlapping Product Thumbnail Badges */}
-            <div className="flex items-center -space-x-2 shrink-0">
-              <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-200 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-bold text-amber-800">DOC</span>
-              </div>
-              <div className="w-8 h-8 rounded-full border-2 border-white bg-purple-300 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-bold text-purple-900">IMG</span>
-              </div>
-              <div className="w-8 h-8 rounded-full border-2 border-white bg-sky-300 flex items-center justify-center overflow-hidden shadow-xs">
-                <span className="text-[9px] font-bold text-sky-900">OTP</span>
-              </div>
-            </div>
+        {/* ─────────────────────────────────────────────────────────────
+            FLOATING "VIEW CART" DRAFT PILL
+            Only displays when there is an active draft in progress!
+            Positioned at bottom-16 on mobile (safely above the footer & nav bar)
+            ───────────────────────────────────────────────────────────── */}
+        {draft && (
+          <div className="fixed bottom-16 sm:bottom-6 inset-x-4 max-w-xs sm:max-w-sm mx-auto z-50">
+            <div className="relative flex items-center">
+              <Link
+                href="/user/print"
+                className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-full px-3.5 py-2.5 flex items-center justify-between shadow-2xl transition-all active:scale-98"
+              >
+                {/* Left: 3 Overlapping Product Badges */}
+                <div className="flex items-center -space-x-2 shrink-0">
+                  <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-200 flex items-center justify-center overflow-hidden shadow-xs">
+                    <span className="text-[9px] font-bold text-amber-800">DOC</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white bg-purple-300 flex items-center justify-center overflow-hidden shadow-xs">
+                    <span className="text-[9px] font-bold text-purple-900">PDF</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white bg-sky-300 flex items-center justify-center overflow-hidden shadow-xs">
+                    <span className="text-[9px] font-bold text-sky-900">OTP</span>
+                  </div>
+                </div>
 
-            {/* Center: Title & Item Count */}
-            <div className="flex-1 text-left px-3">
-              <span className="font-bold text-xs sm:text-sm block leading-tight">View cart</span>
-              <span className="text-[11px] font-normal opacity-90 block leading-tight">
-                {cartCount} items
-              </span>
-            </div>
+                {/* Center: Title & Item Count */}
+                <div className="flex-1 text-left px-3 min-w-0">
+                  <span className="font-bold text-xs sm:text-sm block leading-tight truncate">
+                    {draft.originalFilename || draft.filename || "Resume Print Draft"}
+                  </span>
+                  <span className="text-[11px] font-normal opacity-90 block leading-tight truncate">
+                    {draft.pageCount ? `${draft.pageCount} ${draft.pageCount === 1 ? "page" : "pages"}` : "1 file"} • Tap to checkout
+                  </span>
+                </div>
 
-            {/* Right: Circle Chevron */}
-            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <ChevronRight className="w-4 h-4 text-white" />
+                {/* Right: Circle Chevron */}
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <ChevronRight className="w-4 h-4 text-white" />
+                </div>
+              </Link>
+
+              {/* Dismiss Button */}
+              <button
+                type="button"
+                onClick={dismissDraft}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-neutral-800 text-white flex items-center justify-center shadow-md hover:bg-neutral-900 transition-colors"
+                title="Dismiss draft"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
             </div>
-          </Link>
-        </div>
+          </div>
+        )}
 
       </main>
     </div>

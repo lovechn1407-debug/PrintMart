@@ -116,11 +116,42 @@ function UserPrintContent() {
   const machineParam = searchParams.get("machine");
 
   // State: Document & Upload
-  const [activeDoc, setActiveDoc] = useState<UploadedDocumentRecord | null>(SAMPLE_DOC);
+  const [activeDoc, setActiveDoc] = useState<UploadedDocumentRecord | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadStatusText, setUploadStatusText] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Restore draft from localStorage on client mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("printmart_draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.fileId || parsed.originalFilename)) {
+          setActiveDoc(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const updateActiveDoc = (doc: UploadedDocumentRecord | null) => {
+    setActiveDoc(doc);
+    try {
+      if (doc) {
+        localStorage.setItem(
+          "printmart_draft",
+          JSON.stringify({
+            ...doc,
+            filename: doc.originalFilename,
+            timestamp: Date.now(),
+          })
+        );
+      } else {
+        localStorage.removeItem("printmart_draft");
+      }
+    } catch {}
+  };
 
   // State: Kiosks
   const [machines, setMachines] = useState<MachineRecord[]>(DEFAULT_MACHINES);
@@ -288,7 +319,7 @@ function UserPrintContent() {
               setUploadProgress(100);
               setUploadStatusText("Upload complete!");
               setTimeout(() => {
-                setActiveDoc(data.document);
+                updateActiveDoc(data.document);
                 setUploading(false);
                 setUploadProgress(0);
                 setUploadStatusText("");
@@ -389,6 +420,9 @@ function UserPrintContent() {
       if (simData.success && simData.otp) {
         setGeneratedOtp(simData.otp);
         setIsOtpModalOpen(true);
+        try {
+          localStorage.removeItem("printmart_draft");
+        } catch {}
       }
     } catch (err: any) {
       console.error("Payment error:", err);
@@ -505,7 +539,7 @@ function UserPrintContent() {
                   variant="flat"
                   color="primary"
                   className="font-medium shrink-0 rounded-md text-xs h-8"
-                  onPress={() => setActiveDoc(SAMPLE_DOC)}
+                  onPress={() => updateActiveDoc(SAMPLE_DOC)}
                 >
                   Use Sample
                 </Button>
@@ -550,7 +584,7 @@ function UserPrintContent() {
                     variant="light"
                     color="primary"
                     startContent={<RotateCw className="w-3.5 h-3.5" />}
-                    onPress={() => setActiveDoc(null)}
+                    onPress={() => updateActiveDoc(null)}
                     className="font-medium rounded-md text-xs h-8 shrink-0"
                   >
                     Change

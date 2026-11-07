@@ -5,43 +5,93 @@ import { OtpScreen } from "./screens/OtpScreen";
 import { PrintingProgressScreen } from "./screens/PrintingProgressScreen";
 import { OverlayScreen } from "./screens/OverlayScreen";
 import { ConfigPanelScreen } from "./screens/ConfigPanelScreen";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { database, ref, onValue } from "./firebase";
 import { MachineOverlay, MachinePrinterStatus, PrintJob } from "@printmart/shared";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAaAIzYHlQ9Xmho4oMA7sSDz7aEJmI8Avc",
-  authDomain: "printmart-bd9da.firebaseapp.com",
-  projectId: "printmart-bd9da",
-  storageBucket: "printmart-bd9da.firebasestorage.app",
-  messagingSenderId: "112273507268",
-  appId: "1:112273507268:web:8119878aa05597c963da91",
-  measurementId: "G-1PWQHK6307",
-  databaseURL: "https://printmart-bd9da-default-rtdb.asia-southeast1.firebasedatabase.app",
-};
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const database = getDatabase(app);
-
 export default function App() {
-  const [machineId, setMachineId] = useState<string>("MCH-CAMPUS-01");
-  const [machineName, setMachineName] = useState<string>("Central Library Kiosk A");
+  const [machineId, setMachineId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("kiosk_machine_id") || "MCH-CAMPUS-01";
+    }
+    return "MCH-CAMPUS-01";
+  });
+
+  const [machineName, setMachineName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("kiosk_machine_name") || "Central Library Kiosk A";
+    }
+    return "Central Library Kiosk A";
+  });
+
+  const [masterCode, setMasterCode] = useState<string>("998877");
   const [currentScreen, setCurrentScreen] = useState<"otp" | "printing" | "overlay" | "config">("otp");
   const [activeJob, setActiveJob] = useState<any>(null);
   const [activeOverlay, setActiveOverlay] = useState<MachineOverlay | null>(null);
   const [printerState, setPrinterState] = useState<string>("READY");
 
-  // Read terminal config from Electron main process
+  // 1. Listen to dynamic Master PIN from Firebase RTDB (configured in Admin -> Settings)
+  useEffect(() => {
+    const masterCodeRef = ref(database, "systemSettings/masterKioskCode");
+    const unsub = onValue(masterCodeRef, (snap) => {
+      if (snap.exists() && snap.val()) {
+        setMasterCode(String(snap.val()).trim());
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 2. Listen to Machine record in Firebase RTDB to keep display name in sync
+  useEffect(() => {
+    const machineRef = ref(database, `machines/${machineId}`);
+    const unsub = onValue(machineRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val.name) {
+          setMachineName(val.name);
+          localStorage.setItem("kiosk_machine_name", val.name);
+        }
+        if (val.status === "DISABLED") {
+          setActiveOverlay({
+            overlayId: "OVL_DISABLED",
+            type: "MAINTENANCE",
+            title: "Kiosk Temporarily Disabled",
+            message: "This vending machine is paused by administrator.",
+            active: true,
+            createdAt: Date.now(),
+          });
+          setCurrentScreen("overlay");
+        }
+      }
+    });
+
+    const printerRef = ref(database, `machinePrinterStatus/${machineId}`);
+    const unsubPrinter = onValue(printerRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val.printerState) setPrinterState(val.printerState);
+      }
+    });
+
+    return () => {
+      unsubMachine();
+      unsubPrinter();
+    };
+  }, [machineId]);
+
+  // 3. Read terminal config from Electron main process if available
   useEffect(() => {
     const kioskApi = (window as any).kioskApi;
     if (kioskApi?.getConfig) {
       kioskApi.getConfig().then((cfg: any) => {
-        if (cfg?.machineId) setMachineId(cfg.machineId);
+        if (cfg?.machineId) {
+          setMachineId(cfg.machineId);
+          localStorage.setItem("kiosk_machine_id", cfg.machineId);
+        }
       });
     }
   }, []);
 
-  // Listen to remote overlays from Firebase RTDB
+  // 4. Listen to remote overlays from Firebase RTDB
   useEffect(() => {
     const machineOverlayRef = ref(database, `overlays/machines/${machineId}`);
     const globalOverlayRef = ref(database, "overlays/global");
@@ -71,48 +121,14 @@ export default function App() {
     return () => unsubMachine();
   }, [machineId, currentScreen]);
 
-  // Background Preload Engine: Listen for PRELOAD_QUEUED jobs assigned to this machine
-  useEffect(() => {
-    const jobsRef = ref(database, "printJobs");
-    const unsub = onValue(jobsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const allJobs = Object.values(snapshot.val()) as PrintJob[];
-        const queuedForThisMachine = allJobs.filter(
-          (j) => j.machineId === machineId && j.preparation?.status === "PRELOAD_QUEUED"
-        );
-
-        queuedForThisMachine.forEach((job) => {
-          const kioskApi = (window as any).kioskApi;
-          if (kioskApi?.preloadJob) {
-            // Trigger background download & checksum verification
-            kioskApi.preloadJob(job.jobId).then((res: any) => {
-              if (res.success) {
-                // Update Firebase RTDB preparation status to READY
-                fetch("http://localhost:3000/api/machine/status", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    machineId,
-                    agentVersion: "1.0.0",
-                  }),
-                }).catch(() => {});
-              }
-            });
-          }
-        });
-      }
-    });
-
-    return () => unsub();
-  }, [machineId]);
-
   return (
-    <div className="w-screen h-screen flex flex-col bg-neutral-50 text-neutral-900 select-none overflow-hidden">
+    <div className="w-screen h-screen flex flex-col bg-[#faf7ee] text-neutral-900 select-none overflow-hidden font-sans">
       {currentScreen === "otp" && (
         <OtpScreen
           machineId={machineId}
           machineName={machineName}
           printerState={printerState}
+          masterCode={masterCode}
           onVerifySuccess={(jobDetails) => {
             setActiveJob(jobDetails);
             setCurrentScreen("printing");
@@ -141,11 +157,16 @@ export default function App() {
       {currentScreen === "config" && (
         <ConfigPanelScreen
           machineId={machineId}
+          machineName={machineName}
           onExit={() => setCurrentScreen(activeOverlay ? "overlay" : "otp")}
-          onUpdateMachineId={(newId) => setMachineId(newId)}
+          onUpdateMachine={(newId, newName) => {
+            setMachineId(newId);
+            setMachineName(newName);
+            localStorage.setItem("kiosk_machine_id", newId);
+            localStorage.setItem("kiosk_machine_name", newName);
+          }}
         />
       )}
     </div>
   );
 }
-

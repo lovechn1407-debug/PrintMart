@@ -2,22 +2,22 @@
 
 import React, { useState, useEffect } from "react";
 import { Button, Card, CardBody, Chip, Alert } from "@heroui/react";
-import { Printer, Delete, ArrowRight, ShieldCheck, X } from "lucide-react";
+import { Printer, Delete, ArrowRight, ShieldCheck, X, KeyRound, Lock } from "lucide-react";
 
 interface OtpScreenProps {
   machineId: string;
   machineName: string;
   printerState: string;
+  masterCode?: string;
   onVerifySuccess: (jobDetails: any) => void;
   onOpenConfig: () => void;
 }
-
-const MASTER_DEBUG_CODE = "998877"; // Master bypass/debug code
 
 export function OtpScreen({
   machineId,
   machineName,
   printerState,
+  masterCode = "998877",
   onVerifySuccess,
   onOpenConfig,
 }: OtpScreenProps) {
@@ -25,9 +25,16 @@ export function OtpScreen({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Staff Modal State
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState<boolean>(false);
+  const [staffPinInput, setStaffPinInput] = useState<string>("");
+  const [staffPinError, setStaffPinError] = useState<string | null>(null);
+
   // Physical keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isStaffModalOpen) return; // Don't intercept when staff modal is open
+
       if (e.key >= "0" && e.key <= "9") {
         if (digits.length < 6) {
           setDigits((prev) => [...prev, e.key]);
@@ -45,7 +52,7 @@ export function OtpScreen({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [digits]);
+  }, [digits, isStaffModalOpen]);
 
   const handleKeyPress = (num: string) => {
     if (digits.length < 6) {
@@ -68,8 +75,8 @@ export function OtpScreen({
   };
 
   const handleSubmit = async (otpStr: string) => {
-    // Check if master code was entered
-    if (otpStr === MASTER_DEBUG_CODE) {
+    // Check if master code was entered (dynamic from admin settings or 998877)
+    if (otpStr === masterCode || otpStr === "998877") {
       setDigits([]);
       onOpenConfig();
       return;
@@ -109,6 +116,19 @@ export function OtpScreen({
     }
   };
 
+  const handleVerifyStaffPin = () => {
+    const cleanPin = staffPinInput.trim();
+    if (cleanPin === masterCode || cleanPin === "998877") {
+      setIsStaffModalOpen(false);
+      setStaffPinInput("");
+      setStaffPinError(null);
+      onOpenConfig();
+    } else {
+      setStaffPinError("Incorrect Master PIN. Configured in Admin -> Settings.");
+      setStaffPinInput("");
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-between p-8 max-w-4xl mx-auto w-full min-h-screen">
       {/* Kiosk Header */}
@@ -132,9 +152,18 @@ export function OtpScreen({
           >
             Printer: {printerState}
           </Chip>
-          <Button size="sm" variant="light" onPress={onOpenConfig} className="text-neutral-400 hover:text-neutral-700">
+          <button
+            type="button"
+            onClick={() => {
+              setStaffPinInput("");
+              setStaffPinError(null);
+              setIsStaffModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-xl border border-neutral-300 text-xs font-bold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#0c831f]" />
             Staff
-          </Button>
+          </button>
         </div>
       </header>
 
@@ -232,7 +261,71 @@ export function OtpScreen({
       <footer className="text-center text-xs text-neutral-400 border-t border-neutral-200/80 pt-4 pb-2 w-full font-medium">
         Touch numeric keypad or use physical keyboard • Document preloads before OTP entry for instant output
       </footer>
+
+      {/* Staff Authentication Modal */}
+      {isStaffModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-5 border border-neutral-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-100 text-[#0c831f] rounded-xl">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-base text-neutral-900">Staff Authentication</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStaffModalOpen(false)}
+                className="text-neutral-400 hover:text-neutral-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-500">
+              Enter the 6-digit Master PIN configured in the Admin Settings panel to access hardware diagnostics.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <input
+                type="password"
+                maxLength={6}
+                autoFocus
+                value={staffPinInput}
+                onChange={(e) => setStaffPinInput(e.target.value.replace(/\D/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && staffPinInput.length > 0) {
+                    handleVerifyStaffPin();
+                  }
+                }}
+                placeholder="••••••"
+                className="w-full text-center tracking-[0.5em] font-mono text-2xl font-black py-3 bg-neutral-50 border border-neutral-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0c831f]"
+              />
+
+              {staffPinError && (
+                <span className="text-xs text-rose-600 font-semibold text-center">{staffPinError}</span>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsStaffModalOpen(false)}
+                className="flex-1 py-2.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleVerifyStaffPin}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-[#0c831f] hover:bg-[#0a6c1a] rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

@@ -311,12 +311,22 @@ export default function UserHistoryPage() {
               const isPrinting = job.printing?.status === "PRINTING";
               const isCompleted = job.printing?.status === "COMPLETED" || job.otpConsumed;
 
+              // Multiple documents detection
+              const isMulti =
+                (job.documents && job.documents.length > 1) ||
+                (job.documentCount && job.documentCount > 1) ||
+                (job.documentName && job.documentName.includes("more files"));
+
+              const displayDocTitle = isMulti
+                ? `${job.documents?.length || job.documentCount || (job.documentName.match(/\+(\d+) more/) ? parseInt(RegExp.$1) + 1 : 2)} Documents`
+                : job.documentName || "Document.pdf";
+
               return (
                 <div
                   key={job.jobId}
                   className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all flex flex-col gap-3"
                 >
-                  {/* Card Header: File icon, Document Name & Status Pill */}
+                  {/* Card Header: File icon, Document Name & Moved "Print Again" Link */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-9 h-9 rounded-xl bg-neutral-100 border border-neutral-200/70 flex items-center justify-center shrink-0 text-neutral-700">
@@ -324,7 +334,7 @@ export default function UserHistoryPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="text-sm font-bold text-[#1c1c1c] truncate leading-tight">
-                          {job.documentName || "Document.pdf"}
+                          {displayDocTitle}
                         </h4>
                         <span className="text-[11px] text-neutral-400 mt-0.5 block">
                           {new Date(job.createdAt).toLocaleString([], {
@@ -337,77 +347,44 @@ export default function UserHistoryPage() {
                       </div>
                     </div>
 
-                    {/* Status Badge */}
-                    <div className="shrink-0">
-                      {isPrinting ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                          Printing...
-                        </span>
-                      ) : active ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#eefaf0] text-[#0c831f] border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f] animate-ping" />
-                          Ready to Print
-                        </span>
-                      ) : isCompleted ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          Printed
-                        </span>
-                      ) : expired ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                          Expired
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                          {job.payment?.status || "Pending"}
-                        </span>
-                      )}
-                    </div>
+                    {/* Moved "Print Again" to the capsule area (Capsules and dots removed) */}
+                    <Link
+                      href="/user/print?new=1"
+                      className="shrink-0 text-xs font-semibold text-[#0c831f] hover:text-[#0a6e1a] bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full transition-all flex items-center gap-1 active:scale-95 shadow-2xs"
+                    >
+                      <span>Print Again</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </Link>
                   </div>
 
                   {/* ─────────────────────────────────────────────────────────────
                       OTP DISPLAY BLOCK (SHOWN IN THE PRINT JOB)
-                      Prioritizing Phone First view with 1-tap copy
+                      Universal campus text removed, helper line removed
                       ───────────────────────────────────────────────────────────── */}
                   {job.otp ? (
                     active ? (
                       /* ACTIVE OTP BLOCK */
-                      <div className="bg-[#eefaf0] rounded-lg p-3 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-800">
-                              Universal Campus OTP
-                            </span>
-                            <span className="text-2xl sm:text-3xl font-extrabold font-mono tracking-[0.2em] shimmer-otp-text">
-                              {job.otp}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => copyJobOtp(job.otp!)}
-                            className="h-9 px-3 rounded-md bg-white border border-emerald-200 text-xs font-semibold text-emerald-800 shadow-2xs hover:bg-emerald-50 active:scale-95 flex items-center gap-1.5 transition-all"
-                          >
-                            {copiedJobOtp === job.otp ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span>Copy OTP</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                        {/* Bullet point like homepage document desc */}
-                        <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 pt-0.5 border-t border-emerald-100">
-                          <span className="text-[10px] text-neutral-400">✦</span>
-                          <span>
-                            Enter this code on <strong>any campus kiosk</strong> to release prints
-                          </span>
-                        </div>
+                      <div className="bg-[#eefaf0] rounded-lg p-3 flex items-center justify-between">
+                        <span className="text-2xl sm:text-3xl font-extrabold font-mono tracking-[0.2em] shimmer-otp-text">
+                          {job.otp}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyJobOtp(job.otp!)}
+                          className="h-8 px-3 rounded-md bg-white border border-emerald-200 text-xs font-semibold text-emerald-800 shadow-2xs hover:bg-emerald-50 active:scale-95 flex items-center gap-1.5 transition-all"
+                        >
+                          {copiedJobOtp === job.otp ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy OTP</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     ) : isCompleted ? (
                       /* COMPLETED OTP ROW */
@@ -449,46 +426,22 @@ export default function UserHistoryPage() {
                     </div>
                   )}
 
-                  {/* Print Configuration & Pricing Info */}
+                  {/* ─────────────────────────────────────────────────────────────
+                      MOVED "VIEW RECEIPT" IN PLACE OF "B&W.1COPY.1PG"
+                      Clean line with "View Receipt" and Total Payable Price
+                      ───────────────────────────────────────────────────────────── */}
                   <div className="flex items-center justify-between pt-1 border-t border-neutral-100 text-xs">
-                    <div className="flex items-center gap-2 text-neutral-600 flex-wrap">
-                      <span className="capitalize font-medium">
-                        {job.configuration?.colorMode === "color" ? "🎨 Color" : "📄 B&W"}
-                      </span>
-                      <span className="text-neutral-300">•</span>
-                      <span>
-                        {job.configuration?.copies || 1}{" "}
-                        {(job.configuration?.copies || 1) === 1 ? "copy" : "copies"}
-                      </span>
-                      <span className="text-neutral-300">•</span>
-                      <span>{job.configuration?.totalPagesToPrint || 1} pgs</span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-sm font-bold text-[#0c831f]">
-                        {formatRupees(job.pricing?.finalPayablePaise || 0)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Action Bar */}
-                  <div className="flex items-center justify-between pt-1">
                     <button
                       type="button"
                       onClick={() => setSelectedJob(job)}
                       className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 flex items-center gap-1 transition-colors"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>View Receipt & Specs</span>
+                      <span>View Receipt</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
                     </button>
-
-                    <Link
-                      href="/user/print?new=1"
-                      className="text-xs font-semibold text-[#0c831f] hover:underline flex items-center gap-1"
-                    >
-                      <span>Print Again</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </Link>
+                    <span className="text-sm font-bold text-[#0c831f]">
+                      {formatRupees(job.pricing?.finalPayablePaise || 0)}
+                    </span>
                   </div>
                 </div>
               );
@@ -569,12 +522,38 @@ export default function UserHistoryPage() {
 
               {/* Specs Breakdown */}
               <div className="space-y-2 py-3 text-xs border-b border-neutral-100">
-                <div className="flex justify-between py-1">
-                  <span className="text-neutral-500">Document</span>
-                  <span className="font-semibold text-neutral-900 truncate max-w-[200px]">
-                    {selectedJob.documentName}
-                  </span>
-                </div>
+                {selectedJob.documents && selectedJob.documents.length > 1 ? (
+                  <div className="py-1">
+                    <span className="text-neutral-500 font-semibold block mb-1.5">
+                      Documents ({selectedJob.documents.length})
+                    </span>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {selectedJob.documents.map((doc, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-neutral-50 border border-neutral-100"
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <FileText className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span className="font-medium text-neutral-800 truncate">
+                              {doc.documentName}
+                            </span>
+                          </div>
+                          <span className="text-neutral-500 text-[11px] shrink-0 ml-2">
+                            {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between py-1">
+                    <span className="text-neutral-500">Document</span>
+                    <span className="font-semibold text-neutral-900 truncate max-w-[200px]">
+                      {selectedJob.documentName}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1">
                   <span className="text-neutral-500">Color Mode</span>
                   <span className="font-medium text-neutral-800 capitalize">

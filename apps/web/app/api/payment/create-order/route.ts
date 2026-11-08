@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const {
       userId,
       documentId,
+      documents,
       machineId,
       configuration,
       offerCode,
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
     } = body as {
       userId: string;
       documentId: string;
+      documents?: Array<{
+        documentId: string;
+        documentName: string;
+        pageCount: number;
+        fileSizeBytes?: number;
+      }>;
       machineId?: string;
       configuration: PrintJobConfiguration;
       offerCode?: string;
@@ -98,12 +105,19 @@ export async function POST(req: NextRequest) {
     });
 
     // 6. Register PrintJob in Firebase RTDB
+    const isMultiDoc = Array.isArray(documents) && documents.length > 1;
+    const resolvedDocName = isMultiDoc
+      ? `${documents.length} Documents`
+      : docData.originalFilename || "document.pdf";
+
     const printJob: PrintJob = {
       jobId,
       userId,
       machineId: targetMachineId,
       documentId,
-      documentName: docData.originalFilename || "document.pdf",
+      documentName: resolvedDocName,
+      documents: isMultiDoc ? documents : undefined,
+      documentCount: isMultiDoc ? documents.length : 1,
       orderId,
       configuration,
       pricing: verifiedPricing,
@@ -133,7 +147,9 @@ export async function POST(req: NextRequest) {
       jobId,
       createdAt: now,
       finalPayablePaise: verifiedPricing.finalPayablePaise,
-      documentName: docData.originalFilename,
+      documentName: resolvedDocName,
+      documents: isMultiDoc ? documents : undefined,
+      documentCount: isMultiDoc ? documents.length : 1,
     });
 
     return NextResponse.json({

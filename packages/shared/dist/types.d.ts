@@ -144,6 +144,13 @@ export interface PrintJob {
     otpHash: string;
     otpExpiresAt: number;
     otpConsumed: boolean;
+    documents?: Array<{
+        documentId: string;
+        documentName: string;
+        pageCount: number;
+        fileSizeBytes?: number;
+    }>;
+    documentCount?: number;
     createdAt: number;
     updatedAt: number;
 }

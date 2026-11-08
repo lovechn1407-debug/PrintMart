@@ -49,19 +49,10 @@ export async function POST(req: NextRequest) {
 
     const otpRecord = otpSnap.val();
 
-    // Check machine match (Universal Campus Kiosk Dispense)
-    if (otpRecord.machineId && otpRecord.machineId !== machineId && otpRecord.machineId !== "ALL") {
-      const currentMachineSnap = await adminDb.ref(`machines/${machineId}`).get();
-      if (currentMachineSnap.exists() && currentMachineSnap.val().status !== "DISABLED") {
-        // Allow release at any valid campus kiosk
-        await adminDb.ref(`otpRecords/${otpHash}/machineId`).set(machineId);
-        await adminDb.ref(`printJobs/${otpRecord.jobId}/machineId`).set(machineId);
-      } else {
-        return jsonResponse(
-          { error: `This OTP is assigned to vending machine ${otpRecord.machineId}, not this machine.` },
-          403
-        );
-      }
+    // Universal Campus Kiosk Dispense: OTP works on ANY kiosk on campus
+    if (machineId) {
+      await adminDb.ref(`otpRecords/${otpHash}/dispensedByMachineId`).set(machineId);
+      await adminDb.ref(`printJobs/${otpRecord.jobId}/machineId`).set(machineId);
     }
 
     // Check expiration

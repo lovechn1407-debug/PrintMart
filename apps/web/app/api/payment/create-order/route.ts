@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     } = body as {
       userId: string;
       documentId: string;
-      machineId: string;
+      machineId?: string;
       configuration: PrintJobConfiguration;
       offerCode?: string;
       customerName: string;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       customerPhone?: string;
     };
 
-    if (!userId || !documentId || !machineId || !configuration) {
+    if (!userId || !documentId || !configuration) {
       return NextResponse.json({ error: "Missing required order parameters" }, { status: 400 });
     }
 
@@ -45,48 +45,14 @@ export async function POST(req: NextRequest) {
     }
     const docData = docSnap.val();
 
-    // 2. Verify Machine with Resilient Auto-Resolution
-    let targetMachineId = machineId;
-    let machineSnap = await adminDb.ref(`machines/${targetMachineId}`).get();
-
-    if (!machineSnap.exists()) {
-      // Resilient fallback: find any active machine in the database
-      const allMachinesSnap = await adminDb.ref("machines").get();
-      if (allMachinesSnap.exists()) {
-        const allMachines = allMachinesSnap.val();
-        const activeEntry =
-          Object.entries(allMachines).find(([_, m]: any) => m.status !== "DISABLED") ||
-          Object.entries(allMachines)[0];
-
-        if (activeEntry) {
-          targetMachineId = activeEntry[0];
-          machineSnap = await adminDb.ref(`machines/${targetMachineId}`).get();
-        }
+    // 2. Universal Campus Kiosk: Jobs are universal and can be dispensed at ANY campus kiosk
+    const targetMachineId = machineId || "UNIVERSAL";
+    let machineData: any = null;
+    if (targetMachineId !== "UNIVERSAL") {
+      const machineSnap = await adminDb.ref(`machines/${targetMachineId}`).get();
+      if (machineSnap.exists()) {
+        machineData = machineSnap.val();
       }
-    }
-
-    // If no machine exists in database yet, auto-register default kiosk so orders never crash
-    if (!machineSnap.exists()) {
-      targetMachineId = "MCH-CAMPUS-01";
-      const defaultMachine = {
-        machineId: "MCH-CAMPUS-01",
-        name: "Central Library Kiosk A",
-        location: "Ground Floor, Central Library",
-        status: "ONLINE",
-        pairCode: "123456",
-        createdAt: Date.now(),
-        lastHeartbeat: Date.now(),
-      };
-      await adminDb.ref(`machines/${targetMachineId}`).set(defaultMachine);
-      machineSnap = await adminDb.ref(`machines/${targetMachineId}`).get();
-    }
-
-    const machineData = machineSnap.val() || {};
-    if (machineData.status === "DISABLED") {
-      return NextResponse.json(
-        { error: "This vending machine is temporarily disabled" },
-        { status: 400 }
-      );
     }
 
     // 3. Recalculate price independently on the server

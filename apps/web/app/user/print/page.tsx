@@ -32,10 +32,7 @@ import {
   Eye,
   Layers,
   FileCheck,
-  MapPin,
-  ChevronDown,
 } from "lucide-react";
-import { database, ref, onValue } from "@/lib/firebase";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
 import {
@@ -310,35 +307,6 @@ function UserPrintContent() {
   const [customRange, setCustomRange] = useState<string>("");
   const [offerCode, setOfferCode] = useState<string>("");
   const [appliedOffer, setAppliedOffer] = useState<string>("");
-
-  // State: Vending Machines
-  const [machines, setMachines] = useState<any[]>([]);
-  const [selectedMachineId, setSelectedMachineId] = useState<string>("MCH-CAMPUS-01");
-
-  // Fetch registered vending machines from RTDB
-  useEffect(() => {
-    const machinesRef = ref(database, "machines");
-    const unsub = onValue(machinesRef, (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        const list = Object.entries(val)
-          .map(([id, m]: any) => ({
-            ...m,
-            machineId: id,
-          }))
-          .filter((m) => m.status !== "DISABLED");
-        setMachines(list);
-        if (list.length > 0) {
-          setSelectedMachineId((prev) => {
-            if (!prev || prev === "kiosk_lib_01") return list[0].machineId;
-            const stillExists = list.some((m) => m.machineId === prev);
-            return stillExists ? prev : list[0].machineId;
-          });
-        }
-      }
-    });
-    return () => unsub();
-  }, []);
 
   // State: Page Preview
   const [previewDocIndex, setPreviewDocIndex] = useState<number>(0);
@@ -735,14 +703,12 @@ function UserPrintContent() {
           ? documents[0].originalFilename
           : `${documents[0].originalFilename} (+${documents.length - 1} more files)`;
 
-      const targetMachine = selectedMachineId || (machines[0]?.machineId || "MCH-CAMPUS-01");
-
       const orderRes = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user?.uid || "guest_user",
-          machineId: targetMachine,
+          machineId: "UNIVERSAL",
           documentId: documents[0].fileId,
           documentTitle: docTitle,
           configuration: config,
@@ -1285,39 +1251,6 @@ function UserPrintContent() {
                       </span>
                     </div>
                   )}
-
-                  {/* Pickup Vending Machine Selection */}
-                  <div className="pt-2 border-t border-neutral-100">
-                    <label className="text-xs font-semibold text-neutral-600 block mb-1.5 uppercase tracking-wider flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-[#0c831f]" />
-                        <span>Pickup Vending Machine</span>
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 normal-case">
-                        Universal Campus Release
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={selectedMachineId}
-                        onChange={(e) => setSelectedMachineId(e.target.value)}
-                        className="w-full text-xs font-semibold px-3 py-2.5 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] text-neutral-900 cursor-pointer appearance-none pr-8 transition-colors"
-                      >
-                        {machines.length > 0 ? (
-                          machines.map((m) => (
-                            <option key={m.machineId} value={m.machineId}>
-                              {m.name || m.machineId} — {m.location || "Campus Kiosk"}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="MCH-CAMPUS-01">Central Library Kiosk A — Ground Floor, Central Library</option>
-                        )}
-                      </select>
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-500">
-                        <ChevronDown className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
 
                 </div>
               </div>

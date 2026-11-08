@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // Fetch machine pricing override if applicable
     let machinePricingOverride = null;
-    if (machineId) {
+    if (machineId && machineId !== "UNIVERSAL") {
       machinePricingOverride = await fetchDbWithTimeout<any>(`machines/${machineId}/pricingOverride`);
     }
 

@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
         status: "QUEUED",
         printedPages: 0,
       },
+      otp: "",
       otpHash: "",
       otpExpiresAt: now + 60 * 60 * 1000, // 1 hour
       otpConsumed: false,

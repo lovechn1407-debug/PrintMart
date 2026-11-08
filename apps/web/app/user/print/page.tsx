@@ -32,6 +32,7 @@ import {
   Eye,
   Layers,
   FileCheck,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
@@ -1412,48 +1413,101 @@ function UserPrintContent() {
           </div>
         )}
 
-        {/* Modal: OTP Release Dialog (Universal Kiosk) */}
-        <Modal isOpen={isOtpModalOpen} onOpenChange={setIsOtpModalOpen}>
-          <ModalContent>
-            <ModalHeader className="text-center items-center">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-2" />
-              <h2 className="text-lg font-bold text-neutral-900">Print Order Authorized!</h2>
-              <p className="text-xs text-neutral-500">
-                Documents are preloaded & ready at <strong>Any Campus Kiosk</strong>
-              </p>
-            </ModalHeader>
-            <ModalBody className="text-center py-5">
-              <span className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
-                Your 6-Digit Universal OTP
-              </span>
-              <div className="my-3 py-3 px-6 bg-emerald-50 rounded-xl flex items-center justify-center gap-3 border border-emerald-200">
-                <span className="text-3xl font-extrabold tracking-widest text-[#0c831f] font-mono">
-                  {generatedOtp}
-                </span>
-              </div>
-              <p className="text-xs text-neutral-500 max-w-xs mx-auto">
-                Walk up to <span className="font-semibold text-neutral-800">any kiosk screen</span> on campus, tap <span className="font-semibold text-neutral-800">"Enter OTP"</span>, and your print job will release immediately.
-              </p>
-            </ModalBody>
-            <ModalFooter className="flex flex-col sm:flex-row gap-2">
+        {/* ─────────────────────────────────────────────────────────────
+            BOTTOM NOTIFICATION PANEL: OTP RELEASE SHEET (Universal Kiosk)
+            Bottom-to-up sliding notification panel with zero left/right gaps
+            ───────────────────────────────────────────────────────────── */}
+        {isOtpModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            {/* Backdrop Overlay */}
+            <div
+              className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs transition-opacity duration-300"
+              onClick={() => setIsOtpModalOpen(false)}
+            />
+
+            {/* Bottom-to-Up Panel (Zero gaps on left/right on phone screen) */}
+            <div className="relative w-full sm:max-w-md bg-white rounded-t-[26px] sm:rounded-2xl border-t sm:border border-neutral-200/90 shadow-[0_-12px_40px_rgba(0,0,0,0.18)] p-5 pb-8 sm:p-6 sm:pb-6 z-10 animate-in slide-in-from-bottom duration-300 ease-out">
+              {/* Top drag handle indicator for mobile notification style */}
+              <div className="w-12 h-1 bg-neutral-300 rounded-full mx-auto mb-3 sm:hidden" />
+
+              {/* Close Button */}
               <button
                 type="button"
-                className="w-full font-semibold rounded-xl text-xs h-10 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 flex items-center justify-center gap-2 transition-colors"
-                onClick={copyOtpToClipboard}
-              >
-                {copiedOtp ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedOtp ? "Copied OTP!" : "Copy OTP"}</span>
-              </button>
-              <Link
-                href="/user/history"
                 onClick={() => setIsOtpModalOpen(false)}
-                className="w-full font-bold rounded-xl text-xs h-10 bg-[#0c831f] hover:bg-[#0a6e1a] text-white flex items-center justify-center gap-2 transition-colors shadow-xs"
+                className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+                aria-label="Close"
               >
-                View in My Print Jobs
-              </Link>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Header */}
+              <div className="text-center pt-1 pb-1">
+                <div className="w-11 h-11 rounded-full bg-emerald-100 text-[#0c831f] flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h2 className="text-lg font-bold text-[#1c1c1c] tracking-tight">
+                  Print Order Confirmed!
+                </h2>
+              </div>
+
+              {/* OTP Box: slightly reduced corner radius (rounded-lg) and NO border */}
+              <div className="text-center">
+                <span className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
+                  Your 6-Digit Universal OTP
+                </span>
+                <div className="my-3 py-3.5 px-6 bg-[#eefaf0] rounded-lg flex items-center justify-center gap-3">
+                  <span className="text-3xl sm:text-4xl font-extrabold tracking-[0.2em] font-mono shimmer-otp-text select-all">
+                    {generatedOtp}
+                  </span>
+                </div>
+              </div>
+
+              {/* How to use OTP - in points like homepage document desc points */}
+              <div className="bg-[#fbf9f3] rounded-xl p-3.5 my-3 border border-amber-200/50 text-left">
+                <span className="text-[11px] font-bold text-neutral-800 uppercase tracking-wider block mb-2">
+                  How to release your print
+                </span>
+                <ul className="space-y-1.5 text-xs text-neutral-600 font-normal">
+                  <li className="flex items-center gap-2">
+                    <span className="text-[10px] text-neutral-400">✦</span>
+                    <span>Walk up to <strong>any campus kiosk</strong> touchscreen</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[10px] text-neutral-400">✦</span>
+                    <span>Tap on <strong>"Enter OTP"</strong> on the main screen</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[10px] text-neutral-400">✦</span>
+                    <span>Enter this 6-digit code to immediately release prints</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[10px] text-neutral-400">✦</span>
+                    <span>Universal code valid for 60 minutes across all kiosks</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2 mt-4">
+                <button
+                  type="button"
+                  className="w-full font-semibold rounded-xl text-xs h-11 bg-neutral-100 hover:bg-neutral-200 active:scale-98 text-neutral-800 flex items-center justify-center gap-2 transition-all"
+                  onClick={copyOtpToClipboard}
+                >
+                  {copiedOtp ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedOtp ? "Copied OTP!" : "Copy OTP"}</span>
+                </button>
+                <Link
+                  href="/user/history"
+                  onClick={() => setIsOtpModalOpen(false)}
+                  className="w-full font-bold rounded-xl text-xs h-11 bg-[#0c831f] hover:bg-[#0a6e1a] active:scale-98 text-white flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  View in My Print Jobs
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

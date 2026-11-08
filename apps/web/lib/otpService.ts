@@ -47,9 +47,11 @@ export async function generateAndStoreJobOTP(params: {
   // Atomically write OTP record and update job
   const updates: Record<string, any> = {};
   updates[`otpRecords/${otpHash}`] = otpRecord;
+  updates[`printJobs/${jobId}/otp`] = plainOtp;
   updates[`printJobs/${jobId}/otpHash`] = otpHash;
   updates[`printJobs/${jobId}/otpExpiresAt`] = expiresAt;
   updates[`printJobs/${jobId}/otpConsumed`] = false;
+  updates[`userHistory/${userId}/${jobId}/otp`] = plainOtp;
   updates[`printJobs/${jobId}/payment/status`] = "PAID";
   updates[`printJobs/${jobId}/payment/paidAt`] = Date.now();
   updates[`printJobs/${jobId}/preparation/status`] = "PRELOAD_QUEUED";

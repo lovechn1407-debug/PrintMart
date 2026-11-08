@@ -140,6 +140,7 @@ export interface PrintJob {
         completedAt?: number | null;
         failureReason?: string | null;
     };
+    otp?: string;
     otpHash: string;
     otpExpiresAt: number;
     otpConsumed: boolean;

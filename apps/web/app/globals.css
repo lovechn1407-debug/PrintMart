@@ -195,3 +195,31 @@ body {
 [data-slot="radio"]:has(input:checked) [data-slot="indicator"]:empty::before {
   background-color: #0c831f !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   SHIMMERING TEXT ANIMATION
+   Light, elegant shimmer across OTP digits
+   ───────────────────────────────────────────────────────────── */
+@keyframes text-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-otp-text {
+  background: linear-gradient(
+    90deg,
+    #0c831f 0%,
+    #15a82c 25%,
+    #6ee7b7 50%,
+    #15a82c 75%,
+    #0c831f 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 3s ease-in-out infinite;
+}

@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
 
     // 2. Universal Campus Kiosk: Jobs are universal and can be dispensed at ANY campus kiosk
     const targetMachineId = machineId || "UNIVERSAL";
-    let machineData: any = null;
+    let machineData: any = {};
     if (targetMachineId !== "UNIVERSAL") {
       const machineSnap = await adminDb.ref(`machines/${targetMachineId}`).get();
       if (machineSnap.exists()) {
-        machineData = machineSnap.val();
+        machineData = machineSnap.val() || {};
       }
     }
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       config: configuration,
       pricing,
       offer,
-      machinePricingOverride: machineData.pricingOverride,
+      machinePricingOverride: machineData?.pricingOverride,
     });
 
     // 4. Generate unique Job & Order IDs

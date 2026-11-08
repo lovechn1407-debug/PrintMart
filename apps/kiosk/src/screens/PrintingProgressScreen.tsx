@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Card, CardHeader, CardBody, Progress, Chip, Button } from "@heroui/react";
-import { Printer, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Printer, CheckCircle2, FileText, ArrowDown, Sparkles } from "lucide-react";
 
 interface PrintingProgressScreenProps {
   jobDetails: {
@@ -24,12 +23,11 @@ export function PrintingProgressScreen({ jobDetails, onComplete }: PrintingProgr
     (jobDetails.configuration?.totalPagesToPrint || 5) *
     (jobDetails.configuration?.copies || 1);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const [printerTelemetry, setPrinterTelemetry] = useState<string>("SPOOLING_RAW_GDI");
 
   useEffect(() => {
     const kioskApi = (window as any).kioskApi;
 
-    // Issue native print command to Electron main process
+    // Issue native print command to Electron main process if available
     if (kioskApi?.printJob) {
       kioskApi.printJob(jobDetails.jobId, jobDetails.configuration).then((res: any) => {
         if (res.success) {
@@ -41,7 +39,6 @@ export function PrintingProgressScreen({ jobDetails, onComplete }: PrintingProgr
       const unsub = kioskApi.onPrintProgress((data: any) => {
         if (data.jobId === jobDetails.jobId) {
           setPagesPrinted(data.printedPages);
-          setPrinterTelemetry("PRINTING_PAGE");
         }
       });
 
@@ -66,71 +63,100 @@ export function PrintingProgressScreen({ jobDetails, onComplete }: PrintingProgr
   const percentage = Math.min(100, Math.round((pagesPrinted / totalPages) * 100));
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto w-full">
-      <Card className="w-full border border-neutral-200/80 shadow-none bg-white p-6 text-center">
-        <CardHeader className="flex flex-col items-center gap-3">
+    <div className="flex-1 flex flex-col min-h-screen bg-[#faf7ee]">
+      {/* Top Honey-Gold Bar */}
+      <header className="bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] border-b border-amber-300/40 px-6 h-16 flex items-center justify-between shadow-2xs select-none">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-neutral-950 text-white flex items-center justify-center shadow-xs">
+            <Printer className="w-5 h-5 text-amber-300" />
+          </div>
+          <span className="font-extrabold text-lg text-neutral-950 tracking-tight leading-tight">
+            Print<span className="text-[#0c831f]">Mart</span> Dispenser
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-800 bg-white/70 px-3 py-1 rounded-full border border-amber-400/40">
+          Job ID: {jobDetails.jobId}
+        </div>
+      </header>
+
+      {/* Main Dispensing Card with Guilloché Pattern */}
+      <main className="flex-1 guilloche-bg flex items-center justify-center p-4 sm:p-8">
+        <div className="kiosk-card max-w-lg w-full p-8 flex flex-col items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-neutral-200/90 text-center animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Animated Status Icon */}
           <div
-            className={`p-4 rounded-full ${
-              isCompleted ? "bg-success/10 text-success" : "bg-primary/10 text-primary animate-pulse"
+            className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-sm transition-all duration-300 ${
+              isCompleted
+                ? "bg-emerald-100 text-[#0c831f] scale-105"
+                : "bg-emerald-50 text-[#0c831f] animate-pulse border-2 border-emerald-300"
             }`}
           >
-            {isCompleted ? <CheckCircle2 className="w-12 h-12" /> : <Printer className="w-12 h-12" />}
+            {isCompleted ? (
+              <CheckCircle2 className="w-10 h-10" />
+            ) : (
+              <Printer className="w-10 h-10" />
+            )}
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-neutral-900">
-              {isCompleted ? "Printing Completed!" : "Printing in Progress..."}
+
+          {/* Heading */}
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
+              {isCompleted ? "Printing Complete!" : "Dispensing Your Sheets..."}
             </h2>
-            <p className="text-sm text-neutral-500 font-mono mt-1">
-              Job ID: {jobDetails.jobId}
+            <p className="text-xs sm:text-sm text-neutral-500 font-medium">
+              {isCompleted
+                ? "Please collect your fresh documents from the output tray below"
+                : "High-speed laser spooling in progress. Please wait a moment."}
             </p>
           </div>
-        </CardHeader>
 
-        <CardBody className="flex flex-col items-center gap-6 py-6">
-          <div className="w-full bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left text-sm flex flex-col gap-2">
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Document:</span>
-              <span className="font-bold text-neutral-900">{jobDetails.documentName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Mode:</span>
-              <span className="capitalize text-neutral-800">
-                {jobDetails.configuration?.colorMode} • {jobDetails.configuration?.simplexDuplex}
+          {/* Document Spec Card */}
+          <div className="w-full bg-neutral-50 rounded-2xl border border-neutral-200/80 p-4 text-left flex flex-col gap-2.5 text-xs shadow-2xs">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60">
+              <span className="text-neutral-500 font-medium flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-neutral-700" /> Document Name
+              </span>
+              <span className="font-bold text-neutral-900 max-w-[200px] truncate">
+                {jobDetails.documentName}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Hardware Output:</span>
-              <span className="font-semibold text-primary">
-                {pagesPrinted} / {totalPages} Pages
+
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-500 font-medium">Print Configuration</span>
+              <span className="font-semibold text-neutral-800 capitalize bg-neutral-200/60 px-2 py-0.5 rounded text-[11px]">
+                {jobDetails.configuration?.colorMode === "color" ? "🌈 Color" : "🖤 B&W"} • {jobDetails.configuration?.simplexDuplex}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-neutral-500 font-medium">Hardware Progress</span>
+              <span className="font-bold text-[#0c831f]">
+                {pagesPrinted} of {totalPages} Pages
               </span>
             </div>
           </div>
 
+          {/* Progress Bar Gauge */}
           <div className="w-full flex flex-col gap-2">
-            <div className="flex justify-between text-xs text-neutral-500">
-              <span>Windows Spooler Progress</span>
-              <span className="font-bold">{percentage}%</span>
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-neutral-600">Dispense Progress</span>
+              <span className="text-[#0c831f]">{percentage}%</span>
             </div>
-            <Progress
-              size="lg"
-              value={percentage}
-              color={isCompleted ? "success" : "primary"}
-              className="w-full"
-            />
+            <div className="w-full bg-neutral-100 h-4 rounded-full overflow-hidden border border-neutral-200 shadow-inner">
+              <div
+                className="bg-gradient-to-r from-[#0c831f] to-[#10b981] h-full rounded-full transition-all duration-300"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
           </div>
 
-          <Chip size="sm" variant="flat" color={isCompleted ? "success" : "warning"}>
-            {isCompleted ? "Physical Spool Complete" : "Processing Hardware Driver Stream"}
-          </Chip>
-
-          {isCompleted && (
-            <p className="text-xs text-neutral-400">
-              Please collect your documents from the output tray. Returning to home screen...
-            </p>
-          )}
-        </CardBody>
-      </Card>
+          {/* Tray Arrow Callout */}
+          <div className="w-full p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 font-bold text-xs flex items-center justify-center gap-2">
+            <ArrowDown className="w-4 h-4 text-amber-700 animate-bounce" />
+            <span>Output Tray is located below the touchscreen</span>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
-

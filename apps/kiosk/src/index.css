@@ -19,5 +19,25 @@ body {
   user-select: none;
   -webkit-user-select: none;
   background-color: #faf7ee;
+  color: #171717;
+  letter-spacing: -0.012em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FINE GUILLOCHÉ WAVY CONTOUR TEXTURE
+   Matches the subtle banknote/topography security lines
+   ───────────────────────────────────────────────────────────── */
+.guilloche-bg {
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(253, 224, 71, 0.42) 0%, rgba(254, 240, 138, 0.18) 50%, transparent 80%),
+    repeating-radial-gradient(ellipse at 100% 15%, transparent, transparent 10px, rgba(217, 180, 74, 0.14) 11px, transparent 12px),
+    repeating-radial-gradient(ellipse at 0% 15%, transparent, transparent 10px, rgba(217, 180, 74, 0.14) 11px, transparent 12px);
+}
+
+.kiosk-card {
+  background-color: #ffffff;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.06);
 }
 

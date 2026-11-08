@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Button, Card, CardBody, Chip, Alert } from "@heroui/react";
-import { Printer, Delete, ArrowRight, ShieldCheck, X, KeyRound, Lock } from "lucide-react";
+import { Printer, Delete, ArrowRight, ShieldCheck, X, KeyRound, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import { KioskNavbar } from "../components/KioskNavbar";
 
 interface OtpScreenProps {
   machineId: string;
@@ -33,7 +33,7 @@ export function OtpScreen({
   // Physical keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isStaffModalOpen) return; // Don't intercept when staff modal is open
+      if (isStaffModalOpen) return;
 
       if (e.key >= "0" && e.key <= "9") {
         if (digits.length < 6) {
@@ -41,12 +41,14 @@ export function OtpScreen({
         }
       } else if (e.key === "Backspace") {
         setDigits((prev) => prev.slice(0, -1));
+        setErrorMsg(null);
       } else if (e.key === "Enter") {
         if (digits.length === 6) {
           handleSubmit(digits.join(""));
         }
       } else if (e.key === "Escape") {
         setDigits([]);
+        setErrorMsg(null);
       }
     };
 
@@ -58,6 +60,7 @@ export function OtpScreen({
     if (digits.length < 6) {
       const nextDigits = [...digits, num];
       setDigits(nextDigits);
+      setErrorMsg(null);
       if (nextDigits.length === 6) {
         handleSubmit(nextDigits.join(""));
       }
@@ -75,7 +78,7 @@ export function OtpScreen({
   };
 
   const handleSubmit = async (otpStr: string) => {
-    // Check if master code was entered (dynamic from admin settings or 998877)
+    // Check if master code was entered (dynamic or default 998877)
     if (otpStr === masterCode || otpStr === "998877") {
       setDigits([]);
       onOpenConfig();
@@ -86,14 +89,14 @@ export function OtpScreen({
       setLoading(true);
       setErrorMsg(null);
 
-      // Verify OTP via Electron API bridge
+      // Verify OTP via Electron API bridge if available
       const kioskApi = (window as any).kioskApi;
       let res: any;
 
       if (kioskApi?.verifyOtp) {
         res = await kioskApi.verifyOtp(otpStr);
       } else {
-        // Direct fallback fetch in browser preview
+        // Direct API call to backend server
         const response = await fetch("http://localhost:3000/api/machine/verify-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -130,142 +133,141 @@ export function OtpScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-between p-8 max-w-4xl mx-auto w-full min-h-screen">
-      {/* Kiosk Header */}
-      <header className="flex justify-between items-center w-full pb-4 border-b border-neutral-200/80">
-        <div className="flex items-center gap-3.5">
-          <div className="bg-[#0c831f] text-white p-3 rounded-2xl flex items-center justify-center shadow-xs">
-            <Printer className="w-7 h-7" />
+    <div className="flex-1 flex flex-col min-h-screen bg-[#faf7ee]">
+      {/* ── Signature Honey-Gold Kiosk Navbar ── */}
+      <KioskNavbar
+        machineName={machineName}
+        machineId={machineId}
+        printerState={printerState}
+        onOpenStaff={() => {
+          setStaffPinInput("");
+          setStaffPinError(null);
+          setIsStaffModalOpen(true);
+        }}
+      />
+
+      {/* ── Main Interactive OTP Screen with Fine Guilloché Texture ── */}
+      <main className="flex-1 guilloche-bg flex flex-col items-center justify-center p-4 sm:p-8">
+        <div className="kiosk-card max-w-[440px] w-full p-6 sm:p-8 flex flex-col items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-neutral-200/90 animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Header Pill & Title */}
+          <div className="flex flex-col items-center text-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#0c831f] text-xs font-bold border border-emerald-200/80 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-[#0c831f]" />
+              Zero-Queue Instant Dispenser
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
+              Enter 6-Digit OTP
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 font-medium max-w-xs">
+              Enter the OTP received on your mobile after payment to collect prints
+            </p>
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-neutral-900">PrintMart Kiosk</h1>
-            <p className="text-xs text-neutral-500 font-medium">{machineName} • ID: {machineId}</p>
+
+          {/* Error Message Box */}
+          {errorMsg && (
+            <div className="w-full p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-bold text-center animate-in shake">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* 6 Digit Display Cells */}
+          <div className="flex gap-2 sm:gap-2.5 justify-center w-full">
+            {[0, 1, 2, 3, 4, 5].map((index) => {
+              const digit = digits[index];
+              const isCurrent = index === digits.length;
+              return (
+                <div
+                  key={index}
+                  className={`w-12 h-16 sm:w-14 sm:h-18 rounded-2xl border-2 flex items-center justify-center font-mono text-2xl sm:text-3xl font-black transition-all bg-white shadow-2xs ${
+                    digit
+                      ? "border-[#0c831f] text-[#0c831f] bg-emerald-50/30 scale-102 shadow-xs"
+                      : isCurrent
+                      ? "border-[#0c831f] ring-4 ring-[#0c831f]/15"
+                      : "border-neutral-200 text-neutral-300"
+                  }`}
+                >
+                  {digit || (isCurrent ? <span className="w-2 h-2 rounded-full bg-neutral-300 animate-pulse" /> : "·")}
+                </div>
+              );
+            })}
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <Chip
-            size="md"
-            variant="flat"
-            color={printerState === "READY" ? "success" : "warning"}
-            startContent={<span className={`w-2.5 h-2.5 rounded-full mr-1 ${printerState === "READY" ? "bg-emerald-600 animate-pulse" : "bg-amber-600"}`} />}
-          >
-            Printer: {printerState}
-          </Chip>
-          <button
-            type="button"
-            onClick={() => {
-              setStaffPinInput("");
-              setStaffPinError(null);
-              setIsStaffModalOpen(true);
-            }}
-            className="px-3.5 py-1.5 rounded-xl border border-neutral-300 text-xs font-bold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#0c831f]" />
-            Staff
-          </button>
-        </div>
-      </header>
-
-      {/* Center OTP Display & Touch Keypad */}
-      <main className="flex flex-col items-center gap-7 my-auto py-6">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Enter Your 6-Digit OTP</h2>
-          <p className="text-sm text-neutral-500 mt-1.5 font-medium">
-            Generated on your phone upon payment confirmation
-          </p>
-        </div>
-
-        {errorMsg && (
-          <Alert color="danger" className="max-w-md w-full shadow-xs">
-            {errorMsg}
-          </Alert>
-        )}
-
-        {/* 6 Digit Display Boxes */}
-        <div className="flex gap-3 justify-center">
-          {[0, 1, 2, 3, 4, 5].map((index) => {
-            const digit = digits[index];
-            return (
-              <div
-                key={index}
-                className={`w-14 h-16 rounded-2xl border-2 flex items-center justify-center font-mono text-3xl font-black transition-all bg-white shadow-xs ${
-                  digit
-                    ? "border-[#0c831f] text-[#0c831f] bg-emerald-50/20"
-                    : index === digits.length
-                    ? "border-[#0c831f] ring-4 ring-[#0c831f]/15"
-                    : "border-neutral-200 text-neutral-400"
-                }`}
+          {/* 3x4 Touch Numeric Keypad */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-[340px] pt-1">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => handleKeyPress(num)}
+                className="h-14 sm:h-16 text-2xl font-black rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/90 text-neutral-850 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
               >
-                {digit || ""}
-              </div>
-            );
-          })}
-        </div>
+                {num}
+              </button>
+            ))}
 
-        {/* Touch Numeric Keypad */}
-        <div className="grid grid-cols-3 gap-3.5 w-80 mt-1">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
-            <Button
-              key={num}
-              size="lg"
-              variant="flat"
-              className="h-16 text-2xl font-black bg-white border border-neutral-200/90 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all text-neutral-800"
-              onPress={() => handleKeyPress(num)}
+            {/* Clear Button */}
+            <button
+              type="button"
+              onClick={handleClear}
+              className="h-14 sm:h-16 text-xs sm:text-sm font-extrabold rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200 border border-rose-200/80 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center uppercase tracking-wider"
             >
-              {num}
-            </Button>
-          ))}
-          <Button
-            size="lg"
-            variant="flat"
-            color="danger"
-            className="h-16 text-base font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 active:scale-95 transition-all"
-            onPress={handleClear}
-          >
-            Clear
-          </Button>
-          <Button
-            size="lg"
-            variant="flat"
-            className="h-16 text-2xl font-black bg-white border border-neutral-200/90 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all text-neutral-800"
-            onPress={() => handleKeyPress("0")}
-          >
-            0
-          </Button>
-          <Button
-            size="lg"
-            variant="flat"
-            className="h-16 text-base font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border border-neutral-200 active:scale-95 transition-all flex items-center justify-center"
-            onPress={handleBackspace}
-          >
-            <Delete className="w-6 h-6" />
-          </Button>
-        </div>
+              Clear
+            </button>
 
-        {digits.length === 6 && (
-          <Button
-            color="primary"
-            size="lg"
-            className="w-80 font-bold text-lg h-14 bg-[#0c831f] text-white hover:bg-[#0a6c1a] shadow-md transition-all active:scale-[0.98]"
-            isLoading={loading}
-            onPress={() => handleSubmit(digits.join(""))}
-            endContent={<ArrowRight className="w-5 h-5" />}
-          >
-            Authorize & Print
-          </Button>
-        )}
+            {/* '0' Button */}
+            <button
+              type="button"
+              onClick={() => handleKeyPress("0")}
+              className="h-14 sm:h-16 text-2xl font-black rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/90 text-neutral-850 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+            >
+              0
+            </button>
+
+            {/* Backspace Button */}
+            <button
+              type="button"
+              onClick={handleBackspace}
+              className="h-14 sm:h-16 rounded-2xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-200 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              title="Backspace"
+            >
+              <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          </div>
+
+          {/* Authorize & Print Dispense Button */}
+          {digits.length === 6 && (
+            <button
+              type="button"
+              onClick={() => handleSubmit(digits.join(""))}
+              disabled={loading}
+              className="w-full max-w-[340px] py-4 rounded-2xl bg-gradient-to-r from-[#0c831f] to-[#0a6c1a] text-white font-black text-base shadow-[0_6px_20px_rgba(12,131,31,0.35)] hover:shadow-[0_8px_25px_rgba(12,131,31,0.45)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Authorizing Hardware...</span>
+                </>
+              ) : (
+                <>
+                  <span>Authorize & Dispense</span>
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Security & Instructions Note */}
+          <div className="pt-2 text-center text-[11px] text-neutral-400 font-medium">
+            Touch on-screen keypad or use physical keyboard • Document auto-deletes immediately after print
+          </div>
+        </div>
       </main>
 
-      {/* Footer Instructions */}
-      <footer className="text-center text-xs text-neutral-400 border-t border-neutral-200/80 pt-4 pb-2 w-full font-medium">
-        Touch numeric keypad or use physical keyboard • Document preloads before OTP entry for instant output
-      </footer>
-
-      {/* Staff Authentication Modal */}
+      {/* ── Staff Authentication PIN Modal ── */}
       {isStaffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-5 border border-neutral-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-5 border border-neutral-100 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-emerald-100 text-[#0c831f] rounded-xl">
@@ -276,14 +278,14 @@ export function OtpScreen({
               <button
                 type="button"
                 onClick={() => setIsStaffModalOpen(false)}
-                className="text-neutral-400 hover:text-neutral-700 p-1"
+                className="text-neutral-400 hover:text-neutral-700 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <p className="text-xs text-neutral-500">
-              Enter the 6-digit Master PIN configured in the Admin Settings panel to access hardware diagnostics.
+              Enter the 6-digit Master PIN configured in the Admin Settings panel to access machine diagnostics and pairing.
             </p>
 
             <div className="flex flex-col gap-2">
@@ -307,7 +309,7 @@ export function OtpScreen({
               )}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setIsStaffModalOpen(false)}
@@ -320,7 +322,7 @@ export function OtpScreen({
                 onClick={handleVerifyStaffPin}
                 className="flex-1 py-2.5 text-xs font-bold text-white bg-[#0c831f] hover:bg-[#0a6c1a] rounded-xl shadow-xs transition-all cursor-pointer"
               >
-                Unlock
+                Unlock Panel
               </button>
             </div>
           </div>

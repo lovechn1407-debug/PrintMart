@@ -223,3 +223,43 @@ body {
   -webkit-text-fill-color: transparent;
   animation: text-shimmer 3s ease-in-out infinite;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MINIMAL PAGE TURN ANIMATION (Print Studio Preview)
+   Subtle 3D perspective curl and smooth slide effect
+   ───────────────────────────────────────────────────────────── */
+@keyframes page-turn-next {
+  0% {
+    opacity: 0.75;
+    transform: perspective(1200px) translateX(24px) rotateY(-8deg) scale(0.97);
+    box-shadow: -8px 12px 28px rgba(0, 0, 0, 0.18);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) translateX(0) rotateY(0deg) scale(1);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  }
+}
+
+@keyframes page-turn-prev {
+  0% {
+    opacity: 0.75;
+    transform: perspective(1200px) translateX(-24px) rotateY(8deg) scale(0.97);
+    box-shadow: 8px 12px 28px rgba(0, 0, 0, 0.18);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) translateX(0) rotateY(0deg) scale(1);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.animate-page-turn-next {
+  animation: page-turn-next 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: left center;
+}
+
+.animate-page-turn-prev {
+  animation: page-turn-prev 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: right center;
+}

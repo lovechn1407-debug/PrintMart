@@ -11,7 +11,12 @@ export function AppNavbar() {
 
   const [imgError, setImgError] = useState<boolean>(false);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPendingPath(null);
+  }, [pathname]);
 
   const rawPhoto = profile?.photoURL || user?.photoURL;
   const userPhoto = !imgError ? rawPhoto : null;
@@ -61,40 +66,57 @@ export function AppNavbar() {
           </Link>
         </div>
 
-        {/* Desktop Navigation Links */}
+        {/* Desktop Navigation Links with Circular Buffer Feedback */}
         <nav className="hidden sm:flex items-center gap-6">
           <Link
             href="/"
-            className={`text-xs font-semibold transition-colors ${
+            onClick={() => { if (pathname !== "/") setPendingPath("/"); }}
+            className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
               pathname === "/" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
             }`}
           >
-            Home
+            {pendingPath === "/" && (
+              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+            )}
+            <span>Home</span>
           </Link>
           <Link
             href="/user/print"
-            className={`text-xs font-semibold transition-colors ${
+            onClick={() => { if (pathname !== "/user/print") setPendingPath("/user/print"); }}
+            className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
               pathname === "/user/print" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
             }`}
           >
-            Start Printing
+            {pendingPath === "/user/print" && (
+              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+            )}
+            <span>Start Printing</span>
           </Link>
           {user && (
             <Link
               href="/user/history"
-              className={`text-xs font-semibold transition-colors ${
+              onClick={() => { if (pathname !== "/user/history") setPendingPath("/user/history"); }}
+              className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 pathname === "/user/history" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
               }`}
             >
-              My Print Jobs
+              {pendingPath === "/user/history" && (
+                <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+              )}
+              <span>My Print Jobs</span>
             </Link>
           )}
           {isAdmin && (
             <Link
               href="/admin/dashboard"
-              className="text-xs font-bold flex items-center gap-1 text-rose-700 bg-white/70 hover:bg-white px-2.5 py-1 rounded-full border border-rose-300/60 shadow-2xs"
+              onClick={() => { if (pathname !== "/admin/dashboard") setPendingPath("/admin/dashboard"); }}
+              className="text-xs font-bold flex items-center gap-1.5 text-rose-700 bg-white/70 hover:bg-white px-2.5 py-1 rounded-full border border-rose-300/60 shadow-2xs"
             >
-              <ShieldAlert className="w-3.5 h-3.5" />
+              {pendingPath === "/admin/dashboard" ? (
+                <div className="w-3 h-3 rounded-full border-2 border-rose-300 border-t-rose-600 animate-spin" />
+              ) : (
+                <ShieldAlert className="w-3.5 h-3.5" />
+              )}
               <span>Admin Portal</span>
             </Link>
           )}
@@ -192,47 +214,86 @@ export function AppNavbar() {
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar */}
+      {/* Mobile Bottom Navigation Bar with Circular Buffer Spinner on Tab Switching */}
       <nav className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-lg border-t border-neutral-200/80 z-40 sm:hidden flex items-center justify-around py-2 px-3 shadow-lg">
         <Link
           href="/"
+          onClick={() => { if (pathname !== "/") setPendingPath("/"); }}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
             pathname === "/" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
           }`}
         >
-          <Home className="w-5 h-5" />
+          <div className="relative w-5 h-5 flex items-center justify-center">
+            {pendingPath === "/" ? (
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+            ) : (
+              <Home className="w-5 h-5" />
+            )}
+          </div>
           <span>Home</span>
         </Link>
         <Link
           href="/user/print"
+          onClick={() => { if (pathname !== "/user/print") setPendingPath("/user/print"); }}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
             pathname === "/user/print" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
           }`}
         >
-          <Printer className="w-5 h-5" />
+          <div className="relative w-5 h-5 flex items-center justify-center">
+            {pendingPath === "/user/print" ? (
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+            ) : (
+              <Printer className="w-5 h-5" />
+            )}
+          </div>
           <span>Print</span>
         </Link>
         {user && (
           <Link
             href="/user/history"
+            onClick={() => { if (pathname !== "/user/history") setPendingPath("/user/history"); }}
             className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
               pathname === "/user/history" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <Clock className="w-5 h-5" />
+            <div className="relative w-5 h-5 flex items-center justify-center">
+              {pendingPath === "/user/history" ? (
+                <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+              ) : (
+                <Clock className="w-5 h-5" />
+              )}
+            </div>
             <span>Jobs</span>
           </Link>
         )}
         {isAdmin && (
           <Link
             href="/admin/dashboard"
+            onClick={() => { if (pathname !== "/admin/dashboard") setPendingPath("/admin/dashboard"); }}
             className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-rose-600"
           >
-            <ShieldAlert className="w-5 h-5" />
+            <div className="relative w-5 h-5 flex items-center justify-center">
+              {pendingPath === "/admin/dashboard" ? (
+                <div className="w-4 h-4 rounded-full border-2 border-rose-200 border-t-rose-600 animate-spin" />
+              ) : (
+                <ShieldAlert className="w-5 h-5" />
+              )}
+            </div>
             <span>Admin</span>
           </Link>
         )}
       </nav>
+
+      {/* Floating Circular Loading Buffer Badge when switching tabs */}
+      {pendingPath && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9999] bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-neutral-200/90 shadow-[0_4px_20px_rgba(0,0,0,0.12)] flex items-center gap-2.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          <div className="relative w-4 h-4 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-2 border-emerald-500/25 animate-ping opacity-60" />
+            <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+          </div>
+          <span className="text-xs font-bold text-neutral-800">Switching tab...</span>
+        </div>
+      )}
 
     </>
   );

@@ -27,6 +27,56 @@ function estimatePdfPageCount(buffer: Buffer): number {
 
 export async function POST(req: NextRequest) {
   try {
+    const contentType = req.headers.get("content-type") || "";
+
+    // ── CASE 1: DIRECT UPLOAD METADATA (Bypasses Vercel 4.5MB Serverless Function payload limit) ──
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const {
+        telegramFileId,
+        telegramMessageId,
+        originalFilename,
+        mimeType,
+        fileSizeBytes,
+        pageCount,
+        ownerUid = "anonymous",
+        sha256 = "",
+      } = body;
+
+      if (!telegramFileId || !originalFilename) {
+        return NextResponse.json({ error: "Missing required document metadata" }, { status: 400 });
+      }
+
+      const documentId = `DOC_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      const retentionExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+
+      const docMetadata: DocumentMetadata = {
+        documentId,
+        ownerUid,
+        originalFilename,
+        mimeType: mimeType || "application/octet-stream",
+        fileSizeBytes: Number(fileSizeBytes) || 0,
+        sha256: sha256 || crypto.randomBytes(16).toString("hex"),
+        pageCount: Math.max(1, Number(pageCount) || 1),
+        telegramMessageId: Number(telegramMessageId) || 0,
+        telegramFileId,
+        retentionExpiresAt,
+        createdAt: Date.now(),
+      };
+
+      await adminDb.ref(`documents/${documentId}`).set(docMetadata);
+
+      return NextResponse.json({
+        success: true,
+        document: {
+          ...docMetadata,
+          fileId: documentId,
+          previewUrl: `/api/document/preview?documentId=${documentId}`,
+        },
+      });
+    }
+
+    // ── CASE 2: STANDARD MULTIPART FORMDATA UPLOAD (Files <= 4MB) ──
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const ownerUid = (formData.get("ownerUid") as string) || "anonymous";

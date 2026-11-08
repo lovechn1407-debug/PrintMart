@@ -315,6 +315,19 @@ function UserPrintContent() {
   const [previewDocIndex, setPreviewDocIndex] = useState<number>(0);
   const [previewPageIndex, setPreviewPageIndex] = useState<number>(1);
 
+  // State: Minimal Page Turn Animation & Touch Slide Gestures
+  const [pageTurnAnim, setPageTurnAnim] = useState<"next" | "prev" | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDragX, setTouchDragX] = useState<number>(0);
+  const [isDraggingPage, setIsDraggingPage] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (pageTurnAnim) {
+      const timer = setTimeout(() => setPageTurnAnim(null), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [pageTurnAnim, previewPageIndex]);
+
   // Floating Pay Button Visibility via IntersectionObserver
   const [isInPagePayVisible, setIsInPagePayVisible] = useState<boolean>(false);
   const inPagePayButtonRef = useRef<HTMLButtonElement>(null);
@@ -496,10 +509,14 @@ function UserPrintContent() {
     }
   }, [colorMode, orientation, copies, pageRangeType, customRange]);
 
-  // Upload Multiple Files
+  // Upload Multiple Files with Automatic Direct Cloud Fallback for Large Files (>4MB)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
+
+    const TELEGRAM_BOT_TOKEN = "9146606886:AAGGou_zK4EUwvDAZi6vp2cchjGZhcKO-B8";
+    const TELEGRAM_CHANNEL_ID = "-1004357170113";
+    const DIRECT_UPLOAD_THRESHOLD_BYTES = 4 * 1024 * 1024; // 4MB (bypasses Vercel 4.5MB serverless limit)
 
     setUploading(true);
     setErrorMessage(null);
@@ -511,38 +528,118 @@ function UserPrintContent() {
       setUploadProgress(Math.round(((i + 1) / files.length) * 85));
 
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (user?.uid) {
-          formData.append("ownerUid", user.uid);
+        if (file.size > 20 * 1024 * 1024) {
+          throw new Error(`"${file.name}" exceeds the 20MB maximum limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please select a file under 20MB.`);
         }
 
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+        let uploadedDoc: any = null;
 
-        // Guard: only parse JSON if the response is actually JSON
-        const contentType = res.headers.get("content-type") || "";
-        let data: any;
-        if (contentType.includes("application/json")) {
-          data = await res.json();
+        // Fast-path for files > 4MB: direct upload to Telegram vault
+        if (file.size > DIRECT_UPLOAD_THRESHOLD_BYTES) {
+          setUploadStatusText(`Uploading large file ${file.name} to cloud vault...`);
+          const tgFormData = new FormData();
+          tgFormData.append("chat_id", TELEGRAM_CHANNEL_ID);
+          tgFormData.append("caption", `PrintMart Document Vault: ${file.name}\nTimestamp: ${new Date().toISOString()}`);
+          tgFormData.append("document", file, file.name);
+
+          const tgRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
+            method: "POST",
+            body: tgFormData,
+          });
+
+          const tgText = await tgRes.text();
+          let tgData: any;
+          try {
+            tgData = JSON.parse(tgText);
+          } catch {
+            throw new Error(`Cloud storage gateway error (${tgRes.status})`);
+          }
+
+          if (!tgRes.ok || !tgData.ok || !tgData.result?.document) {
+            throw new Error(`Upload failed: ${tgData.description || tgRes.statusText || "Unable to store document"}`);
+          }
+
+          const tgDoc = tgData.result.document;
+
+          // Estimate page count for PDF client-side
+          let estPages = 1;
+          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            try {
+              const slice = await file.slice(0, 100000).arrayBuffer();
+              const text = new TextDecoder("latin1").decode(slice);
+              const matches = text.match(/\/Type\s*\/Page[^s]/g);
+              if (matches && matches.length > 0) {
+                estPages = matches.length;
+              } else {
+                const countMatch = text.match(/\/Count\s+(\d+)/);
+                if (countMatch && countMatch[1]) {
+                  estPages = parseInt(countMatch[1], 10);
+                }
+              }
+            } catch {
+              estPages = 1;
+            }
+          }
+
+          const metaRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              directUpload: true,
+              telegramFileId: tgDoc.file_id,
+              telegramMessageId: tgData.result.message_id,
+              originalFilename: file.name,
+              mimeType: file.type || "application/octet-stream",
+              fileSizeBytes: file.size,
+              pageCount: estPages,
+              ownerUid: user?.uid || "anonymous",
+            }),
+          });
+
+          const metaData = await metaRes.json();
+          if (!metaRes.ok || !metaData.success || !metaData.document) {
+            throw new Error(metaData.error || `Failed to register ${file.name}`);
+          }
+          uploadedDoc = metaData.document;
         } else {
-          const text = await res.text();
-          throw new Error(`Unexpected server response (${res.status}): ${text.slice(0, 200)}`);
+          // Standard upload for files <= 4MB
+          const formData = new FormData();
+          formData.append("file", file);
+          if (user?.uid) {
+            formData.append("ownerUid", user.uid);
+          }
+
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res.status === 413) {
+            throw new Error("Payload too large. Please retry with direct upload.");
+          }
+
+          const contentType = res.headers.get("content-type") || "";
+          let data: any;
+          if (contentType.includes("application/json")) {
+            data = await res.json();
+          } else {
+            const text = await res.text();
+            throw new Error(`Server returned unexpected response (${res.status}): ${text.slice(0, 150)}`);
+          }
+
+          if (!res.ok || !data.success || !data.document) {
+            throw new Error(data.error || `Failed to process ${file.name}`);
+          }
+          uploadedDoc = data.document;
         }
 
-        if (!res.ok || !data.success || !data.document) {
-          throw new Error(data.error || `Failed to process ${file.name}`);
-        }
-
-        // Generate blob URL for instant current-session rendering
+        // Generate local blob URL for instant current-session rendering
         const blobUrl = URL.createObjectURL(file);
-        const docId = data.document.documentId || data.document.fileId;
+        const docId = uploadedDoc.documentId || uploadedDoc.fileId;
         const permanentPreview = `/api/document/preview?documentId=${docId}`;
 
         newDocs.push({
-          ...data.document,
+          ...uploadedDoc,
           fileId: docId,
           blobUrl,
           previewUrl: permanentPreview,
@@ -789,6 +886,47 @@ function UserPrintContent() {
   // Current preview document & safe page bounds
   const currentPreviewDoc = documents[previewDocIndex] || documents[0];
   const currentDocTotalPages = currentPreviewDoc?.pageCount || 1;
+
+  // Page Turn & Slide Gesture Actions
+  const handleNextPage = () => {
+    if (previewPageIndex < currentDocTotalPages) {
+      setPageTurnAnim("next");
+      setPreviewPageIndex((p) => Math.min(currentDocTotalPages, p + 1));
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (previewPageIndex > 1) {
+      setPageTurnAnim("prev");
+      setPreviewPageIndex((p) => Math.max(1, p - 1));
+    }
+  };
+
+  const handlePageTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    setTouchStartX(clientX);
+    setTouchDragX(0);
+    setIsDraggingPage(true);
+  };
+
+  const handlePageTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (touchStartX === null || !isDraggingPage) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const diff = clientX - touchStartX;
+    setTouchDragX(Math.max(-80, Math.min(80, diff)));
+  };
+
+  const handlePageTouchEnd = () => {
+    if (touchStartX === null || !isDraggingPage) return;
+    if (touchDragX < -35) {
+      handleNextPage();
+    } else if (touchDragX > 35) {
+      handlePrevPage();
+    }
+    setTouchStartX(null);
+    setTouchDragX(0);
+    setIsDraggingPage(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 pb-32 lg:pb-16 relative overflow-x-hidden">
@@ -1073,8 +1211,8 @@ function UserPrintContent() {
                         <button
                           type="button"
                           disabled={previewPageIndex <= 1}
-                          onClick={() => setPreviewPageIndex((p) => Math.max(1, p - 1))}
-                          className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 disabled:opacity-30 disabled:hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition-colors"
+                          onClick={handlePrevPage}
+                          className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 disabled:opacity-30 disabled:hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
                           title="Previous page"
                         >
                           <ChevronLeft className="w-4 h-4" />
@@ -1082,8 +1220,8 @@ function UserPrintContent() {
                         <button
                           type="button"
                           disabled={previewPageIndex >= currentDocTotalPages}
-                          onClick={() => setPreviewPageIndex((p) => Math.min(currentDocTotalPages, p + 1))}
-                          className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 disabled:opacity-30 disabled:hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition-colors"
+                          onClick={handleNextPage}
+                          className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 disabled:opacity-30 disabled:hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
                           title="Next page"
                         >
                           <ChevronRight className="w-4 h-4" />
@@ -1102,8 +1240,9 @@ function UserPrintContent() {
                           onClick={() => {
                             setPreviewDocIndex(idx);
                             setPreviewPageIndex(1);
+                            setPageTurnAnim(null);
                           }}
-                          className={`text-xs px-3 py-1 rounded-full font-semibold shrink-0 transition-all ${
+                          className={`text-xs px-3 py-1 rounded-full font-semibold shrink-0 transition-all cursor-pointer ${
                             previewDocIndex === idx
                               ? "bg-[#0c831f] text-white shadow-xs"
                               : "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
@@ -1117,10 +1256,19 @@ function UserPrintContent() {
                     </div>
                   )}
 
-                  {/* The Paper Sheet Display Canvas with Live Config Filters */}
-                  <div className="bg-neutral-100/70 p-4 sm:p-6 rounded-2xl flex flex-col items-center justify-center min-h-[360px] sm:min-h-[420px] overflow-hidden border border-neutral-200/50 relative">
+                  {/* The Paper Sheet Display Canvas with Touch Slide & Page Turn Animation */}
+                  <div
+                    className="bg-neutral-100/70 p-4 sm:p-6 rounded-2xl flex flex-col items-center justify-center min-h-[360px] sm:min-h-[420px] overflow-hidden border border-neutral-200/50 relative select-none"
+                    onTouchStart={handlePageTouchStart}
+                    onTouchMove={handlePageTouchMove}
+                    onTouchEnd={handlePageTouchEnd}
+                    onMouseDown={handlePageTouchStart}
+                    onMouseMove={handlePageTouchMove}
+                    onMouseUp={handlePageTouchEnd}
+                    onMouseLeave={handlePageTouchEnd}
+                  >
                     {/* Live Config Overlay Badges */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10 pointer-events-none">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/90 text-neutral-800 shadow-2xs border border-neutral-200/60 uppercase">
                         {colorMode === "bw" ? "⚫ B&W" : "🎨 Color"}
                       </span>
@@ -1129,13 +1277,26 @@ function UserPrintContent() {
                       </span>
                     </div>
 
-                    {/* Responsive Simulated Sheet that Renders the Real Document Pages */}
+                    {/* Responsive Simulated Sheet with Minimal 3D Page Turn & Slide Transition */}
                     <div
+                      key={`${previewDocIndex}-${previewPageIndex}`}
                       style={{
                         filter: colorMode === "bw" ? "grayscale(100%) contrast(105%)" : "none",
-                        transition: "all 250ms ease-in-out",
+                        transform:
+                          isDraggingPage && touchDragX !== 0
+                            ? `perspective(1200px) translateX(${touchDragX * 0.4}px) rotateY(${touchDragX * 0.08}deg)`
+                            : undefined,
+                        transition: isDraggingPage ? "none" : "filter 250ms ease-in-out, transform 250ms ease-out",
                       }}
-                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm overflow-hidden flex items-center justify-center ${
+                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm overflow-hidden flex items-center justify-center select-none touch-pan-y ${
+                        currentDocTotalPages > 1 ? "cursor-grab active:cursor-grabbing" : ""
+                      } ${
+                        pageTurnAnim === "next"
+                          ? "animate-page-turn-next"
+                          : pageTurnAnim === "prev"
+                          ? "animate-page-turn-prev"
+                          : ""
+                      } ${
                         orientation === "portrait"
                           ? "w-full max-w-[280px] sm:max-w-[320px] aspect-[210/297]"
                           : "w-full max-w-[400px] sm:max-w-[480px] aspect-[297/210]"
@@ -1148,6 +1309,13 @@ function UserPrintContent() {
                         orientation={orientation}
                       />
                     </div>
+
+                    {/* Minimal Slide to Turn Page Hint */}
+                    {currentDocTotalPages > 1 && (
+                      <div className="flex items-center gap-1.5 mt-3 text-[11px] font-medium text-neutral-400 select-none pointer-events-none">
+                        <span>← Slide to turn page →</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

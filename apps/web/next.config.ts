@@ -13,6 +13,11 @@ function resolvePkg(name: string, fallbackSubpath: string) {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@printmart/shared"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+  },
   async headers() {
     return [
       {

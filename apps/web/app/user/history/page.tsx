@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
-import { ref, onValue } from "@/lib/firebase";
+import { ref, onValue, query, limitToLast } from "@/lib/firebase";
 import { database } from "@/lib/firebase";
 import { formatRupees, PrintJob } from "@printmart/shared";
 
@@ -37,8 +37,8 @@ export default function UserHistoryPage() {
   useEffect(() => {
     if (!user) return;
 
-    const jobsRef = ref(database, "printJobs");
-    const unsub = onValue(jobsRef, (snapshot) => {
+    const jobsQuery = query(ref(database, "printJobs"), limitToLast(100));
+    const unsub = onValue(jobsQuery, (snapshot) => {
       if (snapshot.exists()) {
         const allJobs = Object.values(snapshot.val()) as PrintJob[];
         const userJobs = allJobs

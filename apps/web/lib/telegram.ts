@@ -32,7 +32,16 @@ export async function uploadDocumentToTelegram(params: {
     body: formData,
   });
 
-  const data = await response.json();
+  const text = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Telegram returned non-JSON response (${response.status}): ${text.slice(0, 150)}`
+    );
+  }
+
   if (!response.ok || !data.ok) {
     throw new Error(
       `Telegram upload failed: ${data.description || response.statusText || "Unknown error"}`
@@ -54,7 +63,13 @@ export async function uploadDocumentToTelegram(params: {
 export async function getTelegramFileDownloadUrl(fileId: string): Promise<string> {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`;
   const response = await fetch(url);
-  const data = await response.json();
+  const text = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Telegram getFile returned non-JSON (${response.status}): ${text.slice(0, 150)}`);
+  }
 
   if (!response.ok || !data.ok) {
     throw new Error(`Telegram getFile failed: ${data.description || "Unknown error"}`);

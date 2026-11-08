@@ -54,15 +54,49 @@ export async function POST(req: NextRequest) {
       pageCount = Math.max(1, estimatePdfPageCount(buffer));
     }
 
-    // Upload to Private Telegram Channel vault
-    const tgResult = await uploadDocumentToTelegram({
-      fileBuffer: buffer,
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-    });
-
     const documentId = `DOC_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const retentionExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    // 1. Save copy to temporary local cache first for instant preview & fallback
+    try {
+      const os = await import("os");
+      const tmpDir = path.join(os.tmpdir(), "printmart_cache");
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(tmpDir, documentId), buffer);
+    } catch (cacheErr) {
+      console.warn("Could not cache file locally:", cacheErr);
+    }
+
+    // 2. Upload to Private Telegram Channel vault (with resilient fallback)
+    let tgResult = {
+      messageId: 0,
+      fileId: `LOCAL_${documentId}`,
+      fileUniqueId: `UID_${documentId}`,
+      fileSizeBytes: file.size,
+    };
+
+    try {
+      // Telegram bot API limit is 20MB for document uploads
+      if (file.size <= 20 * 1024 * 1024) {
+        const uploaded = await uploadDocumentToTelegram({
+          fileBuffer: buffer,
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+        });
+        tgResult = {
+          messageId: uploaded.messageId,
+          fileId: uploaded.fileId,
+          fileUniqueId: uploaded.fileUniqueId,
+          fileSizeBytes: uploaded.fileSizeBytes,
+        };
+      } else {
+        console.info(`File size (${file.size} bytes) exceeds Telegram 20MB bot limit, stored in local cache.`);
+      }
+    } catch (tgErr) {
+      console.warn("Telegram vault upload failed, stored in local cache fallback:", tgErr);
+    }
 
     const docMetadata: DocumentMetadata = {
       documentId,
@@ -80,18 +114,6 @@ export async function POST(req: NextRequest) {
 
     // Save to Firebase RTDB
     await adminDb.ref(`documents/${documentId}`).set(docMetadata);
-
-    // Save copy to temporary cache for instant client previews across reloads
-    try {
-      const os = await import("os");
-      const tmpDir = path.join(os.tmpdir(), "printmart_cache");
-      if (!fs.existsSync(tmpDir)) {
-        fs.mkdirSync(tmpDir, { recursive: true });
-      }
-      fs.writeFileSync(path.join(tmpDir, documentId), buffer);
-    } catch (cacheErr) {
-      console.warn("Could not cache file locally:", cacheErr);
-    }
 
     return NextResponse.json({
       success: true,

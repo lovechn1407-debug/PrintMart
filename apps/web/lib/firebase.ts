@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider } from "firebase/auth";
-import { getDatabase, Database, ref, get, set, update, onValue, remove } from "firebase/database";
+import { getDatabase, Database, ref, get, set, update, onValue, remove, query, limitToLast, orderByChild, equalTo } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAaAIzYHlQ9Xmho4oMA7sSDz7aEJmI8Avc",
@@ -19,4 +19,4 @@ export const database: Database = getDatabase(app);
 export const googleProvider: GoogleAuthProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-export { ref, get, set, update, onValue, remove };
+export { ref, get, set, update, onValue, remove, query, limitToLast, orderByChild, equalTo };

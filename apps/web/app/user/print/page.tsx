@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
+import { calculatePrintPrice, DEFAULT_GLOBAL_PRICING } from "@printmart/shared";
 import {
   PrintDraftItem,
   UploadedDocumentRecord,
@@ -349,7 +350,6 @@ function UserPrintContent() {
   const [isOtpModalOpen, setIsOtpModalOpen] = useState<boolean>(false);
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
-  const [floatingOtpDismissed, setFloatingOtpDismissed] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
 
@@ -522,7 +522,16 @@ function UserPrintContent() {
           body: formData,
         });
 
-        const data = await res.json();
+        // Guard: only parse JSON if the response is actually JSON
+        const contentType = res.headers.get("content-type") || "";
+        let data: any;
+        if (contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error(`Unexpected server response (${res.status}): ${text.slice(0, 200)}`);
+        }
+
         if (!res.ok || !data.success || !data.document) {
           throw new Error(data.error || `Failed to process ${file.name}`);
         }
@@ -644,7 +653,7 @@ function UserPrintContent() {
     return totalAllPages;
   };
 
-  // Recalculate Dynamic Price
+  // Recalculate Dynamic Price — computed synchronously client-side (no API round-trip)
   useEffect(() => {
     if (documents.length === 0) return;
 
@@ -661,33 +670,15 @@ function UserPrintContent() {
       totalPagesToPrint: totalPrintPages,
     };
 
-    const fetchPrice = async () => {
-      try {
-        setCalculatingPrice(true);
-        const res = await fetch("/api/pricing/calculate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            config,
-            machineId: "kiosk_lib_01",
-            offerCode: appliedOffer || undefined,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.pricing) {
-            setPricing(data.pricing);
-          }
-        }
-      } catch (e) {
-        console.warn("Pricing calculation error:", e);
-      } finally {
-        setCalculatingPrice(false);
-      }
-    };
+    // Look up applied offer object from local state if present
+    // For now we pass null offer (offer validation happens on the server at payment time)
+    const breakdown = calculatePrintPrice({
+      config,
+      pricing: DEFAULT_GLOBAL_PRICING,
+      offer: null,
+    });
 
-    const timer = setTimeout(fetchPrice, 120);
-    return () => clearTimeout(timer);
+    setPricing(breakdown);
   }, [documents, colorMode, copies, pageRangeType, customRange, appliedOffer, totalAllPages]);
 
   const formatRupees = (paise: number) => {
@@ -744,7 +735,15 @@ function UserPrintContent() {
         }),
       });
 
-      const orderData = await orderRes.json();
+      let orderData: any;
+      const orderContentType = orderRes.headers.get("content-type") || "";
+      if (orderContentType.includes("application/json")) {
+        orderData = await orderRes.json();
+      } else {
+        const text = await orderRes.text();
+        throw new Error(`Order creation server response error (${orderRes.status}): ${text.slice(0, 150)}`);
+      }
+
       if (!orderRes.ok || !orderData.success) {
         throw new Error(orderData.error || "Failed to create order");
       }
@@ -755,22 +754,18 @@ function UserPrintContent() {
         body: JSON.stringify({ jobId: orderData.jobId }),
       });
 
-      const simData = await simRes.json();
+      let simData: any;
+      const simContentType = simRes.headers.get("content-type") || "";
+      if (simContentType.includes("application/json")) {
+        simData = await simRes.json();
+      } else {
+        const text = await simRes.text();
+        throw new Error(`Payment confirmation server response error (${simRes.status}): ${text.slice(0, 150)}`);
+      }
       if (simData.success && simData.otp) {
         setGeneratedOtp(simData.otp);
         setIsOtpModalOpen(true);
-        setFloatingOtpDismissed(false);
         setStep("confirmed");
-        try {
-          localStorage.setItem(
-            "printmart_active_floating_otp",
-            JSON.stringify({ otp: simData.otp, expiresAt: Date.now() + 3600000 })
-          );
-          localStorage.removeItem("printmart_floating_otp_dismissed");
-          window.dispatchEvent(new Event("printmart_otp_updated"));
-        } catch (e) {
-          console.error(e);
-        }
         if (activeDraftId) {
           removeDraftById(activeDraftId);
           setActiveDraftId(null);
@@ -1457,7 +1452,7 @@ function UserPrintContent() {
             ───────────────────────────────────────────────────────────── */}
         {step === "confirmed" && (
           <div className="bg-white rounded-2xl p-6 sm:p-8 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] text-center my-6 max-w-md mx-auto flex flex-col items-center animate-in fade-in duration-300">
-            <div className="w-14 h-14 rounded-2xl bg-[#eefaf0] border border-emerald-200/80 flex items-center justify-center text-[#0c831f] mb-3 shadow-2xs">
+            <div className="w-14 h-14 rounded-2xl bg-[#eefaf0] flex items-center justify-center text-[#0c831f] mb-3 shadow-2xs">
               <CheckCircle2 className="w-7 h-7" />
             </div>
             <h2 className="text-xl font-bold text-[#1c1c1c] tracking-tight">
@@ -1488,24 +1483,36 @@ function UserPrintContent() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-2.5 w-full mt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 w-full mt-3">
               <button
                 type="button"
                 onClick={() => {
                   setDocuments([]);
+                  setGeneratedOtp(null);
+                  setIsOtpModalOpen(false);
+                  setActiveDraftId(null);
+                  setColorMode("bw");
+                  setOrientation("portrait");
+                  setCopies(1);
+                  setPageRangeType("all");
+                  setCustomRange("");
+                  setAppliedOffer("");
                   setStep("upload");
+                  if (typeof window !== "undefined") {
+                    window.history.replaceState({}, "", "/user/print?new=1");
+                  }
                 }}
-                className="flex-1 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 active:scale-98 text-neutral-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                className="w-full sm:flex-1 h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 active:scale-98 text-neutral-800 text-xs sm:text-[13px] font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Print Another File</span>
               </button>
               <Link
                 href="/user/history"
-                className="flex-1 h-10 rounded-xl bg-[#0c831f] hover:bg-[#0a6e1a] active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                className="w-full sm:flex-1 h-11 rounded-xl bg-[#0c831f] hover:bg-[#0a6e1a] active:scale-98 text-white text-xs sm:text-[13px] font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
               >
                 <span>My Print Jobs</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

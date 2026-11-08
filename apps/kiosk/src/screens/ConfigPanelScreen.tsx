@@ -6,21 +6,18 @@ import {
   Printer,
   Wifi,
   ArrowLeft,
-  RefreshCw,
-  Wrench,
+  RotateCw,
   CheckCircle2,
-  AlertTriangle,
+  AlertCircle,
   KeyRound,
   Save,
   Activity,
-  FileText,
   Sliders,
-  Check,
   RotateCcw,
-  Clock,
   Sparkles,
 } from "lucide-react";
 import { database, ref, onValue, set, update, get } from "../firebase";
+import { GuillocheAura } from "../components/GuillocheAura";
 
 interface ConfigPanelScreenProps {
   machineId: string;
@@ -136,9 +133,9 @@ export function ConfigPanelScreen({
       onUpdateMachine(currentId, nameInput.trim());
       localStorage.setItem("kiosk_machine_name", nameInput.trim());
 
-      setSaveSuccess("Saved successfully! Display name synchronized.");
+      setSaveSuccess("Saved! Display name synchronized across network.");
       addLog("SUCCESS", `Vending machine updated to "${nameInput.trim()}"`);
-      setTimeout(() => setSaveSuccess(null), 3000);
+      setTimeout(() => setSaveSuccess(null), 3500);
     } catch (err: any) {
       addLog("ERROR", `Failed to save machine details: ${err.message}`);
     }
@@ -187,7 +184,7 @@ export function ConfigPanelScreen({
         setPairCodeInput("");
         setTimeout(() => setPairSuccess(null), 4000);
       } else {
-        setPairError("Invalid Pair Code. Please check the code in Admin -> Vending Machines.");
+        setPairError("Invalid Pair Code. Check the 6-digit code in Admin -> Vending Machines.");
         addLog("WARNING", `Failed pairing attempt with code: ${code}`);
       }
     } catch (err: any) {
@@ -196,7 +193,6 @@ export function ConfigPanelScreen({
     }
   };
 
-  // Helper to add local log
   const addLog = (level: "INFO" | "SUCCESS" | "WARNING" | "ERROR", message: string) => {
     const newEntry: LogEntry = {
       id: String(Date.now()),
@@ -228,7 +224,7 @@ export function ConfigPanelScreen({
         });
       } catch {}
 
-      addLog("SUCCESS", "Test print page completed successfully. 1 page dispensed.");
+      addLog("SUCCESS", "Test print completed successfully. 1 test page dispensed.");
       setTestPrinting(false);
     }, 2000);
   };
@@ -250,335 +246,356 @@ export function ConfigPanelScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#faf7ee] select-none">
-      {/* ── Signature Honey-Gold Navigation Header ── */}
-      <header className="sticky top-0 z-40 bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] backdrop-blur-md border-b border-amber-300/40 px-5 sm:px-8 h-16 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-neutral-950 text-white flex items-center justify-center shadow-xs">
-            <ShieldCheck className="w-5 h-5 text-amber-300" />
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-x-hidden select-none">
+      {/* ── Signature Honey-Golden Header (Matching AppNavbar) ── */}
+      <header className="sticky top-0 z-50 bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] backdrop-blur-md border-b border-amber-300/30 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center shadow-xs shrink-0">
+            <ShieldCheck className="w-4 h-4 text-amber-300" />
           </div>
           <div className="flex flex-col">
-            <span className="font-extrabold text-lg text-neutral-950 tracking-tight leading-tight">
+            <span className="font-extrabold text-base sm:text-lg text-neutral-950 tracking-tight leading-tight">
               Print<span className="text-[#0c831f]">Mart</span> Diagnostics
             </span>
-            <span className="text-[10px] font-bold text-neutral-800 uppercase tracking-wider leading-none">
+            <span className="text-[10px] font-semibold text-neutral-700 leading-none">
               Terminal Setup & Telemetry
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-white/70 px-3 py-1 rounded-full border border-amber-400/40 text-xs font-bold text-neutral-800">
+          <div className="hidden sm:flex items-center gap-2 bg-white/70 px-3 py-1 rounded-full border border-amber-400/40 text-xs font-semibold text-neutral-800">
             <span className="w-2 h-2 rounded-full bg-[#0c831f] animate-pulse" />
             <span>ID: {currentId}</span>
           </div>
+
           <button
             type="button"
             onClick={onExit}
-            className="px-4 py-2 bg-neutral-950 hover:bg-neutral-850 text-white font-bold text-xs rounded-full shadow-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-amber-300" />
-            Exit Diagnostics
+            <span>Return to Kiosk</span>
           </button>
         </div>
       </header>
 
-      {/* ── Main Diagnostics Workspace with Guilloché Background ── */}
-      <main className="flex-1 guilloche-bg p-5 sm:p-8">
-        <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
+      <GuillocheAura />
 
-          {/* ── Navigation Pill Tabs ── */}
-          <div className="flex flex-wrap gap-2 bg-white/80 p-1.5 rounded-2xl border border-amber-200/60 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab("identity")}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "identity"
-                  ? "bg-[#0c831f] text-white shadow-xs"
-                  : "text-neutral-700 hover:bg-amber-100/40"
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              Machine Identity & Pairing
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("hardware")}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "hardware"
-                  ? "bg-[#0c831f] text-white shadow-xs"
-                  : "text-neutral-700 hover:bg-amber-100/40"
-              }`}
-            >
-              <Printer className="w-4 h-4" />
-              Printer Telemetry & Health
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("logs")}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "logs"
-                  ? "bg-[#0c831f] text-white shadow-xs"
-                  : "text-neutral-700 hover:bg-amber-100/40"
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              Live Diagnostic Logs
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                activeTab === "logs" ? "bg-white/30 text-white" : "bg-neutral-200 text-neutral-800"
-              }`}>
-                {logs.length}
-              </span>
-            </button>
+      {/* ── Main Diagnostics Workspace ── */}
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 z-10 relative space-y-5">
+        
+        {/* Studio-Style Title Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+              Terminal Configuration & Diagnostics
+            </h1>
+            <p className="text-xs text-neutral-500">
+              Terminal: <strong className="text-neutral-800">{nameInput}</strong> • ID: <code className="font-mono">{currentId}</code>
+            </p>
           </div>
+        </div>
 
-          {/* ════ TAB 1: MACHINE IDENTITY & PAIRING ════ */}
-          {activeTab === "identity" && (
-            <div className="flex flex-col gap-6 animate-in fade-in duration-200">
-              {/* Machine Name & Location Card */}
-              <div className="kiosk-card p-6 sm:p-7 flex flex-col gap-5 border border-neutral-200/90 shadow-sm">
-                <div className="flex justify-between items-start border-b border-neutral-100 pb-3">
-                  <div>
-                    <h2 className="text-base font-extrabold text-neutral-900 tracking-tight">Vending Machine Details</h2>
-                    <p className="text-xs text-neutral-500 font-medium">Edit the terminal display name and physical location shown on kiosk screen</p>
-                  </div>
-                  <span className="text-[11px] font-mono font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-200">
-                    Terminal: {currentId}
-                  </span>
-                </div>
+        {/* ── Segmented Tabs (Exact Print Studio Segmented-Track) ── */}
+        <div className="segmented-track">
+          <button
+            type="button"
+            data-active={activeTab === "identity"}
+            onClick={() => setActiveTab("identity")}
+            className="segmented-btn"
+          >
+            <Sliders className="w-4 h-4 text-[#0c831f]" />
+            <span>Machine Identity & Pairing</span>
+          </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-neutral-800">Vending Machine Name</label>
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      placeholder="e.g. Central Library Kiosk A"
-                      className="px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0c831f] focus:bg-white transition-all"
-                    />
-                  </div>
+          <button
+            type="button"
+            data-active={activeTab === "hardware"}
+            onClick={() => setActiveTab("hardware")}
+            className="segmented-btn"
+          >
+            <Printer className="w-4 h-4 text-[#0c831f]" />
+            <span>Hardware Telemetry</span>
+          </button>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-neutral-800">Physical Campus Location</label>
-                    <input
-                      type="text"
-                      value={locationInput}
-                      onChange={(e) => setLocationInput(e.target.value)}
-                      placeholder="e.g. Ground Floor, Central Library"
-                      className="px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0c831f] focus:bg-white transition-all"
-                    />
-                  </div>
-                </div>
+          <button
+            type="button"
+            data-active={activeTab === "logs"}
+            onClick={() => setActiveTab("logs")}
+            className="segmented-btn"
+          >
+            <Activity className="w-4 h-4 text-[#0c831f]" />
+            <span>Event Logs ({logs.length})</span>
+          </button>
+        </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
-                  <div>
-                    {saveSuccess && (
-                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                        <CheckCircle2 className="w-4 h-4 text-[#0c831f]" /> {saveSuccess}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSaveIdentity}
-                    className="px-6 py-2.5 bg-[#0c831f] hover:bg-[#0a6c1a] text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save Machine Name
-                  </button>
-                </div>
-              </div>
-
-              {/* Pair Code Login Card */}
-              <div className="kiosk-card p-6 sm:p-7 flex flex-col gap-5 border border-neutral-200/90 shadow-sm">
-                <div className="border-b border-neutral-100 pb-3">
-                  <h2 className="text-base font-extrabold text-neutral-900 flex items-center gap-2">
-                    <KeyRound className="w-5 h-5 text-[#0c831f]" />
-                    Pair Terminal with Admin Code
+        {/* ════ TAB 1: MACHINE IDENTITY & PAIRING ════ */}
+        {activeTab === "identity" && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            {/* Machine Name & Location Card (Print Studio Card) */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <div>
+                  <h2 className="font-bold text-base text-neutral-900">
+                    Vending Machine Details
                   </h2>
-                  <p className="text-xs text-neutral-500 font-medium mt-0.5">
-                    Enter the 6-digit Pair Code from the Admin Vending Machines tab to automatically pair and link this physical terminal
+                  <p className="text-xs text-neutral-500">
+                    Edit the terminal display name and physical location shown on kiosk screen
                   </p>
                 </div>
+                <span className="text-[11px] font-mono font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-200">
+                  {currentId}
+                </span>
+              </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 max-w-md">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Vending Machine Name
+                  </label>
                   <input
                     type="text"
-                    value={pairCodeInput}
-                    onChange={(e) => setPairCodeInput(e.target.value.trim())}
-                    placeholder="Enter 6-Digit Pair Code (e.g. 123456)"
-                    className="px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#0c831f] focus:bg-white transition-all flex-1"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="e.g. Central Library Kiosk A"
+                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white transition-all font-semibold"
                   />
-                  <button
-                    type="button"
-                    onClick={handlePairWithCode}
-                    className="px-6 py-3 bg-neutral-950 hover:bg-neutral-850 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
-                  >
-                    Verify & Pair
-                  </button>
                 </div>
 
-                {pairError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" /> {pairError}
-                  </div>
-                )}
-
-                {pairSuccess && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0c831f]" /> {pairSuccess}
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Physical Campus Location
+                  </label>
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    placeholder="e.g. Ground Floor, Central Library"
+                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white transition-all font-semibold"
+                  />
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* ════ TAB 2: PRINTER TELEMETRY & HEALTH ════ */}
-          {activeTab === "hardware" && (
-            <div className="flex flex-col gap-6 animate-in fade-in duration-200">
-              <div className="kiosk-card p-6 sm:p-7 flex flex-col gap-6 border border-neutral-200/90 shadow-sm">
-                <div className="flex justify-between items-center pb-3 border-b border-neutral-100">
-                  <div>
-                    <h2 className="text-base font-extrabold text-neutral-900">Hardware & Spooler Telemetry</h2>
-                    <p className="text-xs text-neutral-500 font-medium">{printerData.printerName || "Kiosk Direct Spooler"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#0c831f] animate-pulse" />
-                    <span className="text-xs font-bold text-emerald-800 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                      {printerData.printerState || "READY"}
+              <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
+                <div>
+                  {saveSuccess && (
+                    <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                      <CheckCircle2 className="w-4 h-4 text-[#0c831f]" /> {saveSuccess}
                     </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveIdentity}
+                  className="py-2.5 px-5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Machine Details</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Pair Code Login Card */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-4">
+              <div className="pb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-[#0c831f]" />
+                  <h2 className="font-bold text-base text-neutral-900">
+                    Pair Terminal with Admin Code
+                  </h2>
+                </div>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Enter the 6-digit Pair Code from the Admin Vending Machines panel to automatically link this terminal
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 max-w-md">
+                <input
+                  type="text"
+                  value={pairCodeInput}
+                  onChange={(e) => setPairCodeInput(e.target.value.trim())}
+                  placeholder="Enter 6-Digit Pair Code (e.g. 123456)"
+                  className="flex-1 text-xs sm:text-sm font-mono font-bold tracking-widest px-3.5 py-2.5 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={handlePairWithCode}
+                  className="py-2.5 px-5 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold rounded-xl text-xs sm:text-sm transition-all active:scale-98 shadow-xs cursor-pointer shrink-0"
+                >
+                  Verify & Pair
+                </button>
+              </div>
+
+              {pairError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{pairError}</span>
+                </div>
+              )}
+
+              {pairSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0c831f]" />
+                  <span>{pairSuccess}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ════ TAB 2: PRINTER TELEMETRY & HEALTH ════ */}
+        {activeTab === "hardware" && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <div>
+                  <h2 className="font-bold text-base text-neutral-900">
+                    Hardware & Spooler Telemetry
+                  </h2>
+                  <p className="text-xs text-neutral-500">
+                    {printerData.printerName || "Kiosk Direct Spooler"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0c831f] animate-pulse" />
+                  <span className="text-xs font-semibold text-emerald-800 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                    {printerData.printerState || "READY"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Paper Level */}
+              <div className="space-y-2 bg-neutral-50/80 p-4 rounded-xl border border-neutral-200/80">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-neutral-700">Paper Level (Roll / Tray 1)</span>
+                  <span className="text-[#0c831f]">{printerData.paperPercentage || 92}% OK (~460 Sheets Remaining)</span>
+                </div>
+                <div className="w-full bg-neutral-200 h-3 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#0c831f] h-full rounded-full transition-all duration-500"
+                    style={{ width: `${printerData.paperPercentage || 92}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Ink & Toner Levels Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-neutral-50/80 border border-neutral-200/80 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-neutral-800">Black Toner</span>
+                    <span>{printerData.blackInkPercentage || 88}%</span>
+                  </div>
+                  <div className="w-full bg-neutral-200 h-2 rounded-full overflow-hidden">
+                    <div className="bg-neutral-900 h-full rounded-full" style={{ width: `${printerData.blackInkPercentage || 88}%` }} />
                   </div>
                 </div>
 
-                {/* Paper Level */}
-                <div className="flex flex-col gap-2.5 bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-neutral-800">Paper Level (Roll / Tray 1)</span>
-                    <span className="text-[#0c831f]">{printerData.paperPercentage || 92}% OK (~460 Sheets Remaining)</span>
+                <div className="p-3 rounded-xl bg-cyan-50/60 border border-cyan-200/60 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-cyan-900">Cyan</span>
+                    <span>{printerData.cyanInkPercentage || 84}%</span>
                   </div>
-                  <div className="w-full bg-neutral-200 h-3.5 rounded-full overflow-hidden border border-neutral-300/40">
+                  <div className="w-full bg-cyan-200 h-2 rounded-full overflow-hidden">
+                    <div className="bg-cyan-500 h-full rounded-full" style={{ width: `${printerData.cyanInkPercentage || 84}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-rose-50/60 border border-rose-200/60 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-rose-900">Magenta</span>
+                    <span>{printerData.magentaInkPercentage || 82}%</span>
+                  </div>
+                  <div className="w-full bg-rose-200 h-2 rounded-full overflow-hidden">
+                    <div className="bg-rose-500 h-full rounded-full" style={{ width: `${printerData.magentaInkPercentage || 82}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/60 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-amber-900">Yellow</span>
+                    <span>{printerData.yellowInkPercentage || 86}%</span>
+                  </div>
+                  <div className="w-full bg-amber-200 h-2 rounded-full overflow-hidden">
+                    <div className="bg-amber-400 h-full rounded-full" style={{ width: `${printerData.yellowInkPercentage || 86}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Hardware Actions */}
+              <div className="pt-3 border-t border-neutral-100 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleTestPrint}
+                  disabled={testPrinting}
+                  className="py-2.5 px-5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>{testPrinting ? "Dispensing Test Page..." : "Run Test Print"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetPrinter}
+                  className="py-2.5 px-4 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4 text-neutral-600" />
+                  <span>Reset Spooler</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════ TAB 3: DIAGNOSTIC LOGS ════ */}
+        {activeTab === "logs" && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <div>
+                  <h2 className="font-bold text-base text-neutral-900">
+                    Live Telemetry & Spooler Logs
+                  </h2>
+                  <p className="text-xs text-neutral-500">
+                    Real-time spooler events, OTP authentications, and cloud socket status
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLogs([])}
+                  className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-lg border border-neutral-200 transition-colors cursor-pointer"
+                >
+                  Clear Logs
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {logs.map((log) => {
+                  let badgeClass = "bg-neutral-100 text-neutral-700";
+                  if (log.level === "SUCCESS") badgeClass = "bg-emerald-100 text-emerald-800 font-semibold";
+                  if (log.level === "WARNING") badgeClass = "bg-amber-100 text-amber-800 font-semibold";
+                  if (log.level === "ERROR") badgeClass = "bg-rose-100 text-rose-800 font-semibold";
+
+                  return (
                     <div
-                      className="bg-gradient-to-r from-[#0c831f] to-emerald-400 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${printerData.paperPercentage || 92}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Ink & Toner Levels Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200/80 flex flex-col gap-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-neutral-800">Black Toner</span>
-                      <span>{printerData.blackInkPercentage || 88}%</span>
+                      key={log.id}
+                      className="p-3 rounded-xl bg-neutral-50/80 border border-neutral-200/80 flex items-start gap-3 text-xs"
+                    >
+                      <span className="text-neutral-400 shrink-0 font-mono text-[11px] font-medium">{log.timestamp}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] shrink-0 font-mono ${badgeClass}`}>
+                        {log.level}
+                      </span>
+                      <span className="text-neutral-800 flex-1 font-mono">{log.message}</span>
                     </div>
-                    <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-neutral-900 h-full rounded-full" style={{ width: `${printerData.blackInkPercentage || 88}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-cyan-50/60 rounded-xl border border-cyan-200/60 flex flex-col gap-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-cyan-900">Cyan</span>
-                      <span>{printerData.cyanInkPercentage || 84}%</span>
-                    </div>
-                    <div className="w-full bg-cyan-200 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-cyan-500 h-full rounded-full" style={{ width: `${printerData.cyanInkPercentage || 84}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-rose-50/60 rounded-xl border border-rose-200/60 flex flex-col gap-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-rose-900">Magenta</span>
-                      <span>{printerData.magentaInkPercentage || 82}%</span>
-                    </div>
-                    <div className="w-full bg-rose-200 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-rose-500 h-full rounded-full" style={{ width: `${printerData.magentaInkPercentage || 82}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/60 flex flex-col gap-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-amber-900">Yellow</span>
-                      <span>{printerData.yellowInkPercentage || 86}%</span>
-                    </div>
-                    <div className="w-full bg-amber-200 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-400 h-full rounded-full" style={{ width: `${printerData.yellowInkPercentage || 86}%` }} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Hardware Actions */}
-                <div className="pt-4 border-t border-neutral-100 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleTestPrint}
-                    disabled={testPrinting}
-                    className="px-5 py-2.5 bg-[#0c831f] hover:bg-[#0a6c1a] text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    <Printer className="w-4 h-4" />
-                    {testPrinting ? "Dispensing Test Page..." : "Run Diagnostic Test Print"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleResetPrinter}
-                    className="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs rounded-xl border border-neutral-200 shadow-2xs transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
-                  >
-                    <RotateCcw className="w-4 h-4 text-neutral-600" />
-                    Reset Spooler
-                  </button>
-                </div>
+                  );
+                })}
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ════ TAB 3: DIAGNOSTIC LOGS ════ */}
-          {activeTab === "logs" && (
-            <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-              <div className="kiosk-card p-6 sm:p-7 flex flex-col gap-4 border border-neutral-200/90 shadow-sm">
-                <div className="flex justify-between items-center pb-3 border-b border-neutral-100">
-                  <div>
-                    <h2 className="text-base font-extrabold text-neutral-900">Live Kiosk Telemetry & Event Logs</h2>
-                    <p className="text-xs text-neutral-500 font-medium">Real-time spooler events, OTP authentications, and cloud socket status</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLogs([])}
-                    className="text-xs font-bold text-neutral-500 hover:text-neutral-900 bg-neutral-100 px-3 py-1.5 rounded-lg border border-neutral-200 transition-all cursor-pointer"
-                  >
-                    Clear Display
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-96 overflow-y-auto font-mono text-xs pr-1">
-                  {logs.map((log) => {
-                    let badgeClass = "bg-neutral-100 text-neutral-700";
-                    if (log.level === "SUCCESS") badgeClass = "bg-emerald-100 text-emerald-800 font-bold";
-                    if (log.level === "WARNING") badgeClass = "bg-amber-100 text-amber-800 font-bold";
-                    if (log.level === "ERROR") badgeClass = "bg-rose-100 text-rose-800 font-bold";
-
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3 bg-neutral-50 rounded-xl border border-neutral-200/70 flex items-start gap-3"
-                      >
-                        <span className="text-neutral-400 shrink-0 text-[11px] font-semibold">{log.timestamp}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] shrink-0 ${badgeClass}`}>
-                          {log.level}
-                        </span>
-                        <span className="text-neutral-800 flex-1">{log.message}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
       </main>
     </div>
   );

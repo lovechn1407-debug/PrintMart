@@ -1,8 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Printer, Delete, ArrowRight, ShieldCheck, X, KeyRound, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import {
+  Printer,
+  Delete,
+  ArrowRight,
+  ShieldCheck,
+  X,
+  Lock,
+  Sparkles,
+  KeyRound,
+  AlertCircle,
+  RotateCw,
+} from "lucide-react";
 import { KioskNavbar } from "../components/KioskNavbar";
+import { GuillocheAura } from "../components/GuillocheAura";
 
 interface OtpScreenProps {
   machineId: string;
@@ -37,7 +49,14 @@ export function OtpScreen({
 
       if (e.key >= "0" && e.key <= "9") {
         if (digits.length < 6) {
-          setDigits((prev) => [...prev, e.key]);
+          setDigits((prev) => {
+            const next = [...prev, e.key];
+            if (next.length === 6) {
+              setTimeout(() => handleSubmit(next.join("")), 50);
+            }
+            return next;
+          });
+          setErrorMsg(null);
         }
       } else if (e.key === "Backspace") {
         setDigits((prev) => prev.slice(0, -1));
@@ -62,7 +81,7 @@ export function OtpScreen({
       setDigits(nextDigits);
       setErrorMsg(null);
       if (nextDigits.length === 6) {
-        handleSubmit(nextDigits.join(""));
+        setTimeout(() => handleSubmit(nextDigits.join("")), 50);
       }
     }
   };
@@ -133,8 +152,8 @@ export function OtpScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#faf7ee]">
-      {/* ── Signature Honey-Gold Kiosk Navbar ── */}
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none">
+      {/* ── Signature Honey-Golden Header ── */}
       <KioskNavbar
         machineName={machineName}
         machineId={machineId}
@@ -146,61 +165,67 @@ export function OtpScreen({
         }}
       />
 
-      {/* ── Main Interactive OTP Screen with Fine Guilloché Texture ── */}
-      <main className="flex-1 guilloche-bg flex flex-col items-center justify-center p-4 sm:p-8">
-        <div className="kiosk-card max-w-[440px] w-full p-6 sm:p-8 flex flex-col items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-neutral-200/90 animate-in fade-in zoom-in-95 duration-200">
-          
-          {/* Header Pill & Title */}
-          <div className="flex flex-col items-center text-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#0c831f] text-xs font-bold border border-emerald-200/80 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-[#0c831f]" />
-              Zero-Queue Instant Dispenser
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
-              Enter 6-Digit OTP
-            </h2>
-            <p className="text-xs sm:text-sm text-neutral-500 font-medium max-w-xs">
-              Enter the OTP received on your mobile after payment to collect prints
-            </p>
-          </div>
+      {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
+      <GuillocheAura />
 
+      {/* ── Main Container ── */}
+      <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-4 z-10 relative flex flex-col justify-center py-6 sm:py-10">
+        
+        {/* Header Title Section (Matching Homepage Hero) */}
+        <div className="text-center pb-5 sm:pb-6">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#0c831f] text-xs font-semibold border border-emerald-200/80 mb-2.5 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#0c831f]" />
+            <span>Zero-Queue Instant Dispenser</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl lg:text-[2rem] font-bold text-[#1c1c1c] tracking-tight leading-tight">
+            Enter 6-Digit OTP
+          </h1>
+          <p className="text-xs sm:text-[13px] text-[#5c6874] mt-1.5 font-normal tracking-wide">
+            Provided on your phone upon payment confirmation
+          </p>
+        </div>
+
+        {/* Card Box (Matching Homepage & Print Studio Cards) */}
+        <div className="bg-white rounded-2xl p-5 sm:p-7 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-5 max-w-sm w-full mx-auto">
+          
           {/* Error Message Box */}
           {errorMsg && (
-            <div className="w-full p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-bold text-center animate-in shake">
-              {errorMsg}
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold text-center flex items-center justify-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* 6 Digit Display Cells */}
-          <div className="flex gap-2 sm:gap-2.5 justify-center w-full">
+          {/* 6 Digit Display Cells (Matching Print Studio OTP Display) */}
+          <div className="flex gap-2 justify-center w-full">
             {[0, 1, 2, 3, 4, 5].map((index) => {
               const digit = digits[index];
               const isCurrent = index === digits.length;
               return (
                 <div
                   key={index}
-                  className={`w-12 h-16 sm:w-14 sm:h-18 rounded-2xl border-2 flex items-center justify-center font-mono text-2xl sm:text-3xl font-black transition-all bg-white shadow-2xs ${
+                  className={`w-11 h-14 sm:w-12 sm:h-16 rounded-xl flex items-center justify-center font-mono text-2xl font-bold transition-all ${
                     digit
-                      ? "border-[#0c831f] text-[#0c831f] bg-emerald-50/30 scale-102 shadow-xs"
+                      ? "border border-emerald-300 bg-emerald-50 text-[#0c831f] shadow-2xs"
                       : isCurrent
-                      ? "border-[#0c831f] ring-4 ring-[#0c831f]/15"
-                      : "border-neutral-200 text-neutral-300"
+                      ? "border-2 border-[#0c831f] bg-white ring-2 ring-[#0c831f]/20"
+                      : "border border-neutral-200 bg-neutral-50/70 text-neutral-300"
                   }`}
                 >
-                  {digit || (isCurrent ? <span className="w-2 h-2 rounded-full bg-neutral-300 animate-pulse" /> : "·")}
+                  {digit || (isCurrent ? <span className="w-2 h-2 rounded-full bg-[#0c831f] animate-pulse" /> : "·")}
                 </div>
               );
             })}
           </div>
 
-          {/* 3x4 Touch Numeric Keypad */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-[340px] pt-1">
+          {/* 3x4 Touch Numeric Keypad (Print Studio Clean Controls) */}
+          <div className="grid grid-cols-3 gap-2 w-full pt-1">
             {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
               <button
                 key={num}
                 type="button"
                 onClick={() => handleKeyPress(num)}
-                className="h-14 sm:h-16 text-2xl font-black rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/90 text-neutral-850 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                className="h-12 sm:h-13 rounded-xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/80 text-neutral-900 font-bold text-xl transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center justify-center"
               >
                 {num}
               </button>
@@ -210,7 +235,7 @@ export function OtpScreen({
             <button
               type="button"
               onClick={handleClear}
-              className="h-14 sm:h-16 text-xs sm:text-sm font-extrabold rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200 border border-rose-200/80 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center uppercase tracking-wider"
+              className="h-12 sm:h-13 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200 border border-rose-200/80 text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center justify-center"
             >
               Clear
             </button>
@@ -219,7 +244,7 @@ export function OtpScreen({
             <button
               type="button"
               onClick={() => handleKeyPress("0")}
-              className="h-14 sm:h-16 text-2xl font-black rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/90 text-neutral-850 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              className="h-12 sm:h-13 rounded-xl bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-200/80 text-neutral-900 font-bold text-xl transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center justify-center"
             >
               0
             </button>
@@ -228,102 +253,104 @@ export function OtpScreen({
             <button
               type="button"
               onClick={handleBackspace}
-              className="h-14 sm:h-16 rounded-2xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-200 shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              className="h-12 sm:h-13 rounded-xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-200/80 transition-all active:scale-95 cursor-pointer flex items-center justify-center"
               title="Backspace"
             >
-              <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
+              <Delete className="w-5 h-5 text-neutral-600" />
             </button>
           </div>
 
-          {/* Authorize & Print Dispense Button */}
+          {/* Authorize & Dispense Button (Matching Studio Primary Button) */}
           {digits.length === 6 && (
             <button
               type="button"
               onClick={() => handleSubmit(digits.join(""))}
               disabled={loading}
-              className="w-full max-w-[340px] py-4 rounded-2xl bg-gradient-to-r from-[#0c831f] to-[#0a6c1a] text-white font-black text-base shadow-[0_6px_20px_rgba(12,131,31,0.35)] hover:shadow-[0_8px_25px_rgba(12,131,31,0.45)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 px-5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Authorizing Hardware...</span>
+                  <RotateCw className="w-4 h-4 animate-spin text-white" />
+                  <span>Authorizing Dispenser...</span>
                 </>
               ) : (
                 <>
                   <span>Authorize & Dispense</span>
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           )}
 
-          {/* Security & Instructions Note */}
-          <div className="pt-2 text-center text-[11px] text-neutral-400 font-medium">
-            Touch on-screen keypad or use physical keyboard • Document auto-deletes immediately after print
+          {/* Subtext info */}
+          <div className="pt-1 text-center">
+            <p className="text-[11px] text-neutral-400 font-normal">
+              Touch numeric keypad or use physical keyboard • Document preloads for instant output
+            </p>
           </div>
         </div>
       </main>
 
-      {/* ── Staff Authentication PIN Modal ── */}
+      {/* ── Staff PIN Maintenance Modal (Matching Studio Modal Dialog) ── */}
       {isStaffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-5 border border-neutral-100 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-100 text-[#0c831f] rounded-xl">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold text-base text-neutral-900">Staff Authentication</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="text-neutral-400 hover:text-neutral-700 p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100 text-center animate-in zoom-in-95 duration-150 relative">
+            <button
+              type="button"
+              onClick={() => setIsStaffModalOpen(false)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-12 h-12 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center mx-auto mb-3 shadow-xs">
+              <KeyRound className="w-6 h-6 text-[#0c831f]" />
             </div>
 
-            <p className="text-xs text-neutral-500">
-              Enter the 6-digit Master PIN configured in the Admin Settings panel to access machine diagnostics and pairing.
+            <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1">
+              Staff Maintenance Login
+            </h3>
+            <p className="text-xs text-neutral-500 mb-4">
+              Enter Master PIN configured in Admin Settings to access hardware telemetry
             </p>
 
-            <div className="flex flex-col gap-2">
+            <div className="space-y-3">
               <input
                 type="password"
                 maxLength={6}
-                autoFocus
                 value={staffPinInput}
-                onChange={(e) => setStaffPinInput(e.target.value.replace(/\D/g, ""))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && staffPinInput.length > 0) {
-                    handleVerifyStaffPin();
-                  }
+                onChange={(e) => {
+                  setStaffPinInput(e.target.value);
+                  setStaffPinError(null);
                 }}
-                placeholder="••••••"
-                className="w-full text-center tracking-[0.5em] font-mono text-2xl font-black py-3 bg-neutral-50 border border-neutral-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0c831f]"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleVerifyStaffPin();
+                }}
+                placeholder="Enter 6-digit Master PIN"
+                autoFocus
+                className="w-full text-center text-xl font-mono font-bold tracking-widest px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] focus:bg-white transition-all"
               />
 
               {staffPinError && (
-                <span className="text-xs text-rose-600 font-semibold text-center">{staffPinError}</span>
+                <p className="text-xs text-rose-600 font-semibold">{staffPinError}</p>
               )}
-            </div>
 
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="flex-1 py-2.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleVerifyStaffPin}
-                className="flex-1 py-2.5 text-xs font-bold text-white bg-[#0c831f] hover:bg-[#0a6c1a] rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                Unlock Panel
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStaffModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 font-semibold rounded-xl text-xs transition-all active:scale-98"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyStaffPin}
+                  className="flex-1 py-2.5 px-4 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs transition-all active:scale-98 shadow-xs"
+                >
+                  Unlock Diagnostics
+                </button>
+              </div>
             </div>
           </div>
         </div>

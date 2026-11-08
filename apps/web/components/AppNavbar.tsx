@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
+import { MovableOtpWidget } from "@/components/MovableOtpWidget";
 
 export function AppNavbar() {
   const pathname = usePathname();
@@ -234,6 +235,9 @@ export function AppNavbar() {
           </Link>
         )}
       </nav>
+
+      {/* Movable Floating OTP Widget that persists across all panels */}
+      <MovableOtpWidget />
     </>
   );
 }

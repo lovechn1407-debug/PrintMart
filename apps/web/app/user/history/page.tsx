@@ -347,13 +347,13 @@ export default function UserHistoryPage() {
                       </div>
                     </div>
 
-                    {/* Moved "Print Again" to the capsule area (Capsules and dots removed) */}
+                    {/* Moved "Print Again" to the capsule area (No pill background) */}
                     <Link
                       href="/user/print?new=1"
-                      className="shrink-0 text-xs font-semibold text-[#0c831f] hover:text-[#0a6e1a] bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full transition-all flex items-center gap-1 active:scale-95 shadow-2xs"
+                      className="shrink-0 text-xs font-semibold text-[#0c831f] hover:text-[#0a6e1a] hover:underline transition-colors flex items-center gap-1 active:scale-95"
                     >
                       <span>Print Again</span>
-                      <ChevronRight className="w-3 h-3" />
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -350,6 +351,22 @@ function UserPrintContent() {
   const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
   const [floatingOtpDismissed, setFloatingOtpDismissed] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock body scroll when OTP modal is open
+  useEffect(() => {
+    if (isOtpModalOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isOtpModalOpen]);
 
   // Cross-device cloud sync: keep drafts in sync while in Print Studio
   useEffect(() => {
@@ -744,6 +761,16 @@ function UserPrintContent() {
         setIsOtpModalOpen(true);
         setFloatingOtpDismissed(false);
         setStep("confirmed");
+        try {
+          localStorage.setItem(
+            "printmart_active_floating_otp",
+            JSON.stringify({ otp: simData.otp, expiresAt: Date.now() + 3600000 })
+          );
+          localStorage.removeItem("printmart_floating_otp_dismissed");
+          window.dispatchEvent(new Event("printmart_otp_updated"));
+        } catch (e) {
+          console.error(e);
+        }
         if (activeDraftId) {
           removeDraftById(activeDraftId);
           setActiveDraftId(null);
@@ -847,7 +874,7 @@ function UserPrintContent() {
         {/* ─────────────────────────────────────────────────────────────
             STAGE 1: UPLOAD & MULTI-FILE QUEUE
             ───────────────────────────────────────────────────────────── */}
-        {step === "upload" ? (
+        {step === "upload" && (
           <div className="max-w-xl mx-auto space-y-5 pt-3">
             <div className="text-center space-y-1.5">
               <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
@@ -1000,10 +1027,12 @@ function UserPrintContent() {
               </div>
             )}
           </div>
-        ) : (
-          /* ─────────────────────────────────────────────────────────────
-              STAGE 2: SLEEK PRINT STUDIO (With Real Document Page Preview)
-              ───────────────────────────────────────────────────────────── */
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            STAGE 2: SLEEK PRINT STUDIO (With Real Document Page Preview)
+            ───────────────────────────────────────────────────────────── */}
+        {step === "studio" && (
           <div className="space-y-5">
             {/* Studio Header with Return to Upload Button */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
@@ -1484,77 +1513,43 @@ function UserPrintContent() {
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          FLOATING OTP WIDGET ON SITE (when user closes the popup)
-          Positioned above footer with one-tap copy and cancel button
-          ───────────────────────────────────────────────────────────── */}
-      {generatedOtp && !isOtpModalOpen && !floatingOtpDismissed && (
-        <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-[95] animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-emerald-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.14)] flex items-center gap-2.5">
-            {/* Tap to reopen sheet */}
-            <div
-              onClick={() => setIsOtpModalOpen(true)}
-              className="flex items-center gap-2 cursor-pointer select-none"
-            >
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center shrink-0">
-                <Printer className="w-4 h-4" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-neutral-400 font-semibold uppercase leading-none">
-                  Kiosk OTP
-                </span>
-                <span className="text-base sm:text-lg font-black font-mono tracking-widest text-[#0c831f] shimmer-otp-text">
-                  {generatedOtp}
-                </span>
-              </div>
-            </div>
-
-            {/* Copy button */}
-            <button
-              type="button"
-              onClick={copyOtpToClipboard}
-              className="h-7 px-2 rounded-lg bg-emerald-50 text-[#0c831f] text-[11px] font-bold hover:bg-emerald-100 active:scale-95 transition-all flex items-center gap-1"
-              title="Copy OTP"
-            >
-              {copiedOtp ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-              <span>{copiedOtp ? "Copied" : "Copy"}</span>
-            </button>
-
-            {/* Small cancel / dismiss button */}
-            <button
-              type="button"
-              onClick={() => setFloatingOtpDismissed(true)}
-              className="w-5 h-5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 flex items-center justify-center transition-colors"
-              title="Dismiss floating code"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
           BOTTOM NOTIFICATION PANEL: OTP RELEASE SHEET (Universal Kiosk)
-          Rendered at ROOT LEVEL (outside <main>) at z-[999] so it sits
-          strictly ABOVE the mobile bottom footer & touches interact cleanly
+          Rendered via Portal directly into document.body at z-[99999]
+          with stopPropagation to guarantee 100% interactive touch/clicks
           ───────────────────────────────────────────────────────────── */}
-      {isOtpModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-end justify-center pointer-events-auto">
+      {mounted && isOtpModalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] flex items-end justify-center pointer-events-auto overflow-hidden"
+          style={{ pointerEvents: "auto" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsOtpModalOpen(false);
+            }
+          }}
+        >
           {/* Backdrop Overlay */}
           <div
-            className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs transition-opacity duration-300 z-[998]"
+            className="absolute inset-0 bg-neutral-950/60 backdrop-blur-xs transition-opacity duration-300 pointer-events-auto"
             onClick={() => setIsOtpModalOpen(false)}
           />
 
           {/* Bottom-to-Up Panel (Zero gaps on left/right on phone screen) */}
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-[26px] sm:rounded-2xl border-t sm:border border-neutral-200/90 shadow-[0_-12px_40px_rgba(0,0,0,0.22)] p-5 pb-8 sm:p-6 sm:pb-6 z-[999] animate-in slide-in-from-bottom duration-300 ease-out pointer-events-auto">
+          <div
+            className="relative z-10 w-full sm:max-w-md bg-white rounded-t-[26px] sm:rounded-2xl border-t sm:border border-neutral-200/90 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] p-5 pb-8 sm:p-6 sm:pb-6 animate-in slide-in-from-bottom duration-300 ease-out pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
             {/* Top drag handle indicator for mobile notification style */}
             <div className="w-12 h-1 bg-neutral-300 rounded-full mx-auto mb-3 sm:hidden" />
 
             {/* Close Button */}
             <button
               type="button"
-              onClick={() => setIsOtpModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOtpModalOpen(false);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
@@ -1612,21 +1607,28 @@ function UserPrintContent() {
               <button
                 type="button"
                 className="w-full font-semibold rounded-xl text-xs h-11 bg-neutral-100 hover:bg-neutral-200 active:scale-98 text-neutral-800 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                onClick={copyOtpToClipboard}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyOtpToClipboard();
+                }}
               >
                 {copiedOtp ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedOtp ? "Copied OTP!" : "Copy OTP"}</span>
               </button>
               <Link
                 href="/user/history"
-                onClick={() => setIsOtpModalOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOtpModalOpen(false);
+                }}
                 className="w-full font-bold rounded-xl text-xs h-11 bg-[#0c831f] hover:bg-[#0a6e1a] active:scale-98 text-white flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
               >
                 View in My Print Jobs
               </Link>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

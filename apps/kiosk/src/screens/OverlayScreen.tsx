@@ -45,7 +45,7 @@ export function OverlayScreen({ overlay, onOpenConfig }: OverlayScreenProps) {
       {/* ── Main Overlay Card ── */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 z-10 relative flex flex-col justify-center py-8">
         <div className="bg-white rounded-2xl p-6 sm:p-8 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-5 text-center animate-in zoom-in-95 duration-150">
-          
+
           {/* Status Badge Icon */}
           <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
             <Wrench className="w-6 h-6" />

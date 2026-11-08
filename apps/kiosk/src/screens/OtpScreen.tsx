@@ -7,14 +7,13 @@ import {
   ArrowRight,
   ShieldCheck,
   X,
-  Lock,
   Sparkles,
   KeyRound,
-  AlertCircle,
   RotateCw,
 } from "lucide-react";
 import { KioskNavbar } from "../components/KioskNavbar";
 import { GuillocheAura } from "../components/GuillocheAura";
+import { NoticeModal } from "../components/NoticeModal";
 
 interface OtpScreenProps {
   machineId: string;
@@ -35,17 +34,16 @@ export function OtpScreen({
 }: OtpScreenProps) {
   const [digits, setDigits] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Staff Modal State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState<boolean>(false);
   const [staffPinInput, setStaffPinInput] = useState<string>("");
-  const [staffPinError, setStaffPinError] = useState<string | null>(null);
 
   // Physical keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isStaffModalOpen) return;
+      if (isStaffModalOpen || errorMessage) return;
 
       if (e.key >= "0" && e.key <= "9") {
         if (digits.length < 6) {
@@ -56,30 +54,26 @@ export function OtpScreen({
             }
             return next;
           });
-          setErrorMsg(null);
         }
       } else if (e.key === "Backspace") {
         setDigits((prev) => prev.slice(0, -1));
-        setErrorMsg(null);
       } else if (e.key === "Enter") {
         if (digits.length === 6) {
           handleSubmit(digits.join(""));
         }
       } else if (e.key === "Escape") {
         setDigits([]);
-        setErrorMsg(null);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [digits, isStaffModalOpen]);
+  }, [digits, isStaffModalOpen, errorMessage]);
 
   const handleKeyPress = (num: string) => {
     if (digits.length < 6) {
       const nextDigits = [...digits, num];
       setDigits(nextDigits);
-      setErrorMsg(null);
       if (nextDigits.length === 6) {
         setTimeout(() => handleSubmit(nextDigits.join("")), 50);
       }
@@ -88,12 +82,10 @@ export function OtpScreen({
 
   const handleBackspace = () => {
     setDigits((prev) => prev.slice(0, -1));
-    setErrorMsg(null);
   };
 
   const handleClear = () => {
     setDigits([]);
-    setErrorMsg(null);
   };
 
   const handleSubmit = async (otpStr: string) => {
@@ -106,7 +98,6 @@ export function OtpScreen({
 
     try {
       setLoading(true);
-      setErrorMsg(null);
 
       // Verify OTP via Electron API bridge if available
       const kioskApi = (window as any).kioskApi;
@@ -127,11 +118,11 @@ export function OtpScreen({
       if (res && res.success) {
         onVerifySuccess(res);
       } else {
-        setErrorMsg(res?.error || "Invalid OTP. Please check your order details.");
+        setErrorMessage(res?.error || "Invalid OTP. Please check the 6-digit code provided upon payment.");
         setDigits([]);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to contact printing server");
+      setErrorMessage(err.message || "Failed to contact printing server. Please try again.");
       setDigits([]);
     } finally {
       setLoading(false);
@@ -143,24 +134,23 @@ export function OtpScreen({
     if (cleanPin === masterCode || cleanPin === "998877") {
       setIsStaffModalOpen(false);
       setStaffPinInput("");
-      setStaffPinError(null);
       onOpenConfig();
     } else {
-      setStaffPinError("Incorrect Master PIN. Configured in Admin -> Settings.");
+      setIsStaffModalOpen(false);
       setStaffPinInput("");
+      setErrorMessage("Incorrect Master PIN. Configured in Admin -> Settings.");
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none">
-      {/* ── Signature Honey-Golden Header ── */}
+      {/* ── Signature Honey-Golden Header (Matching AppNavbar) ── */}
       <KioskNavbar
         machineName={machineName}
         machineId={machineId}
         printerState={printerState}
         onOpenStaff={() => {
           setStaffPinInput("");
-          setStaffPinError(null);
           setIsStaffModalOpen(true);
         }}
       />
@@ -168,7 +158,7 @@ export function OtpScreen({
       {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
       <GuillocheAura />
 
-      {/* ── Main Container ── */}
+      {/* ── Main Container (Centered, Breathing Room matching Homepage) ── */}
       <main className="flex-1 w-full max-w-md sm:max-w-xl mx-auto px-4 z-10 relative flex flex-col justify-center py-6 sm:py-10">
         
         {/* Header Title Section (Matching Homepage Hero) */}
@@ -177,7 +167,7 @@ export function OtpScreen({
             <Sparkles className="w-3.5 h-3.5 text-[#0c831f]" />
             <span>Zero-Queue Instant Dispenser</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-[2rem] font-bold text-[#1c1c1c] tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-[2.2rem] font-bold text-[#1c1c1c] tracking-tight leading-tight">
             Enter 6-Digit OTP
           </h1>
           <p className="text-xs sm:text-[13px] text-[#5c6874] mt-1.5 font-normal tracking-wide">
@@ -185,17 +175,9 @@ export function OtpScreen({
           </p>
         </div>
 
-        {/* Card Box (Matching Homepage & Print Studio Cards) */}
+        {/* Card Box (Exact Print Studio / Homepage Card Structure) */}
         <div className="bg-white rounded-2xl p-5 sm:p-7 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-5 max-w-sm w-full mx-auto">
           
-          {/* Error Message Box */}
-          {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold text-center flex items-center justify-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
           {/* 6 Digit Display Cells (Matching Print Studio OTP Display) */}
           <div className="flex gap-2 justify-center w-full">
             {[0, 1, 2, 3, 4, 5].map((index) => {
@@ -291,9 +273,19 @@ export function OtpScreen({
         </div>
       </main>
 
+      {/* ── ERROR POPUP MODAL (Exact Print Studio Notice Dialog) ── */}
+      <NoticeModal
+        isOpen={!!errorMessage}
+        type="error"
+        title="Notice"
+        message={errorMessage || ""}
+        buttonText="Okay"
+        onClose={() => setErrorMessage(null)}
+      />
+
       {/* ── Staff PIN Maintenance Modal (Matching Studio Modal Dialog) ── */}
       {isStaffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150 select-none">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100 text-center animate-in zoom-in-95 duration-150 relative">
             <button
               type="button"
@@ -319,34 +311,27 @@ export function OtpScreen({
                 type="password"
                 maxLength={6}
                 value={staffPinInput}
-                onChange={(e) => {
-                  setStaffPinInput(e.target.value);
-                  setStaffPinError(null);
-                }}
+                onChange={(e) => setStaffPinInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleVerifyStaffPin();
                 }}
                 placeholder="Enter 6-digit Master PIN"
                 autoFocus
-                className="w-full text-center text-xl font-mono font-bold tracking-widest px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] focus:bg-white transition-all"
+                className="w-full text-center text-xl font-mono font-bold tracking-widest px-4 py-3 bg-neutral-50 border border-neutral-300 rounded-xl focus:outline-none focus:border-[#0c831f] bg-white transition-all"
               />
-
-              {staffPinError && (
-                <p className="text-xs text-rose-600 font-semibold">{staffPinError}</p>
-              )}
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsStaffModalOpen(false)}
-                  className="flex-1 py-2.5 px-4 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 font-semibold rounded-xl text-xs transition-all active:scale-98"
+                  className="flex-1 py-2.5 px-4 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 font-semibold rounded-xl text-xs transition-all active:scale-98 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleVerifyStaffPin}
-                  className="flex-1 py-2.5 px-4 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs transition-all active:scale-98 shadow-xs"
+                  className="flex-1 py-2.5 px-4 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs transition-all active:scale-98 shadow-xs cursor-pointer"
                 >
                   Unlock Diagnostics
                 </button>

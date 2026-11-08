@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { database, ref, onValue, set, update, get } from "../firebase";
 import { GuillocheAura } from "../components/GuillocheAura";
+import { NoticeModal } from "../components/NoticeModal";
 
 interface ConfigPanelScreenProps {
   machineId: string;
@@ -46,9 +47,17 @@ export function ConfigPanelScreen({
   const [nameInput, setNameInput] = useState<string>(machineName);
   const [locationInput, setLocationInput] = useState<string>("Ground Floor, Central Library");
   const [pairCodeInput, setPairCodeInput] = useState<string>("");
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [pairError, setPairError] = useState<string | null>(null);
-  const [pairSuccess, setPairSuccess] = useState<string | null>(null);
+  const [modalNotice, setModalNotice] = useState<{
+    isOpen: boolean;
+    type: "error" | "success" | "info";
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "info",
+    title: "Notice",
+    message: "",
+  });
 
   // Printer Telemetry State
   const [printerData, setPrinterData] = useState<any>({
@@ -123,7 +132,6 @@ export function ConfigPanelScreen({
   // Save Name and Location to Firebase & Local
   const handleSaveIdentity = async () => {
     try {
-      setSaveSuccess(null);
       await update(ref(database, `machines/${currentId}`), {
         name: nameInput.trim(),
         location: locationInput.trim(),
@@ -133,29 +141,46 @@ export function ConfigPanelScreen({
       onUpdateMachine(currentId, nameInput.trim());
       localStorage.setItem("kiosk_machine_name", nameInput.trim());
 
-      setSaveSuccess("Saved! Display name synchronized across network.");
+      setModalNotice({
+        isOpen: true,
+        type: "success",
+        title: "Details Synchronized",
+        message: `Machine name updated to "${nameInput.trim()}" and location saved.`,
+      });
       addLog("SUCCESS", `Vending machine updated to "${nameInput.trim()}"`);
-      setTimeout(() => setSaveSuccess(null), 3500);
     } catch (err: any) {
+      setModalNotice({
+        isOpen: true,
+        type: "error",
+        title: "Save Failed",
+        message: err.message || "Failed to save machine details.",
+      });
       addLog("ERROR", `Failed to save machine details: ${err.message}`);
     }
   };
 
   // Pair Terminal with Pair Code generated from Admin Panel
   const handlePairWithCode = async () => {
-    setPairError(null);
-    setPairSuccess(null);
-
     const code = pairCodeInput.trim();
     if (!code) {
-      setPairError("Please enter a Pair Code.");
+      setModalNotice({
+        isOpen: true,
+        type: "error",
+        title: "Code Required",
+        message: "Please enter the 6-digit Pair Code from the Admin Vending Machines panel.",
+      });
       return;
     }
 
     try {
       const snap = await get(ref(database, "machines"));
       if (!snap.exists()) {
-        setPairError("No machines found in database. Please add one in Admin Panel.");
+        setModalNotice({
+          isOpen: true,
+          type: "error",
+          title: "No Machines Found",
+          message: "No vending machines found in the database. Please create one in Admin Panel first.",
+        });
         return;
       }
 
@@ -179,16 +204,30 @@ export function ConfigPanelScreen({
         localStorage.setItem("kiosk_machine_id", matchedMachine.machineId);
         localStorage.setItem("kiosk_machine_name", matchedMachine.name || "Kiosk Machine");
 
-        setPairSuccess(`Paired successfully with "${matchedMachine.name}" (${matchedMachine.machineId})!`);
+        setModalNotice({
+          isOpen: true,
+          type: "success",
+          title: "Paired Successfully",
+          message: `This terminal is now paired with "${matchedMachine.name}" (${matchedMachine.machineId}).`,
+        });
         addLog("SUCCESS", `Kiosk paired with machine: ${matchedMachine.name} (Code: ${code})`);
         setPairCodeInput("");
-        setTimeout(() => setPairSuccess(null), 4000);
       } else {
-        setPairError("Invalid Pair Code. Check the 6-digit code in Admin -> Vending Machines.");
+        setModalNotice({
+          isOpen: true,
+          type: "error",
+          title: "Invalid Pair Code",
+          message: "The entered code does not match any registered machine. Please verify the code in Admin -> Vending Machines.",
+        });
         addLog("WARNING", `Failed pairing attempt with code: ${code}`);
       }
     } catch (err: any) {
-      setPairError(`Error connecting to server: ${err.message}`);
+      setModalNotice({
+        isOpen: true,
+        type: "error",
+        title: "Connection Error",
+        message: `Error connecting to database: ${err.message}`,
+      });
       addLog("ERROR", `Pairing error: ${err.message}`);
     }
   };
@@ -226,6 +265,12 @@ export function ConfigPanelScreen({
 
       addLog("SUCCESS", "Test print completed successfully. 1 test page dispensed.");
       setTestPrinting(false);
+      setModalNotice({
+        isOpen: true,
+        type: "success",
+        title: "Test Page Dispensed",
+        message: "Diagnostic print spool completed successfully. Laser engine verified.",
+      });
     }, 2000);
   };
 
@@ -240,8 +285,20 @@ export function ConfigPanelScreen({
       });
       setPrinterData((prev: any) => ({ ...prev, printerState: "READY", paperStatus: "OK" }));
       addLog("SUCCESS", "Spooler state reset to READY.");
+      setModalNotice({
+        isOpen: true,
+        type: "success",
+        title: "Spooler Reset",
+        message: "Printer spooler service has been reset to READY state.",
+      });
     } catch (err: any) {
       addLog("ERROR", `Failed to reset printer: ${err.message}`);
+      setModalNotice({
+        isOpen: true,
+        type: "error",
+        title: "Reset Failed",
+        message: `Failed to reset printer spooler: ${err.message}`,
+      });
     }
   };
 
@@ -378,15 +435,7 @@ export function ConfigPanelScreen({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
-                <div>
-                  {saveSuccess && (
-                    <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                      <CheckCircle2 className="w-4 h-4 text-[#0c831f]" /> {saveSuccess}
-                    </span>
-                  )}
-                </div>
-
+              <div className="flex items-center justify-end pt-3 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={handleSaveIdentity}
@@ -428,20 +477,6 @@ export function ConfigPanelScreen({
                   Verify & Pair
                 </button>
               </div>
-
-              {pairError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{pairError}</span>
-                </div>
-              )}
-
-              {pairSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0c831f]" />
-                  <span>{pairSuccess}</span>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -597,6 +632,15 @@ export function ConfigPanelScreen({
         )}
 
       </main>
+
+      {/* ── NOTICE MODAL (Exact Print Studio Notice Dialog) ── */}
+      <NoticeModal
+        isOpen={modalNotice.isOpen}
+        type={modalNotice.type}
+        title={modalNotice.title}
+        message={modalNotice.message}
+        onClose={() => setModalNotice((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

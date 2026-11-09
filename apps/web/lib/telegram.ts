@@ -78,3 +78,4 @@ export async function getTelegramFileDownloadUrl(fileId: string): Promise<string
   const filePath = data.result.file_path;
   return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
 }
+

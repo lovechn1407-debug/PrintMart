@@ -220,41 +220,51 @@ function formatRupees(paise: number = 0): string {
   return `₹${(paise / 100).toFixed(2)}`;
 }
 
-function resizeImageToDataUrl(file: File, maxWidth = 160, maxHeight = 160, quality = 0.75): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+function compressImageTo10Kb(file: File | string, maxDimension = 120): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
         }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(e.target?.result as string);
-          return;
+      } else {
+        if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
         }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve("");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Guarantee size <= 10 KB (approx 13,500 base64 chars)
+      let quality = 0.7;
+      let dataUrl = canvas.toDataURL("image/jpeg", quality);
+      while (dataUrl.length > 13500 && quality > 0.15) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+      resolve(dataUrl);
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    img.onerror = () => resolve("");
+    if (typeof file === "string") {
+      img.src = file;
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    }
   });
 }
 
@@ -265,6 +275,7 @@ export default function MorePage() {
   // Local immediate updates for profile photo and name
   const [localPhoto, setLocalPhoto] = useState<string | null>(null);
   const [localDisplayName, setLocalDisplayName] = useState<string | null>(null);
+  const [isPhotoUpdating, setIsPhotoUpdating] = useState<boolean>(false);
 
   // Exit Animation State
   const [isExiting, setIsExiting] = useState<boolean>(false);
@@ -415,7 +426,7 @@ export default function MorePage() {
     }
   };
 
-  // Handle Photo Select with Client-side Canvas Thumbnail (Fixes "URL too long")
+  // Handle Photo Select with Client-side Canvas Thumbnail (Re-compressed to <= 10 KB)
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !auth.currentUser) return;
     const file = e.target.files[0];
@@ -424,23 +435,26 @@ export default function MorePage() {
       return;
     }
     setSavingProfile(true);
+    setIsPhotoUpdating(true);
+    setLocalPhoto(null);
     try {
-      const resizedBase64 = await resizeImageToDataUrl(file, 160, 160, 0.75);
-      setLocalPhoto(resizedBase64);
+      const compressed10Kb = await compressImageTo10Kb(file, 120);
+      setLocalPhoto(compressed10Kb);
       if (updateProfileState) {
-        updateProfileState({ photoURL: resizedBase64 });
+        updateProfileState({ photoURL: compressed10Kb });
       }
       const uid = auth.currentUser.uid;
       // Store in Realtime Database where there is no 2048 character length limit
-      await update(ref(database, `users/${uid}`), { photoURL: resizedBase64 });
+      await update(ref(database, `users/${uid}`), { photoURL: compressed10Kb });
       // Update Auth Profile if within 2000 chars, ignore error if string exceeds limit
-      if (resizedBase64.length <= 2000) {
-        await updateProfile(auth.currentUser, { photoURL: resizedBase64 }).catch(() => {});
+      if (compressed10Kb.length <= 2000) {
+        await updateProfile(auth.currentUser, { photoURL: compressed10Kb }).catch(() => {});
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to update profile photo");
     } finally {
       setSavingProfile(false);
+      setIsPhotoUpdating(false);
     }
   };
 
@@ -491,7 +505,7 @@ export default function MorePage() {
   };
 
   const displayName = localDisplayName || profile?.displayName || user?.displayName || nameInput || "Love Chauhan";
-  const userPhoto = localPhoto || profile?.photoURL || user?.photoURL;
+  const userPhoto = isPhotoUpdating ? null : (localPhoto || profile?.photoURL || null);
   const subtext = user?.email || "8383090874 • PrintMart Campus";
 
   return (

@@ -49,6 +49,7 @@ export interface KioskPopupSettings {
   title: string;
   description: string;
   buttonText: string;
+  buttonEnabled?: boolean;
   updatedAt: number;
 }
 
@@ -77,6 +78,7 @@ export default function AdminAdsPage() {
   const [popupTitle, setPopupTitle] = useState<string>("Notice");
   const [popupDescription, setPopupDescription] = useState<string>("Please note this announcement on the kiosk.");
   const [popupButtonText, setPopupButtonText] = useState<string>("Okay, Got It");
+  const [popupButtonEnabled, setPopupButtonEnabled] = useState<boolean>(true);
   const [popupSaving, setPopupSaving] = useState<boolean>(false);
   const [globalPricing, setGlobalPricing] = useState<GlobalPricing>(DEFAULT_GLOBAL_PRICING);
   const adminQrPreview = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(
@@ -166,6 +168,7 @@ export default function AdminAdsPage() {
         setPopupTitle(val.title || "Notice");
         setPopupDescription(val.description || "");
         setPopupButtonText(val.buttonText || "Okay, Got It");
+        setPopupButtonEnabled(val.buttonEnabled !== false);
       } else {
         setPopupEnabled(false);
         setPopupTargetArea("otp");
@@ -173,6 +176,7 @@ export default function AdminAdsPage() {
         setPopupTitle("Notice");
         setPopupDescription("");
         setPopupButtonText("Okay, Got It");
+        setPopupButtonEnabled(true);
       }
     });
 
@@ -195,6 +199,7 @@ export default function AdminAdsPage() {
         title: popupTitle.trim() || "Notice",
         description: popupDescription.trim(),
         buttonText: popupButtonText.trim() || "Okay, Got It",
+        buttonEnabled: popupButtonEnabled,
         updatedAt: Date.now(),
       };
 
@@ -872,6 +877,19 @@ export default function AdminAdsPage() {
             >
               {popupEnabled ? "● Popup Active" : "○ Popup Off"}
             </span>
+
+            <button
+              type="button"
+              onClick={() => handleSavePopup(!popupEnabled)}
+              disabled={popupSaving}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
+                popupEnabled
+                  ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                  : "bg-[#0c831f] text-white border-[#0c831f] hover:bg-[#0a6e1a]"
+              }`}
+            >
+              {popupEnabled ? "Disable Popup" : "Enable Popup"}
+            </button>
           </div>
         </div>
 
@@ -990,7 +1008,68 @@ export default function AdminAdsPage() {
           </div>
         </div>
 
-        {/* 3. Title, Description, and Button Text */}
+        {/* 3. Modal Action Button (Enable / Disable Button) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-neutral-800 block">
+              Modal Action Button (Enable / Disable Button)
+            </label>
+            <span className="text-[11px] font-semibold text-neutral-500">
+              {popupButtonEnabled ? "Dismiss button visible to user" : "No button (Sticky Notice)"}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setPopupButtonEnabled(true)}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                popupButtonEnabled
+                  ? "border-[#0c831f] bg-emerald-50/40 ring-1 ring-[#0c831f]"
+                  : "border-neutral-200 bg-neutral-50 hover:bg-neutral-100"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                    popupButtonEnabled ? "border-[#0c831f] bg-[#0c831f]" : "border-neutral-400"
+                  }`}
+                >
+                  {popupButtonEnabled && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <span className="text-xs font-bold text-neutral-900">Enable Button</span>
+              </div>
+              <p className="text-[11px] text-neutral-500 mt-1 pl-5.5">
+                Displays the action button so kiosk users can tap to dismiss the popup.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPopupButtonEnabled(false)}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                !popupButtonEnabled
+                  ? "border-[#0c831f] bg-emerald-50/40 ring-1 ring-[#0c831f]"
+                  : "border-neutral-200 bg-neutral-50 hover:bg-neutral-100"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                    !popupButtonEnabled ? "border-[#0c831f] bg-[#0c831f]" : "border-neutral-400"
+                  }`}
+                >
+                  {!popupButtonEnabled && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <span className="text-xs font-bold text-neutral-900">Disable Button</span>
+              </div>
+              <p className="text-[11px] text-neutral-500 mt-1 pl-5.5">
+                Hides the button entirely. Turns the popup into a sticky notice screen.
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* 4. Title, Description, and Button Text */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-neutral-800 block">
@@ -1006,15 +1085,27 @@ export default function AdminAdsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-neutral-800 block">
-              Button Text
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-neutral-800 block">
+                Button Text
+              </label>
+              {!popupButtonEnabled && (
+                <span className="text-[10px] font-semibold text-neutral-400">
+                  (Disabled)
+                </span>
+              )}
+            </div>
             <input
               type="text"
               value={popupButtonText}
               onChange={(e) => setPopupButtonText(e.target.value)}
-              placeholder="e.g. Okay, Got It"
-              className="w-full h-10 px-3 text-xs bg-neutral-50 rounded-xl border border-neutral-200 text-neutral-900 focus:ring-2 focus:ring-[#0c831f]"
+              disabled={!popupButtonEnabled}
+              placeholder={popupButtonEnabled ? "e.g. Okay, Got It" : "Button is disabled"}
+              className={`w-full h-10 px-3 text-xs rounded-xl border border-neutral-200 transition-all ${
+                popupButtonEnabled
+                  ? "bg-neutral-50 text-neutral-900 focus:ring-2 focus:ring-[#0c831f]"
+                  : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+              }`}
             />
           </div>
         </div>
@@ -1032,7 +1123,7 @@ export default function AdminAdsPage() {
           />
         </div>
 
-        {/* 4. Interactive Live Preview */}
+        {/* 5. Interactive Live Preview */}
         <div className="space-y-2 pt-1">
           <label className="text-xs font-bold text-neutral-800 block">
             Popup Live Visual Simulation (Where it appears on Kiosk)
@@ -1059,9 +1150,15 @@ export default function AdminAdsPage() {
                       </div>
                       <span className="text-[9px] font-bold text-neutral-900 block truncate">{popupTitle}</span>
                       <span className="text-[8px] text-neutral-500 block line-clamp-1">{popupDescription || "Notice message..."}</span>
-                      <div className="text-[8px] font-bold py-0.5 px-1 bg-black text-white rounded">
-                        {popupButtonText}
-                      </div>
+                      {popupButtonEnabled ? (
+                        <div className="text-[8px] font-bold py-0.5 px-1 bg-black text-white rounded">
+                          {popupButtonText}
+                        </div>
+                      ) : (
+                        <div className="text-[7px] font-semibold py-0.5 px-1 bg-neutral-100 text-neutral-500 rounded">
+                          (Sticky • No Button)
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1085,9 +1182,15 @@ export default function AdminAdsPage() {
                       </div>
                       <span className="text-[10px] font-bold text-neutral-900 block truncate">{popupTitle}</span>
                       <span className="text-[8px] text-neutral-500 block line-clamp-2">{popupDescription || "Notice message..."}</span>
-                      <div className="text-[8px] font-bold py-0.5 px-2 bg-black text-white rounded inline-block">
-                        {popupButtonText}
-                      </div>
+                      {popupButtonEnabled ? (
+                        <div className="text-[8px] font-bold py-0.5 px-2 bg-black text-white rounded inline-block">
+                          {popupButtonText}
+                        </div>
+                      ) : (
+                        <div className="text-[7px] font-semibold py-0.5 px-1.5 bg-neutral-100 text-neutral-500 rounded inline-block">
+                          (Sticky • No Button)
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1102,9 +1205,15 @@ export default function AdminAdsPage() {
                     </div>
                     <span className="text-xs font-bold text-neutral-900 block">{popupTitle}</span>
                     <span className="text-[9px] text-neutral-600 block line-clamp-2">{popupDescription || "Notice message..."}</span>
-                    <div className="text-[9px] font-bold py-1 px-3 bg-black text-white rounded-md inline-block">
-                      {popupButtonText}
-                    </div>
+                    {popupButtonEnabled ? (
+                      <div className="text-[9px] font-bold py-1 px-3 bg-black text-white rounded-md inline-block">
+                        {popupButtonText}
+                      </div>
+                    ) : (
+                      <div className="text-[8px] font-semibold py-0.5 px-2 bg-neutral-100 text-neutral-500 rounded-md inline-block">
+                        (Sticky • No Button)
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

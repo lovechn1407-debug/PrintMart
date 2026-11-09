@@ -30,6 +30,7 @@ interface RemoteKioskPopup {
   title: string;
   description: string;
   buttonText?: string;
+  buttonEnabled?: boolean;
   updatedAt: number;
 }
 
@@ -441,10 +442,14 @@ export default function OnlineKioskPage() {
       iconClass = "text-amber-700 bg-amber-50";
     }
 
+    const canDismiss = remotePopup.buttonEnabled !== false;
+
     return (
       <div
         className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none"
-        onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+        onClick={() => {
+          if (canDismiss) setDismissedRemotePopupAt(remotePopup.updatedAt);
+        }}
       >
         <div
           className="bg-white rounded-[14px] p-5 sm:p-6 max-w-[280px] sm:max-w-[320px] w-full shadow-2xl border-0 space-y-3 text-center animate-in zoom-in-95"
@@ -463,13 +468,15 @@ export default function OnlineKioskPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
-            className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[8px] transition-all border-0 cursor-pointer shadow-xs"
-          >
-            {remotePopup.buttonText || "Okay, Got It"}
-          </button>
+          {canDismiss && (
+            <button
+              type="button"
+              onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+              className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[8px] transition-all border-0 cursor-pointer shadow-xs"
+            >
+              {remotePopup.buttonText || "Okay, Got It"}
+            </button>
+          )}
         </div>
       </div>
     );

@@ -249,18 +249,19 @@ export function OtpScreen({
         }}
       />
 
-      {/* ── Main Workspace: Naturally Sized, Fits Screen, Slight Gap Between OTP and Ad ── */}
+      {/* ── Main Workspace: Naturally Sized, Unified Single Outer Box, Fits Screen ── */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-center z-10 overflow-hidden">
         {hasAds ? (
           /* ══════════════════════════════════════════════════════════════════════
-             SIDE-BY-SIDE PANELS WITH SLIGHT GAP (gap-4 sm:gap-5)
-             - Both boxes height-locked to viewport: fits screen without overflow
+             UNIFIED SINGLE OUTER CARD:
+             - Encloses both OTP area & Ad area in ONE cohesive white card
              - Left: OTP Area strictly in 3:4 portrait (aspect-[3/4])
-             - Right: Blue Ad Area with configurable aspect ratio (9:16, 9:14, 16:9, etc.)
+             - Right: Ad Area has a slight gap from top, bottom, and right of the outer box
+             - Height-locked to viewport: fits screen 100% without overflow
              ══════════════════════════════════════════════════════════════════════ */
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-5 md:gap-6 max-w-full h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-7.5rem)]">
-            {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Height-Bounded, Relative for Local Blur) */}
-            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white rounded-[14px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border-0 relative overflow-hidden shrink-0">
+          <div className="bg-white rounded-[16px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]">
+            {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Relative Container for Localized Blur) */}
+            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 relative overflow-hidden">
               {/* Brand Logo */}
               <div className="flex flex-col items-center pt-0.5">
                 <img
@@ -450,7 +451,7 @@ export function OtpScreen({
                 </div>
               </div>
 
-              {/* ── 5 & 6. ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
+              {/* ── ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
               {noticeMessage && (
                 <div
                   className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in"
@@ -479,79 +480,81 @@ export function OtpScreen({
               )}
             </div>
 
-            {/* RIGHT: BLUE AD AREA (Standalone Card with Slight Gap, Configurable Aspect Ratio, Zero Overflow) */}
-            <div
-              className="w-full md:w-auto h-auto md:h-full max-w-[90vw] md:max-w-[calc(100vw-440px)] bg-[#00bcd4] rounded-[14px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] relative flex items-center justify-center overflow-hidden select-none border-0 shrink-0"
-              style={getAdAspectRatioStyle()}
-            >
-              {adConfig.videoUrl ? (
-                /* Video Player */
-                <div className="w-full h-full relative">
-                  <video
-                    src={adConfig.videoUrl}
-                    autoPlay
-                    loop
-                    muted={isMuted}
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsMuted((prev) => !prev)}
-                    className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-xs cursor-pointer border-0"
-                    title={isMuted ? "Unmute" : "Mute"}
-                  >
-                    {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              ) : adConfig.slides && adConfig.slides.length > 0 ? (
-                /* Image Slides Carousel with Smooth Page Sliding Animation */
-                <div className="w-full h-full relative overflow-hidden">
-                  <div
-                    className="flex h-full w-full transition-transform duration-700 ease-in-out"
-                    style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
-                  >
-                    {adConfig.slides.map((slideUrl, idx) => (
-                      <div key={idx} className="w-full h-full shrink-0 relative">
-                        <img
-                          src={slideUrl}
-                          alt={`Slide ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+            {/* RIGHT: AD AREA (Inside the outer box, with slight gap/padding from top, bottom, and right) */}
+            <div className="h-full flex items-center justify-center py-2.5 pr-2.5 pl-0 sm:py-3 sm:pr-3 shrink-0">
+              <div
+                className="h-full bg-[#00bcd4] rounded-[12px] relative flex items-center justify-center overflow-hidden select-none border-0"
+                style={getAdAspectRatioStyle()}
+              >
+                {adConfig.videoUrl ? (
+                  /* Video Player */
+                  <div className="w-full h-full relative">
+                    <video
+                      src={adConfig.videoUrl}
+                      autoPlay
+                      loop
+                      muted={isMuted}
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsMuted((prev) => !prev)}
+                      className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-xs cursor-pointer border-0"
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  {adConfig.slides.length > 1 && (
-                    <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
-                      {adConfig.slides.map((_, i) => (
-                        <div
-                          key={i}
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            i === activeSlideIndex
-                              ? "bg-white w-5 shadow-sm"
-                              : "bg-white/50 w-1.5"
-                          }`}
-                        />
+                ) : adConfig.slides && adConfig.slides.length > 0 ? (
+                  /* Image Slides Carousel with Smooth Page Sliding Animation */
+                  <div className="w-full h-full relative overflow-hidden">
+                    <div
+                      className="flex h-full w-full transition-transform duration-700 ease-in-out"
+                      style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
+                    >
+                      {adConfig.slides.map((slideUrl, idx) => (
+                        <div key={idx} className="w-full h-full shrink-0 relative">
+                          <img
+                            src={slideUrl}
+                            alt={`Slide ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       ))}
                     </div>
-                  )}
-                </div>
-              ) : (
-                /* Ad Area Wireframe Graphic */
-                <div className="p-8 text-center text-white space-y-2">
-                  <span className="text-xl sm:text-2xl font-black tracking-tight text-white/95 uppercase">
-                    AD AREA
-                  </span>
-                </div>
-              )}
+                    {adConfig.slides.length > 1 && (
+                      <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
+                        {adConfig.slides.map((_, i) => (
+                          <div
+                            key={i}
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              i === activeSlideIndex
+                                ? "bg-white w-5 shadow-sm"
+                                : "bg-white/50 w-1.5"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Ad Area Wireframe Graphic */
+                  <div className="p-8 text-center text-white space-y-2">
+                    <span className="text-xl sm:text-2xl font-black tracking-tight text-white/95 uppercase">
+                      AD AREA
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : (
           /* ══════════════════════════════════════════════════════════════════════
              CENTERED CARD: No Ad configured or Ads disabled in Admin.
-             White OTP card strictly in 3:4 portrait (aspect-[3/4])
+             Single outer card strictly in 3:4 portrait (aspect-[3/4])
              ══════════════════════════════════════════════════════════════════════ */
-          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-7.5rem)] aspect-[3/4] mx-auto bg-white rounded-[14px] p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
+          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-6.5rem)] aspect-[3/4] mx-auto bg-white rounded-[16px] p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
             {/* Brand Logo */}
             <div className="flex flex-col items-center pt-0.5">
               <img
@@ -735,7 +738,7 @@ export function OtpScreen({
               </div>
             </div>
 
-            {/* ── 5 & 6. ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
+            {/* ── ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
             {noticeMessage && (
               <div
                 className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in"

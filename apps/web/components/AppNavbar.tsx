@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
+import { Arc } from "@/components/loading-ui/arc";
 export function AppNavbar() {
   const pathname = usePathname();
   const { user, profile, isAdmin, signInWithGoogle, signOut, loading } = useAuth();
@@ -76,7 +77,7 @@ export function AppNavbar() {
             }`}
           >
             {pendingPath === "/" && (
-              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+              <Arc className="size-3 text-[#0c831f]" />
             )}
             <span>Home</span>
           </Link>
@@ -88,7 +89,7 @@ export function AppNavbar() {
             }`}
           >
             {pendingPath === "/user/print" && (
-              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+              <Arc className="size-3 text-[#0c831f]" />
             )}
             <span>Start Printing</span>
           </Link>
@@ -101,7 +102,7 @@ export function AppNavbar() {
               }`}
             >
               {pendingPath === "/user/history" && (
-                <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+                <Arc className="size-3 text-[#0c831f]" />
               )}
               <span>My Print Jobs</span>
             </Link>
@@ -113,7 +114,7 @@ export function AppNavbar() {
               className="text-xs font-bold flex items-center gap-1.5 text-rose-700 bg-white/70 hover:bg-white px-2.5 py-1 rounded-full border border-rose-300/60 shadow-2xs"
             >
               {pendingPath === "/admin/dashboard" ? (
-                <div className="w-3 h-3 rounded-full border-2 border-rose-300 border-t-rose-600 animate-spin" />
+                <Arc className="size-3 text-rose-600" />
               ) : (
                 <ShieldAlert className="w-3.5 h-3.5" />
               )}
@@ -225,7 +226,7 @@ export function AppNavbar() {
         >
           <div className="relative w-5 h-5 flex items-center justify-center">
             {pendingPath === "/" ? (
-              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+              <Arc className="size-4 text-[#0c831f]" />
             ) : (
               <Home className="w-5 h-5" />
             )}
@@ -241,7 +242,7 @@ export function AppNavbar() {
         >
           <div className="relative w-5 h-5 flex items-center justify-center">
             {pendingPath === "/user/print" ? (
-              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+              <Arc className="size-4 text-[#0c831f]" />
             ) : (
               <Printer className="w-5 h-5" />
             )}
@@ -258,7 +259,7 @@ export function AppNavbar() {
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
               {pendingPath === "/user/history" ? (
-                <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+                <Arc className="size-4 text-[#0c831f]" />
               ) : (
                 <Clock className="w-5 h-5" />
               )}
@@ -274,7 +275,7 @@ export function AppNavbar() {
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
               {pendingPath === "/admin/dashboard" ? (
-                <div className="w-4 h-4 rounded-full border-2 border-rose-200 border-t-rose-600 animate-spin" />
+                <Arc className="size-4 text-rose-600" />
               ) : (
                 <ShieldAlert className="w-5 h-5" />
               )}
@@ -284,14 +285,17 @@ export function AppNavbar() {
         )}
       </nav>
 
-      {/* Floating Circular Loading Buffer Badge when switching tabs */}
+      {/* Centered Buffer Loading Overlay over current background page using Arc */}
       {pendingPath && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9999] bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-neutral-200/90 shadow-[0_4px_20px_rgba(0,0,0,0.12)] flex items-center gap-2.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-          <div className="relative w-4 h-4 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full border-2 border-emerald-500/25 animate-ping opacity-60" />
-            <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/15 backdrop-blur-[1.5px] pointer-events-none transition-all duration-150 animate-in fade-in">
+          <div className="bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.18)] border border-neutral-100 flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-150">
+            <div className="text-[#0c831f]">
+              <Arc className="size-14" />
+            </div>
+            <span className="text-xs font-bold text-neutral-800 tracking-tight">
+              Loading...
+            </span>
           </div>
-          <span className="text-xs font-bold text-neutral-800">Switching tab...</span>
         </div>
       )}
 

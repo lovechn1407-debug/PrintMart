@@ -206,7 +206,8 @@ export default function UserHistoryPage() {
             </div>
           </div>
           <Link
-            href="/user/print?new=1"
+            href="/user/print"
+            prefetch={true}
             className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-lg bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -294,7 +295,8 @@ export default function UserHistoryPage() {
                 : "Upload your document to print instantly at any campus kiosk."}
             </p>
             <Link
-              href="/user/print?new=1"
+              href="/user/print"
+              prefetch={true}
               className="h-10 px-5 rounded-lg bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -349,7 +351,8 @@ export default function UserHistoryPage() {
 
                     {/* Moved "Print Again" to the capsule area (No pill background) */}
                     <Link
-                      href="/user/print?new=1"
+                      href="/user/print"
+                      prefetch={true}
                       className="shrink-0 text-xs font-semibold text-[#0c831f] hover:text-[#0a6e1a] hover:underline transition-colors flex items-center gap-1 active:scale-95"
                     >
                       <span>Print Again</span>

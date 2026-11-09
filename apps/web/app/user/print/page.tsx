@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Arc } from "@/components/loading-ui/arc";
 import {
   Modal,
   ModalContent,
@@ -74,23 +75,32 @@ interface PricingBreakdown {
 
 /**
  * RealDocumentViewer Component
- * Renders the REAL uploaded PDF (all pages via PDF.js canvas with native iframe fallback)
- * or real uploaded images.
+ * Renders the REAL uploaded PDF (with smart window pre-rendering for pages [page-10..page+10],
+ * instant 0ms cached display, and automatic page-count detection).
  */
 function RealDocumentViewer({
   doc,
   pageIndex,
   colorMode,
   orientation,
+  onTotalPagesDetected,
 }: {
   doc?: UploadedDocumentRecord;
   pageIndex: number;
   colorMode: ColorMode;
   orientation: Orientation;
+  onTotalPagesDetected?: (pages: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [renderError, setRenderError] = useState<boolean>(false);
+
+  // Cached PDF Document & Rendered Page Images
+  const pdfDocRef = useRef<any>(null);
+  const loadedDocKeyRef = useRef<string | null>(null);
+  const pageCacheRef = useRef<Map<number, string>>(new Map());
+  const preRenderingSetRef = useRef<Set<number>>(new Set());
+  const isPreRenderingRef = useRef<boolean>(false);
 
   const docId = doc?.fileId || (doc as any)?.documentId;
   const permanentApiUrl = docId
@@ -105,8 +115,19 @@ function RealDocumentViewer({
     doc?.mimeType?.startsWith("image/") ||
     (doc?.originalFilename && /\.(jpg|jpeg|png|webp|bmp|svg)$/i.test(doc.originalFilename));
 
+  const currentDocKey = `${docId || doc?.originalFilename || "doc"}-${orientation}`;
+
+  // Reset cache if document or orientation changes
   useEffect(() => {
-    // If no document URL is available at all
+    if (loadedDocKeyRef.current !== currentDocKey) {
+      pageCacheRef.current.clear();
+      preRenderingSetRef.current.clear();
+      pdfDocRef.current = null;
+      loadedDocKeyRef.current = currentDocKey;
+    }
+  }, [currentDocKey]);
+
+  useEffect(() => {
     if (!doc?.blobUrl && !permanentApiUrl && !doc?.previewUrl) {
       setLoading(false);
       return;
@@ -118,13 +139,88 @@ function RealDocumentViewer({
       return;
     }
 
-    setLoading(true);
-    setRenderError(false);
     let cancelled = false;
 
+    // Helper: Draw cached image dataUrl to canvas
+    const drawCachedToCanvas = (dataUrl: string) => {
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0);
+        setLoading(false);
+      };
+      img.src = dataUrl;
+    };
+
+    // Pre-render window [centerPage - 10, centerPage + 10]
+    const startBgPreRendering = async (pdf: any, centerPage: number, total: number) => {
+      if (isPreRenderingRef.current) return;
+      isPreRenderingRef.current = true;
+
+      try {
+        const minPage = Math.max(1, centerPage - 10);
+        const maxPage = Math.min(total, centerPage + 10);
+
+        // Build priority order: closest adjacent pages first (+1, -1, +2, -2...)
+        const pagesToPreRender: number[] = [];
+        for (let offset = 1; offset <= 10; offset++) {
+          const nextP = centerPage + offset;
+          const prevP = centerPage - offset;
+          if (nextP <= maxPage && !pageCacheRef.current.has(nextP) && !preRenderingSetRef.current.has(nextP)) {
+            pagesToPreRender.push(nextP);
+          }
+          if (prevP >= minPage && !pageCacheRef.current.has(prevP) && !preRenderingSetRef.current.has(prevP)) {
+            pagesToPreRender.push(prevP);
+          }
+        }
+
+        for (const pNum of pagesToPreRender) {
+          if (cancelled || loadedDocKeyRef.current !== currentDocKey) break;
+          preRenderingSetRef.current.add(pNum);
+          try {
+            const p = await pdf.getPage(pNum);
+            const unscaledViewport = p.getViewport({ scale: 1.0 });
+            const targetWidth = orientation === "portrait" ? 700 : 950;
+            const scale = targetWidth / unscaledViewport.width;
+            const viewport = p.getViewport({ scale });
+
+            const offCanvas = document.createElement("canvas");
+            offCanvas.width = viewport.width;
+            offCanvas.height = viewport.height;
+            const offCtx = offCanvas.getContext("2d");
+            if (offCtx) {
+              await p.render({ canvasContext: offCtx, viewport }).promise;
+              pageCacheRef.current.set(pNum, offCanvas.toDataURL("image/jpeg", 0.85));
+            }
+          } catch {
+            // Ignore single page pre-render error
+          } finally {
+            preRenderingSetRef.current.delete(pNum);
+          }
+        }
+      } finally {
+        isPreRenderingRef.current = false;
+      }
+    };
+
+    // Fast-path: If the page was already pre-rendered, draw immediately with 0 delay!
+    if (pageCacheRef.current.has(pageIndex)) {
+      drawCachedToCanvas(pageCacheRef.current.get(pageIndex)!);
+      if (pdfDocRef.current) {
+        startBgPreRendering(pdfDocRef.current, pageIndex, pdfDocRef.current.numPages);
+      }
+      return;
+    }
+
+    setLoading(true);
+    setRenderError(false);
+
     const renderPdf = async () => {
-      // Prioritize local in-memory blobUrl (fastest, zero-latency)
-      // If blobUrl fails or does not exist (e.g. reload or across devices), fall back to permanent server preview API
       let loadUrl = doc?.blobUrl || permanentApiUrl || doc?.previewUrl || "";
       if (!loadUrl) {
         if (!cancelled) setLoading(false);
@@ -132,7 +228,7 @@ function RealDocumentViewer({
       }
 
       try {
-        // Load PDF.js from CDN dynamically if not present
+        // Ensure PDF.js is loaded
         if (!(window as any).pdfjsLib) {
           await new Promise<void>((resolve, reject) => {
             const existingScript = document.getElementById("pdfjs-cdn-script");
@@ -165,23 +261,31 @@ function RealDocumentViewer({
         const pdfjsLib = (window as any).pdfjsLib;
         if (!pdfjsLib) throw new Error("PDF.js unavailable");
 
-        let pdf;
-        try {
-          const loadingTask = pdfjsLib.getDocument(loadUrl);
-          pdf = await loadingTask.promise;
-        } catch (firstErr) {
-          // If in-memory blob URL was revoked (after page reload), fall back to permanent server preview API without loop
-          if (permanentApiUrl && loadUrl !== permanentApiUrl) {
-            console.warn("Initial PDF source unavailable, falling back to permanent server preview:", permanentApiUrl);
-            loadUrl = permanentApiUrl;
-            const retryTask = pdfjsLib.getDocument(permanentApiUrl);
-            pdf = await retryTask.promise;
-          } else {
-            throw firstErr;
+        let pdf = pdfDocRef.current;
+        if (!pdf) {
+          try {
+            const loadingTask = pdfjsLib.getDocument(loadUrl);
+            pdf = await loadingTask.promise;
+            pdfDocRef.current = pdf;
+          } catch (firstErr) {
+            if (permanentApiUrl && loadUrl !== permanentApiUrl) {
+              console.warn("Initial PDF source unavailable, falling back to permanent server preview:", permanentApiUrl);
+              loadUrl = permanentApiUrl;
+              const retryTask = pdfjsLib.getDocument(permanentApiUrl);
+              pdf = await retryTask.promise;
+              pdfDocRef.current = pdf;
+            } else {
+              throw firstErr;
+            }
           }
         }
 
         if (cancelled) return;
+
+        // Immediately communicate actual PDF page count to unlock all pages
+        if (pdf?.numPages && pdf.numPages > 0) {
+          onTotalPagesDetected?.(pdf.numPages);
+        }
 
         const safePageNum = Math.min(Math.max(1, pageIndex), pdf.numPages);
         const page = await pdf.getPage(safePageNum);
@@ -207,7 +311,10 @@ function RealDocumentViewer({
         }).promise;
 
         if (!cancelled) {
+          pageCacheRef.current.set(safePageNum, canvas.toDataURL("image/jpeg", 0.85));
           setLoading(false);
+          // Pre-render surrounding 10 pages ahead and behind
+          startBgPreRendering(pdf, safePageNum, pdf.numPages);
         }
       } catch (err) {
         console.warn("PDF render failed, falling back to frame:", err);
@@ -223,7 +330,7 @@ function RealDocumentViewer({
     return () => {
       cancelled = true;
     };
-  }, [docId, doc?.blobUrl, permanentApiUrl, pageIndex, orientation, isImage]);
+  }, [docId, doc?.blobUrl, permanentApiUrl, pageIndex, orientation, isImage, currentDocKey]);
 
   if (isImage) {
     const imgSrc = doc?.blobUrl || permanentApiUrl || doc?.previewUrl;
@@ -253,12 +360,11 @@ function RealDocumentViewer({
 
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-white overflow-hidden">
-      {loading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20 space-y-2">
-          <RotateCw className="w-6 h-6 animate-spin text-[#0c831f]" />
-          <span className="text-[11px] font-semibold text-neutral-600">
-            Rendering Page {pageIndex}...
-          </span>
+      {/* Subtle non-blocking indicator only when a non-cached page is being prepared */}
+      {loading && !pageCacheRef.current.has(pageIndex) && (
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-xs border border-neutral-200/60 shadow-2xs">
+          <Arc className="size-3 text-[#0c831f]" />
+          <span className="text-[10px] font-semibold text-neutral-600">Page {pageIndex}</span>
         </div>
       )}
 
@@ -278,7 +384,7 @@ function RealDocumentViewer({
       ) : (
         <canvas
           ref={canvasRef}
-          className="max-w-full max-h-full object-contain shadow-2xs"
+          className="max-w-full max-h-full object-contain shadow-2xs transition-opacity duration-150"
         />
       )}
     </div>
@@ -502,6 +608,25 @@ function UserPrintContent() {
     }
   };
 
+  // Real-time synchronization of true page counts detected from viewer
+  const handleTotalPagesDetected = useCallback(
+    (detectedPages: number) => {
+      if (!detectedPages || detectedPages < 1) return;
+      setDocuments((prevDocs) => {
+        if (!prevDocs[previewDocIndex]) return prevDocs;
+        if (prevDocs[previewDocIndex].pageCount === detectedPages) return prevDocs;
+        const updated = [...prevDocs];
+        updated[previewDocIndex] = {
+          ...updated[previewDocIndex],
+          pageCount: detectedPages,
+        };
+        saveDraft(updated);
+        return updated;
+      });
+    },
+    [previewDocIndex, activeDraftId, user?.uid, colorMode, orientation, copies, pageRangeType, customRange]
+  );
+
   // Sync draft options automatically when configurations change in studio
   useEffect(() => {
     if (documents.length > 0 && activeDraftId) {
@@ -532,6 +657,41 @@ function UserPrintContent() {
           throw new Error(`"${file.name}" exceeds the 20MB maximum limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please select a file under 20MB.`);
         }
 
+        // Accurate client-side PDF page count detection
+        let estPages = 1;
+        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+          try {
+            const pdfjsLib = (window as any).pdfjsLib;
+            if (pdfjsLib) {
+              const arrayBuffer = await file.slice(0, Math.min(file.size, 15 * 1024 * 1024)).arrayBuffer();
+              const p = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              if (p?.numPages > 0) {
+                estPages = p.numPages;
+              }
+            }
+          } catch {
+            // Ignore error
+          }
+
+          if (estPages <= 1) {
+            try {
+              const slice = await file.slice(0, 200000).arrayBuffer();
+              const text = new TextDecoder("latin1").decode(slice);
+              const matches = text.match(/\/Type\s*\/Page[^s]/g);
+              if (matches && matches.length > 0) {
+                estPages = matches.length;
+              } else {
+                const countMatch = text.match(/\/Count\s+(\d+)/);
+                if (countMatch && countMatch[1]) {
+                  estPages = parseInt(countMatch[1], 10);
+                }
+              }
+            } catch {
+              estPages = 1;
+            }
+          }
+        }
+
         let uploadedDoc: any = null;
 
         // Fast-path for files > 4MB: direct upload to Telegram vault
@@ -560,26 +720,6 @@ function UserPrintContent() {
           }
 
           const tgDoc = tgData.result.document;
-
-          // Estimate page count for PDF client-side
-          let estPages = 1;
-          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-            try {
-              const slice = await file.slice(0, 100000).arrayBuffer();
-              const text = new TextDecoder("latin1").decode(slice);
-              const matches = text.match(/\/Type\s*\/Page[^s]/g);
-              if (matches && matches.length > 0) {
-                estPages = matches.length;
-              } else {
-                const countMatch = text.match(/\/Count\s+(\d+)/);
-                if (countMatch && countMatch[1]) {
-                  estPages = parseInt(countMatch[1], 10);
-                }
-              }
-            } catch {
-              estPages = 1;
-            }
-          }
 
           const metaRes = await fetch("/api/upload", {
             method: "POST",
@@ -640,6 +780,7 @@ function UserPrintContent() {
 
         newDocs.push({
           ...uploadedDoc,
+          pageCount: Math.max(uploadedDoc.pageCount || 1, estPages),
           fileId: docId,
           blobUrl,
           previewUrl: permanentPreview,
@@ -1279,7 +1420,7 @@ function UserPrintContent() {
 
                     {/* Responsive Simulated Sheet with Minimal 3D Page Turn & Slide Transition */}
                     <div
-                      key={`${previewDocIndex}-${previewPageIndex}`}
+                      key={`preview-doc-${previewDocIndex}`}
                       style={{
                         filter: colorMode === "bw" ? "grayscale(100%) contrast(105%)" : "none",
                         transform:
@@ -1307,6 +1448,7 @@ function UserPrintContent() {
                         pageIndex={previewPageIndex}
                         colorMode={colorMode}
                         orientation={orientation}
+                        onTotalPagesDetected={handleTotalPagesDetected}
                       />
                     </div>
 
@@ -1667,7 +1809,7 @@ function UserPrintContent() {
                   setAppliedOffer("");
                   setStep("upload");
                   if (typeof window !== "undefined") {
-                    window.history.replaceState({}, "", "/user/print?new=1");
+                    window.history.replaceState({}, "", "/user/print");
                   }
                 }}
                 className="w-full sm:flex-1 h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 active:scale-98 text-neutral-800 text-xs sm:text-[13px] font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"

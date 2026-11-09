@@ -164,7 +164,8 @@ export default function HomePage() {
                 </li>
               </ul>
               <Link
-                href="/user/print?new=1"
+                href="/user/print"
+                prefetch={true}
                 className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
               >
                 Upload Files
@@ -569,7 +570,8 @@ export default function HomePage() {
               {/* Footer */}
               <div className="p-3 px-4 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between text-xs">
                 <Link
-                  href="/user/print?new=1"
+                  href="/user/print"
+                  prefetch={true}
                   className="text-[#0c831f] hover:text-[#0a6e1a] font-bold flex items-center gap-1.5 py-1 transition-colors"
                 >
                   <Plus className="w-4 h-4" />

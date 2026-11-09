@@ -35,17 +35,65 @@ export function VendingQrView({
     subtitle?.trim() || "Scan the QR code to upload your documents & print instantly.";
 
   /* ══════════════════════════════════════════════════════════════════════
+     HOMEPAGE BACKGROUND TEXTURE & AURA (Inside Vending QR Ad Container)
+     Features subtle banknote security contour lines & golden glow
+     ══════════════════════════════════════════════════════════════════════ */
+  const HomepageBackgroundAura = () => (
+    <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+      {/* Soft Golden Top Radial Glow */}
+      <div className="absolute top-0 inset-x-0 h-44 bg-gradient-to-b from-[#fde047]/30 via-[#fef08a]/10 to-transparent" />
+      
+      {/* Left Delicate Contour Waves */}
+      <svg
+        className="absolute -top-4 -left-10 w-64 h-72 opacity-25 text-[#d9b44a] pointer-events-none"
+        viewBox="0 0 320 380"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {Array.from({ length: 14 }).map((_, i) => (
+          <path
+            key={`left-arc-${i}`}
+            d={`M -20 ${20 + i * 20} C 120 ${10 + i * 20}, 210 ${90 + i * 20}, 260 ${240 + i * 20}`}
+            stroke="currentColor"
+            strokeWidth="0.8"
+            strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+          />
+        ))}
+      </svg>
+
+      {/* Right Delicate Contour Waves */}
+      <svg
+        className="absolute -top-4 -right-10 w-64 h-72 opacity-25 text-[#d9b44a] pointer-events-none"
+        viewBox="0 0 320 380"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {Array.from({ length: 14 }).map((_, i) => (
+          <path
+            key={`right-arc-${i}`}
+            d={`M 340 ${20 + i * 20} C 200 ${10 + i * 20}, 110 ${90 + i * 20}, 60 ${240 + i * 20}`}
+            stroke="currentColor"
+            strokeWidth="0.8"
+            strokeDasharray={i % 3 === 0 ? "3 3" : undefined}
+          />
+        ))}
+      </svg>
+    </div>
+  );
+
+  /* ══════════════════════════════════════════════════════════════════════
      PORTRAIT LAYOUT (9:16, 9:14, 3:4)
-     - Self-service kiosk pill removed
+     - Clean homepage background with Guilloche waves
      - Price boxes have reduced corner radius (rounded-[6px])
      - QR box has NO radius (rounded-none)
-     - Clean warm background matching homepage
      ══════════════════════════════════════════════════════════════════════ */
   if (isPortrait) {
     return (
-      <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex flex-col justify-between overflow-hidden select-none font-sans">
-        {/* Header (No pill) */}
-        <div className="flex flex-col items-center text-center gap-1.5 pt-1">
+      <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex flex-col justify-between overflow-hidden select-none font-sans relative">
+        <HomepageBackgroundAura />
+
+        {/* Header */}
+        <div className="flex flex-col items-center text-center gap-1.5 pt-1 relative z-10">
           <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight leading-snug">
             {displayTitle}
           </h2>
@@ -55,7 +103,7 @@ export function VendingQrView({
         </div>
 
         {/* QR Code Card (NO RADIUS: rounded-none) */}
-        <div className="flex flex-col items-center gap-2 my-auto py-1">
+        <div className="flex flex-col items-center gap-2 my-auto py-1 relative z-10">
           <div className="p-3 bg-white rounded-none shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center border-0">
             <img
               src={qrImageUrl}
@@ -74,7 +122,7 @@ export function VendingQrView({
         </div>
 
         {/* Dynamic Pricing Cards (Reduced corner radius: rounded-[6px]) */}
-        <div className="space-y-2 pb-1">
+        <div className="space-y-2 pb-1 relative z-10">
           <div className="grid grid-cols-2 gap-2 w-full max-w-[280px] mx-auto">
             {/* B&W Card */}
             <div className="bg-white rounded-[6px] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center text-center border-0">
@@ -118,15 +166,16 @@ export function VendingQrView({
 
   /* ══════════════════════════════════════════════════════════════════════
      LANDSCAPE LAYOUT (16:9, 4:3, custom)
-     - Self-service kiosk pill removed
+     - Clean homepage background with Guilloche waves
      - Price boxes have reduced corner radius (rounded-[6px])
      - QR box has NO radius (rounded-none)
-     - Clean warm background matching homepage
      ══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex items-center justify-between gap-4 overflow-hidden select-none font-sans">
+    <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex items-center justify-between gap-4 overflow-hidden select-none font-sans relative">
+      <HomepageBackgroundAura />
+
       {/* LEFT COLUMN: Info, Pricing Cards, Steps */}
-      <div className="flex-1 flex flex-col justify-between h-full py-0.5 min-w-0">
+      <div className="flex-1 flex flex-col justify-between h-full py-0.5 min-w-0 relative z-10">
         <div className="space-y-1">
           <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1c1c1c] tracking-tight leading-snug">
             {displayTitle}
@@ -182,7 +231,7 @@ export function VendingQrView({
       </div>
 
       {/* RIGHT COLUMN: QR Code Card (NO RADIUS: rounded-none) */}
-      <div className="shrink-0 flex flex-col items-center justify-center gap-1.5 pl-1">
+      <div className="shrink-0 flex flex-col items-center justify-center gap-1.5 pl-1 relative z-10">
         <div className="p-3 bg-white rounded-none shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center border-0">
           <img
             src={qrImageUrl}

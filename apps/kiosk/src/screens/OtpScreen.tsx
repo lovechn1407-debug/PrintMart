@@ -9,6 +9,11 @@ import {
   RotateCw,
   Volume2,
   VolumeX,
+  Bell,
+  Info,
+  CheckCircle2,
+  Wrench,
+  Sparkles,
 } from "lucide-react";
 import { KioskNavbar } from "../components/KioskNavbar";
 import { VendingQrView } from "../components/VendingQrView";
@@ -36,6 +41,16 @@ interface AdConfig {
   targetUrl?: string;
 }
 
+interface RemoteKioskPopup {
+  enabled: boolean;
+  targetArea: "otp" | "ad" | "both";
+  icon: "alert" | "info" | "check" | "bell" | "sparkles" | "wrench";
+  title: string;
+  description: string;
+  buttonText?: string;
+  updatedAt: number;
+}
+
 export function OtpScreen({
   machineId,
   machineName,
@@ -49,6 +64,10 @@ export function OtpScreen({
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // Broadcast Remote Notice Popup State
+  const [remotePopup, setRemotePopup] = useState<RemoteKioskPopup | null>(null);
+  const [dismissedRemotePopupAt, setDismissedRemotePopupAt] = useState<number | null>(null);
 
   // Staff Authorization Modal State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState<boolean>(false);
@@ -110,6 +129,33 @@ export function OtpScreen({
     });
     return () => unsubPricing();
   }, []);
+
+  // Listen to remote broadcast notice popup from Firebase RTDB
+  useEffect(() => {
+    const globalPopupRef = ref(database, "systemSettings/kioskNoticePopup");
+    const machinePopupRef = ref(database, `machines/${machineId}/noticePopup`);
+
+    const unsubGlobal = onValue(globalPopupRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val() as RemoteKioskPopup;
+        setRemotePopup(val);
+      } else {
+        setRemotePopup(null);
+      }
+    });
+
+    const unsubMachine = onValue(machinePopupRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val() as RemoteKioskPopup;
+        setRemotePopup(val);
+      }
+    });
+
+    return () => {
+      unsubGlobal();
+      unsubMachine();
+    };
+  }, [machineId]);
 
   // Slides rotator
   useEffect(() => {
@@ -280,11 +326,73 @@ export function OtpScreen({
     return "h-auto md:h-[480px] lg:h-[510px] xl:h-[530px] max-h-[calc(100vh-6.5rem)]";
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
-      {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
-      <GuillocheAura />
+  // Remote Notice Popup active state
+  const isRemotePopupActive =
+    Boolean(remotePopup?.enabled) &&
+    Boolean(remotePopup?.updatedAt) &&
+    remotePopup!.updatedAt > (dismissedRemotePopupAt || 0);
 
+  // Render Notice Popup with targeted blur and customized icons
+  const renderPopupModal = () => {
+    if (!isRemotePopupActive || !remotePopup) return null;
+
+    const iconType = remotePopup.icon || "alert";
+    let IconComp = AlertCircle;
+    let iconClass = "text-rose-600 bg-rose-50";
+
+    if (iconType === "info") {
+      IconComp = Info;
+      iconClass = "text-blue-600 bg-blue-50";
+    } else if (iconType === "check") {
+      IconComp = CheckCircle2;
+      iconClass = "text-[#0c831f] bg-emerald-50";
+    } else if (iconType === "bell") {
+      IconComp = Bell;
+      iconClass = "text-amber-600 bg-amber-50";
+    } else if (iconType === "sparkles") {
+      IconComp = Sparkles;
+      iconClass = "text-purple-600 bg-purple-50";
+    } else if (iconType === "wrench") {
+      IconComp = Wrench;
+      iconClass = "text-amber-700 bg-amber-50";
+    }
+
+    return (
+      <div
+        className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none"
+        onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+      >
+        <div
+          className="bg-white rounded-[14px] p-5 sm:p-6 max-w-[280px] sm:max-w-[320px] w-full shadow-2xl border-0 space-y-3 text-center animate-in zoom-in-95"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto shadow-xs border-0 ${iconClass}`}>
+            <IconComp className="w-6 h-6" />
+          </div>
+
+          <div className="space-y-1">
+            <h4 className="font-bold text-sm sm:text-base text-neutral-900 leading-snug">
+              {remotePopup.title || "Notification"}
+            </h4>
+            <p className="text-[11px] sm:text-xs text-neutral-600 leading-relaxed font-normal">
+              {remotePopup.description}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+            className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[8px] transition-all border-0 cursor-pointer shadow-xs"
+          >
+            {remotePopup.buttonText || "Okay, Got It"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
       {/* ── Signature Navbar with iPhone Notch ── */}
       <KioskNavbar
         machineName={machineName}
@@ -525,6 +633,9 @@ export function OtpScreen({
                   </div>
                 </div>
               )}
+
+              {/* ── REMOTE NOTICE POPUP (Covering OTP Area) ── */}
+              {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupModal()}
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
@@ -603,15 +714,21 @@ export function OtpScreen({
                     </span>
                   </div>
                 )}
+
+                {/* ── REMOTE NOTICE POPUP (Covering Ad Area) ── */}
+                {isRemotePopupActive && remotePopup?.targetArea === "ad" && renderPopupModal()}
               </div>
             </div>
+
+            {/* ── REMOTE NOTICE POPUP (Covering Both Areas / Entire Card) ── */}
+            {isRemotePopupActive && remotePopup?.targetArea === "both" && renderPopupModal()}
           </div>
         ) : (
           /* ══════════════════════════════════════════════════════════════════════
              CENTERED CARD: No Ad configured or Ads disabled in Admin.
              Single outer card strictly in 3:4 portrait (aspect-[3/4])
              ══════════════════════════════════════════════════════════════════════ */
-          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-6.5rem)] aspect-[3/4] mx-auto bg-white rounded-tl-none rounded-bl-none rounded-tr-[14px] rounded-br-[14px] sm:rounded-tr-[16px] sm:rounded-br-[16px] p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
+          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-6.5rem)] aspect-[3/4] mx-auto bg-white rounded-[18px] sm:rounded-[22px] p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
             {/* Brand Logo */}
             <div className="flex flex-col items-center pt-0.5">
               <img
@@ -822,6 +939,9 @@ export function OtpScreen({
                 </div>
               </div>
             )}
+
+            {/* ── REMOTE NOTICE POPUP (Covering Centered Card) ── */}
+            {isRemotePopupActive && renderPopupModal()}
           </div>
         )}
       </main>

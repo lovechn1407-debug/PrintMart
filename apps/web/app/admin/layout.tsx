@@ -21,6 +21,7 @@ import {
   Settings,
   ArrowLeft,
   ShieldCheck,
+  Tv,
 } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
@@ -28,6 +29,7 @@ import { useAuth } from "@/lib/authContext";
 const navItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Vending Machines", href: "/admin/machines", icon: Printer },
+  { label: "Kiosk Ads & Media", href: "/admin/ads", icon: Tv },
   { label: "Pricing Management", href: "/admin/pricing", icon: Coins },
   { label: "Offers & Referrals", href: "/admin/offers", icon: TicketPercent },
   { label: "Users & Accounts", href: "/admin/users", icon: Users },

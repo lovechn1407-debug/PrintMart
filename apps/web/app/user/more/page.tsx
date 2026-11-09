@@ -230,12 +230,12 @@ export default function MorePage() {
   // Active Bottom Sheet Modal
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
-  // Dedicated Help & Support Window (Requirement 7)
+  // Dedicated Help & Support Window
   const [isHelpWindowOpen, setIsHelpWindowOpen] = useState<boolean>(false);
   const [showActiveTicketsList, setShowActiveTicketsList] = useState<boolean>(false);
   const [ticketSuccessSnackbar, setTicketSuccessSnackbar] = useState<string | null>(null);
 
-  // In-App Error Notification Popup (Requirement 10)
+  // In-App Error Notification Popup
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Profile Edit State
@@ -262,7 +262,7 @@ export default function MorePage() {
   const [userTickets, setUserTickets] = useState<SupportTicket[]>([]);
   const ticketFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Back Navigation with Smooth Exit Swipe
+  // Back Navigation with Smooth Exit
   const handleGoBack = () => {
     setIsExiting(true);
     setTimeout(() => {
@@ -276,6 +276,20 @@ export default function MorePage() {
     window.addEventListener("more-page-exit", handleExit);
     return () => window.removeEventListener("more-page-exit", handleExit);
   }, []);
+
+  // Prevent background scrolling when any modal, ticket window, or popup is open
+  useEffect(() => {
+    if (activeModal || isHelpWindowOpen || selectedTx || errorMessage) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [activeModal, isHelpWindowOpen, selectedTx, errorMessage]);
 
   // Sync profile display name
   useEffect(() => {
@@ -422,15 +436,15 @@ export default function MorePage() {
 
   return (
     <div
-      className={`min-h-screen bg-[#f3f4f7] text-neutral-900 pb-28 select-none overflow-x-hidden ${
+      className={`min-h-screen w-full max-w-full bg-[#f3f4f7] text-neutral-900 pb-28 select-none overflow-x-hidden ${
         isExiting ? "animate-screen-slide-out" : "animate-screen-slide-in"
       }`}
     >
       {/* ─────────────────────────────────────────────────────────────
           1. BLINKIT-STYLE TOP GOLDEN GRADIENT HERO BANNER
           ───────────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] pt-3 pb-6 px-4">
-        {/* Back Button (Requirement 1: No border) */}
+      <div className="bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] pt-3 pb-6 px-4 w-full overflow-hidden">
+        {/* Back Button */}
         <div className="max-w-md mx-auto flex items-center justify-between mb-2">
           <button
             type="button"
@@ -442,7 +456,7 @@ export default function MorePage() {
           </button>
         </div>
 
-        {/* Profile Avatar & Centered Name (Requirement 5 & 6) */}
+        {/* Profile Avatar & Centered Name */}
         <div className="max-w-md mx-auto flex flex-col items-center text-center">
           {/* Avatar with Camera badge */}
           <div className="relative group">
@@ -479,43 +493,44 @@ export default function MorePage() {
             />
           </div>
 
-          {/* Profile Name & Centered Inline Edit (Requirement 5 & 6) */}
+          {/* Profile Name & Centered Inline Edit (No overflow outside viewport) */}
           <div className="mt-3 w-full flex flex-col items-center">
             {isEditingName ? (
-              <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <div className="flex items-center justify-center gap-1.5 mt-0.5 max-w-full px-2">
                 <input
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  className="h-8 px-2.5 text-sm font-semibold bg-white border-0 shadow-xs rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#0c831f]"
+                  className="h-8 px-2.5 text-sm font-semibold bg-white border-0 shadow-xs rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#0c831f] max-w-[200px]"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={handleSaveName}
                   disabled={savingProfile}
-                  className="h-8 px-2.5 bg-[#0c831f] text-white text-xs font-bold rounded-lg cursor-pointer"
+                  className="h-8 px-2.5 bg-[#0c831f] text-white text-xs font-bold rounded-lg cursor-pointer shrink-0"
                 >
                   <Check className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsEditingName(false)}
-                  className="h-8 px-2 text-xs text-neutral-500 hover:text-neutral-800"
+                  className="h-8 px-2 text-xs text-neutral-500 hover:text-neutral-800 shrink-0"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="relative inline-flex items-center justify-center">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight text-center">
+              <div className="flex items-center justify-center gap-1.5 max-w-full px-2">
+                <span className="w-5 h-5 invisible shrink-0" aria-hidden="true" />
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight text-center truncate max-w-[260px]">
                   {displayName}
                 </h1>
                 <button
                   type="button"
                   onClick={() => setIsEditingName(true)}
                   title="Edit Name"
-                  className="absolute -right-7 p-1 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                  className="w-5 h-5 flex items-center justify-center text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer shrink-0"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
@@ -532,7 +547,7 @@ export default function MorePage() {
           2. MAIN BODY (BLINKIT 3-CARD ROW + GROUPED LISTS)
           ───────────────────────────────────────────────────────────── */}
       <main className="max-w-md mx-auto px-3.5 -mt-2 space-y-4">
-        {/* 3 Quick Action Cards Row (Requirement 4: reduced radius, no borders, no bg on icons) */}
+        {/* 3 Quick Action Cards Row */}
         <div className="grid grid-cols-3 gap-2.5">
           {/* Card 1: Your orders */}
           <Link
@@ -559,7 +574,7 @@ export default function MorePage() {
             </span>
           </button>
 
-          {/* Card 3: Need help? (Requirement 7: Opens dedicated new window) */}
+          {/* Card 3: Need help? */}
           <button
             type="button"
             onClick={() => setIsHelpWindowOpen(true)}
@@ -573,14 +588,14 @@ export default function MorePage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 1: YOUR INFORMATION (Requirement 1, 2, 3)
+            GROUP 1: YOUR INFORMATION
             ───────────────────────────────────────────────────────────── */}
         <div className="space-y-1.5">
           <h2 className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight px-1">
             Your information
           </h2>
           <div className="bg-white rounded-2xl border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-neutral-100">
-            {/* Help & Support (Opens dedicated new window) */}
+            {/* Help & Support */}
             <button
               type="button"
               onClick={() => setIsHelpWindowOpen(true)}
@@ -668,7 +683,7 @@ export default function MorePage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 2: LEGAL AND POLICIES (Requirement 1, 2, 3)
+            GROUP 2: LEGAL AND POLICIES
             ───────────────────────────────────────────────────────────── */}
         <div className="space-y-1.5">
           <h2 className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight px-1">
@@ -705,7 +720,7 @@ export default function MorePage() {
               <ChevronRight className="w-4 h-4 text-neutral-400" />
             </button>
 
-            {/* Refund Policy */}
+            {/* Refund Policy (Requirement 3: GUARANTEE pill removed) */}
             <button
               type="button"
               onClick={() => setActiveModal("refund")}
@@ -722,12 +737,7 @@ export default function MorePage() {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                  GUARANTEE
-                </span>
-                <ChevronRight className="w-4 h-4 text-neutral-400" />
-              </div>
+              <ChevronRight className="w-4 h-4 text-neutral-400" />
             </button>
 
             {/* Return Policy */}
@@ -763,7 +773,7 @@ export default function MorePage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 3: ACCOUNT ACTIONS (Requirement 11: reduced radius, black, no border)
+            GROUP 3: ACCOUNT ACTIONS
             ───────────────────────────────────────────────────────────── */}
         <div className="pt-2">
           {user ? (
@@ -788,14 +798,12 @@ export default function MorePage() {
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          REQUIREMENT 7: DEDICATED HELP & SUPPORT FULL WINDOW
-          (Not a swipe popup! Has dropdown, borderless green snackbar,
-          and green active ticket button)
+          HELP & SUPPORT FULL WINDOW
           ───────────────────────────────────────────────────────────── */}
       {isHelpWindowOpen && (
-        <div className="fixed inset-0 z-50 bg-[#f3f4f7] overflow-y-auto animate-in slide-in-from-right duration-200 flex flex-col pb-12">
+        <div className="fixed inset-0 z-50 bg-[#f3f4f7] overflow-y-auto overscroll-contain animate-in slide-in-from-right duration-200 flex flex-col pb-12">
           {/* Header */}
-          <header className="sticky top-0 z-30 bg-white border-0 shadow-2xs px-4 h-14 flex items-center justify-between">
+          <header className="sticky top-0 z-30 bg-white border-0 shadow-2xs px-4 h-14 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -826,7 +834,7 @@ export default function MorePage() {
 
           {/* Body Content */}
           <div className="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
-            {/* Green Button of My Active Tickets (Homepage style) */}
+            {/* Green Button of My Active Tickets */}
             <button
               type="button"
               onClick={() => setShowActiveTicketsList((prev) => !prev)}
@@ -889,7 +897,7 @@ export default function MorePage() {
               </div>
 
               <form onSubmit={handleRaiseTicket} className="space-y-4">
-                {/* Requirement 7: Common problem shown in DROPDOWN */}
+                {/* Common Problem Dropdown */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-neutral-700 block">
                     Common Problem <span className="text-rose-500">*</span>
@@ -1003,7 +1011,7 @@ export default function MorePage() {
             </div>
           </div>
 
-          {/* Requirement 7: Green Snackbar with No Border */}
+          {/* Green Snackbar with No Border */}
           {ticketSuccessSnackbar && (
             <div className="fixed bottom-6 inset-x-4 max-w-md mx-auto z-60 animate-in slide-in-from-bottom duration-200">
               <div className="bg-[#0c831f] text-white p-4 rounded-2xl shadow-xl flex items-center justify-between gap-3 border-0">
@@ -1030,17 +1038,29 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          REQUIREMENT 9: MY TRANSACTIONS (BOTTOM SHEET)
-          - No list boxes, just simple line separators (divide-y)
-          - Remove PAID pill
-          - Show amount in red with - (or green with + if refund)
-          - Remove OTP info
+          SWIPE POPUP 1: MY TRANSACTIONS (BOTTOM SHEET)
+          (Scroll locked, touch-pan isolated, no background bleeding)
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "transactions" && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 overscroll-none touch-none animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveModal(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Pill */}
+            <div className="w-12 h-1 rounded-full bg-neutral-300 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
+
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60 shrink-0">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-[#0c831f]" />
                 <h3 className="font-bold text-sm sm:text-base text-neutral-900">
@@ -1056,8 +1076,12 @@ export default function MorePage() {
               </button>
             </div>
 
-            {/* Modal Body: Line separated list (divide-y), no boxes */}
-            <div className="p-4 sm:p-5 overflow-y-auto divide-y divide-neutral-100">
+            {/* Modal Body: Isolated touch scroll */}
+            <div
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y divide-y divide-neutral-100 flex-1"
+              style={{ WebkitOverflowScrolling: "touch" }}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {txLoading ? (
                 <div className="py-12 text-center text-xs text-neutral-400">Loading orders...</div>
               ) : !user ? (
@@ -1095,7 +1119,6 @@ export default function MorePage() {
                         <div className="text-xs font-semibold text-neutral-900 truncate">
                           {tx.documentName || "Document.pdf"}
                         </div>
-                        {/* Requirement 9: OTP removed, clean date and page info */}
                         <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 mt-0.5">
                           <span>
                             {new Date(tx.createdAt).toLocaleDateString([], {
@@ -1111,7 +1134,6 @@ export default function MorePage() {
                         </div>
                       </div>
 
-                      {/* Requirement 9: Amount in red (-) or green (+) with View Receipt button */}
                       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
                         <span
                           className={`text-sm font-bold ${
@@ -1138,14 +1160,28 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          REQUIREMENT 8: CONTACT SUPPORT (BOTTOM SHEET)
-          - Remove borders from list boxes
+          SWIPE POPUP 2: CONTACT SUPPORT (BOTTOM SHEET)
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "contact" && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 overscroll-none touch-none animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveModal(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Pill */}
+            <div className="w-12 h-1 rounded-full bg-neutral-300 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
+
             {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60 shrink-0">
               <div className="flex items-center gap-2">
                 <PhoneCall className="w-5 h-5 text-emerald-700" />
                 <h3 className="font-bold text-sm sm:text-base text-neutral-900">
@@ -1161,8 +1197,12 @@ export default function MorePage() {
               </button>
             </div>
 
-            {/* Body (Requirement 8: No borders on list boxes) */}
-            <div className="p-4 sm:p-5 space-y-2.5">
+            {/* Body */}
+            <div
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2.5 flex-1"
+              style={{ WebkitOverflowScrolling: "touch" }}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {/* Mail */}
               <a
                 href="mailto:lovechn1407@gmail.com?subject=PrintMart%20Support%20Request"
@@ -1248,13 +1288,28 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 4: FAQ (BOTTOM SHEET, NO BORDERS)
+          SWIPE POPUP 3: FAQ (BOTTOM SHEET)
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "faq" && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 overscroll-none touch-none animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveModal(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Pill */}
+            <div className="w-12 h-1 rounded-full bg-neutral-300 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
+
             {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60 shrink-0">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-600" />
                 <h3 className="font-bold text-sm sm:text-base text-neutral-900">
@@ -1271,7 +1326,11 @@ export default function MorePage() {
             </div>
 
             {/* Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-2">
+            <div
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2 flex-1"
+              style={{ WebkitOverflowScrolling: "touch" }}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {FAQS_DATA.map((faq, idx) => {
                 const isOpen = openFaqIndex === idx;
                 return (
@@ -1302,17 +1361,32 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 5: POLICIES VIEWER (BOTTOM SHEET, NO BORDERS)
+          SWIPE POPUP 4: POLICIES VIEWER (BOTTOM SHEET)
           ───────────────────────────────────────────────────────────── */}
       {(activeModal === "terms" ||
         activeModal === "privacy" ||
         activeModal === "refund" ||
         activeModal === "return" ||
         activeModal === "disclaimer") && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 overscroll-none touch-none animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveModal(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Pill */}
+            <div className="w-12 h-1 rounded-full bg-neutral-300 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
+
             {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60 shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-neutral-800" />
                 <h3 className="font-bold text-sm sm:text-base text-neutral-900">
@@ -1329,7 +1403,11 @@ export default function MorePage() {
             </div>
 
             {/* Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5">
+            <div
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-3.5 flex-1"
+              style={{ WebkitOverflowScrolling: "touch" }}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-700 inline-block">
                 {POLICIES_DATA[activeModal].badge}
               </span>
@@ -1347,11 +1425,23 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 6: ITEMIZED RECEIPT (POPUP, NO BORDERS)
+          ITEMIZED RECEIPT (POPUP)
           ───────────────────────────────────────────────────────────── */}
       {selectedTx && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border-0 shadow-2xl space-y-4 animate-in zoom-in-95">
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overscroll-none touch-none animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedTx(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border-0 shadow-2xl space-y-4 touch-auto overscroll-contain animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-[#0c831f]" />
@@ -1362,7 +1452,7 @@ export default function MorePage() {
                 onClick={() => setSelectedTx(null)}
                 className="text-neutral-400 hover:text-neutral-700 border-0 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -1422,12 +1512,23 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          REQUIREMENT 10: IN-APP ERROR NOTIFICATION POPUP
-          (Replaces browser alert() dialogs with elegant native popup)
+          IN-APP ERROR NOTIFICATION POPUP
           ───────────────────────────────────────────────────────────── */}
       {errorMessage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border-0 space-y-3 animate-in zoom-in-95">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overscroll-none touch-none animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setErrorMessage(null);
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border-0 space-y-3 touch-auto overscroll-contain animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2.5 text-rose-600">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <h4 className="font-bold text-sm text-neutral-900">Notification</h4>

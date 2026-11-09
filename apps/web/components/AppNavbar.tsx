@@ -333,16 +333,11 @@ export function AppNavbar() {
         )}
       </nav>
 
-      {/* Centered Buffer Loading Overlay over current background page using Arc */}
+      {/* Centered Buffer Loading Overlay using Arc with NO background box */}
       {pendingPath && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/15 backdrop-blur-[1.5px] pointer-events-none transition-all duration-150 animate-in fade-in">
-          <div className="bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.18)] border border-neutral-100 flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-150">
-            <div className="text-[#0c831f]">
-              <Arc className="size-14" />
-            </div>
-            <span className="text-xs font-bold text-neutral-800 tracking-tight">
-              Loading...
-            </span>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none transition-all duration-150 animate-in fade-in">
+          <div className="text-[#0c831f] drop-shadow-md">
+            <Arc className="size-14" />
           </div>
         </div>
       )}

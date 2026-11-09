@@ -1,5 +1,5 @@
 import React from "react";
-import { Smartphone, CheckCircle, ChevronRight, FileText, Sparkles } from "lucide-react";
+import { Smartphone } from "lucide-react";
 
 interface GlobalPricingData {
   bwPerSidePaise: number;
@@ -36,19 +36,16 @@ export function VendingQrView({
 
   /* ══════════════════════════════════════════════════════════════════════
      PORTRAIT LAYOUT (9:16, 9:14, 3:4)
-     Matches PrintMart User Homepage style: Clean warm background, 
-     soft white cards, no borders, Poppins typography, official green accents.
+     - Self-service kiosk pill removed
+     - Price boxes have reduced corner radius (rounded-[6px])
+     - QR box has NO radius (rounded-none)
+     - Clean warm background matching homepage
      ══════════════════════════════════════════════════════════════════════ */
   if (isPortrait) {
     return (
       <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex flex-col justify-between overflow-hidden select-none font-sans">
-        {/* Header */}
+        {/* Header (No pill) */}
         <div className="flex flex-col items-center text-center gap-1.5 pt-1">
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#e8f5e9] text-[#0c831f] text-[11px] font-semibold tracking-normal">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f]" />
-            <span>Self-Service Kiosk</span>
-          </div>
-
           <h2 className="text-base sm:text-lg font-bold text-[#1c1c1c] tracking-tight leading-snug">
             {displayTitle}
           </h2>
@@ -57,13 +54,13 @@ export function VendingQrView({
           </p>
         </div>
 
-        {/* QR Code Card (Clean White Box, No Borders, Soft Shadow) */}
+        {/* QR Code Card (NO RADIUS: rounded-none) */}
         <div className="flex flex-col items-center gap-2 my-auto py-1">
-          <div className="p-3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center">
+          <div className="p-3 bg-white rounded-none shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center border-0">
             <img
               src={qrImageUrl}
               alt="Scan QR to Print"
-              className="w-32 h-32 sm:w-36 sm:h-36 object-contain rounded-xl"
+              className="w-32 h-32 sm:w-36 sm:h-36 object-contain rounded-none"
             />
           </div>
 
@@ -76,11 +73,11 @@ export function VendingQrView({
           </span>
         </div>
 
-        {/* Dynamic Pricing Cards (Exact match with Homepage documents card) */}
+        {/* Dynamic Pricing Cards (Reduced corner radius: rounded-[6px]) */}
         <div className="space-y-2 pb-1">
           <div className="grid grid-cols-2 gap-2 w-full max-w-[280px] mx-auto">
             {/* B&W Card */}
-            <div className="bg-white rounded-xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
+            <div className="bg-white rounded-[6px] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center text-center border-0">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide">
                 B&W Print
               </span>
@@ -92,7 +89,7 @@ export function VendingQrView({
             </div>
 
             {/* Color Card */}
-            <div className="bg-white rounded-xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
+            <div className="bg-white rounded-[6px] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center text-center border-0">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide">
                 Color Print
               </span>
@@ -106,11 +103,11 @@ export function VendingQrView({
 
           {/* 3 Steps */}
           <div className="flex items-center justify-center gap-1.5 text-[10px] text-neutral-600 font-medium pt-1">
-            <span className="px-2 py-0.5 rounded-md bg-white shadow-xs">1. Scan</span>
+            <span className="px-2 py-0.5 rounded-[4px] bg-white shadow-xs">1. Scan</span>
             <span>→</span>
-            <span className="px-2 py-0.5 rounded-md bg-white shadow-xs">2. Upload</span>
+            <span className="px-2 py-0.5 rounded-[4px] bg-white shadow-xs">2. Upload</span>
             <span>→</span>
-            <span className="px-2 py-0.5 rounded-md bg-[#0c831f] text-white font-semibold shadow-xs">
+            <span className="px-2 py-0.5 rounded-[4px] bg-[#0c831f] text-white font-semibold shadow-xs">
               3. Enter OTP
             </span>
           </div>
@@ -121,19 +118,16 @@ export function VendingQrView({
 
   /* ══════════════════════════════════════════════════════════════════════
      LANDSCAPE LAYOUT (16:9, 4:3, custom)
-     Two-column clean PrintMart brand layout that comfortably fits inside
-     the 16:9 card without overflowing or clipping.
+     - Self-service kiosk pill removed
+     - Price boxes have reduced corner radius (rounded-[6px])
+     - QR box has NO radius (rounded-none)
+     - Clean warm background matching homepage
      ══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="w-full h-full bg-[#fbf9f3] text-[#1c1c1c] p-4 sm:p-5 flex items-center justify-between gap-4 overflow-hidden select-none font-sans">
       {/* LEFT COLUMN: Info, Pricing Cards, Steps */}
       <div className="flex-1 flex flex-col justify-between h-full py-0.5 min-w-0">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#e8f5e9] text-[#0c831f] text-[11px] font-semibold tracking-normal">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f]" />
-            <span>Self-Service Kiosk</span>
-          </div>
-
           <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1c1c1c] tracking-tight leading-snug">
             {displayTitle}
           </h2>
@@ -142,7 +136,7 @@ export function VendingQrView({
           </p>
         </div>
 
-        {/* Dynamic Pricing Cards */}
+        {/* Dynamic Pricing Cards (Reduced corner radius: rounded-[6px]) */}
         <div className="space-y-1.5 my-auto py-1">
           <div className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">
             Live Print Pricing
@@ -150,7 +144,7 @@ export function VendingQrView({
 
           <div className="grid grid-cols-2 gap-2 max-w-xs">
             {/* B&W Card */}
-            <div className="bg-white rounded-xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col">
+            <div className="bg-white rounded-[6px] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col border-0">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide">
                 Black & White
               </span>
@@ -162,7 +156,7 @@ export function VendingQrView({
             </div>
 
             {/* Color Card */}
-            <div className="bg-white rounded-xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col">
+            <div className="bg-white rounded-[6px] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col border-0">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide">
                 Color Print
               </span>
@@ -177,23 +171,23 @@ export function VendingQrView({
 
         {/* 3 Steps */}
         <div className="flex items-center gap-1.5 text-[10px] text-neutral-600 font-medium pt-1">
-          <span className="px-2 py-0.5 rounded-md bg-white shadow-xs">1. Scan QR</span>
+          <span className="px-2 py-0.5 rounded-[4px] bg-white shadow-xs">1. Scan QR</span>
           <span>→</span>
-          <span className="px-2 py-0.5 rounded-md bg-white shadow-xs">2. Upload Files</span>
+          <span className="px-2 py-0.5 rounded-[4px] bg-white shadow-xs">2. Upload Files</span>
           <span>→</span>
-          <span className="px-2 py-0.5 rounded-md bg-[#0c831f] text-white font-semibold shadow-xs">
+          <span className="px-2 py-0.5 rounded-[4px] bg-[#0c831f] text-white font-semibold shadow-xs">
             3. Enter OTP
           </span>
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Clean White Card with QR Code */}
+      {/* RIGHT COLUMN: QR Code Card (NO RADIUS: rounded-none) */}
       <div className="shrink-0 flex flex-col items-center justify-center gap-1.5 pl-1">
-        <div className="p-3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center">
+        <div className="p-3 bg-white rounded-none shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center border-0">
           <img
             src={qrImageUrl}
             alt="Scan QR to Print"
-            className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 object-contain rounded-xl"
+            className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 object-contain rounded-none"
           />
         </div>
 

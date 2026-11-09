@@ -536,10 +536,6 @@ export default function AdminAdsPage() {
               </span>
               <div className="p-4 bg-[#fbf9f3] rounded-2xl text-[#1c1c1c] flex flex-col sm:flex-row items-center justify-between gap-4 border border-neutral-200 shadow-xs font-sans">
                 <div className="space-y-2 flex-1">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#e8f5e9] text-[#0c831f] text-[11px] font-semibold tracking-normal">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f]" />
-                    <span>Self-Service Kiosk</span>
-                  </div>
                   <h3 className="text-base font-bold text-[#1c1c1c] tracking-tight">
                     {title || "Print from Your Phone"}
                   </h3>
@@ -547,20 +543,20 @@ export default function AdminAdsPage() {
                     {subtitle || "Scan the QR code with your camera, upload your document, and enter the OTP on this screen to dispense."}
                   </p>
                   <div className="flex items-center gap-2 pt-1 text-[11px]">
-                    <span className="px-2.5 py-1 rounded-lg bg-white shadow-xs font-bold text-[#1c1c1c]">
+                    <span className="px-2.5 py-1 rounded-[6px] bg-white shadow-xs font-bold text-[#1c1c1c]">
                       B&W: ₹{((globalPricing.bwPerSidePaise ?? 150) / 100).toFixed(2)}/page
                     </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-white shadow-xs font-bold text-[#0c831f]">
+                    <span className="px-2.5 py-1 rounded-[6px] bg-white shadow-xs font-bold text-[#0c831f]">
                       Color: ₹{((globalPricing.colorPerSidePaise ?? 500) / 100).toFixed(2)}/page
                     </span>
                   </div>
                 </div>
 
-                <div className="shrink-0 flex flex-col items-center gap-1 bg-white p-3 rounded-2xl text-neutral-900 shadow-sm border-0">
+                <div className="shrink-0 flex flex-col items-center gap-1 bg-white p-3 rounded-none text-neutral-900 shadow-sm border-0">
                   {adminQrPreview ? (
-                    <img src={adminQrPreview} alt="QR Preview" className="w-28 h-28 object-contain rounded-xl" />
+                    <img src={adminQrPreview} alt="QR Preview" className="w-28 h-28 object-contain rounded-none" />
                   ) : (
-                    <div className="w-28 h-28 bg-neutral-100 flex items-center justify-center rounded-xl text-[10px] text-neutral-400">
+                    <div className="w-28 h-28 bg-neutral-100 flex items-center justify-center rounded-none text-[10px] text-neutral-400">
                       Generating...
                     </div>
                   )}

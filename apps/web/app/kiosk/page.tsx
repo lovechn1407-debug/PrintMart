@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { database, ref, onValue } from "@/lib/firebase";
 import { VendingQrView } from "./components/VendingQrView";
+import { GuillocheAura } from "./components/GuillocheAura";
+import { ConfigPanelScreen } from "./components/ConfigPanelScreen";
 
 interface AdConfig {
   enabled: boolean;
@@ -27,9 +29,58 @@ interface AdConfig {
 }
 
 export default function OnlineKioskPage() {
-  const machineId = "KM-01";
-  const machineName = "Campus Kiosk #1";
-  const masterCode = "998877";
+  const [machineId, setMachineId] = useState<string>("MCH-CAMPUS-01");
+  const [machineName, setMachineName] = useState<string>("Central Library Kiosk A");
+  const [masterCode, setMasterCode] = useState<string>("998877");
+  const [currentScreen, setCurrentScreen] = useState<"otp" | "config">("otp");
+
+  // Read machine ID / Name from localStorage or URL query params on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlId = params.get("machineId") || params.get("id");
+      const storedId = localStorage.getItem("kiosk_machine_id");
+      const storedName = localStorage.getItem("kiosk_machine_name");
+
+      if (urlId) {
+        setMachineId(urlId);
+      } else if (storedId) {
+        setMachineId(storedId);
+      }
+      if (storedName) {
+        setMachineName(storedName);
+      }
+    }
+  }, []);
+
+  // Listen to remote machine details and master pin in real-time from Firebase RTDB
+  useEffect(() => {
+    if (!machineId) return;
+    const machineRef = ref(database, `machines/${machineId}`);
+    const unsubMachine = onValue(machineRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val.name) {
+          setMachineName(val.name);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kiosk_machine_name", val.name);
+          }
+        }
+      }
+    });
+
+    const masterRef = ref(database, "systemSettings/masterKioskCode");
+    const unsubMaster = onValue(masterRef, (snap) => {
+      if (snap.exists() && snap.val()) {
+        setMasterCode(String(snap.val()).trim());
+      }
+    });
+
+    return () => {
+      unsubMachine();
+      unsubMaster();
+    };
+  }, [machineId]);
 
   const [digits, setDigits] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -224,7 +275,7 @@ export default function OnlineKioskPage() {
     if (cleanPin === masterCode || cleanPin === "998877") {
       setIsStaffModalOpen(false);
       setStaffPinInput("");
-      setNoticeMessage("Staff Authorization Verified! Terminal is healthy.");
+      setCurrentScreen("config");
     } else {
       setIsStaffModalOpen(false);
       setStaffPinInput("");
@@ -269,8 +320,25 @@ export default function OnlineKioskPage() {
     return "h-auto md:h-[480px] lg:h-[510px] xl:h-[530px] max-h-[calc(100vh-6.5rem)]";
   };
 
+  if (currentScreen === "config") {
+    return (
+      <ConfigPanelScreen
+        machineId={machineId}
+        machineName={machineName}
+        onExit={() => setCurrentScreen("otp")}
+        onUpdateMachine={(newId, newName) => {
+          setMachineId(newId);
+          setMachineName(newName);
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
+      {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
+      <GuillocheAura />
+
       {/* ── 1. Top iPhone-Style Dynamic Notch ── */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] bg-neutral-950 text-white px-5 py-1.5 rounded-b-2xl shadow-xl flex items-center justify-center gap-2.5 pointer-events-none select-none border-t-0">
         <div className="w-2.5 h-2.5 rounded-full bg-neutral-800 border border-neutral-700/80 shrink-0 shadow-inner" />

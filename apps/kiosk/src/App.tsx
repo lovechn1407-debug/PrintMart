@@ -11,6 +11,9 @@ import { MachineOverlay, MachinePrinterStatus, PrintJob } from "@printmart/share
 export default function App() {
   const [machineId, setMachineId] = useState<string>(() => {
     if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlId = params.get("machineId") || params.get("id");
+      if (urlId) return urlId;
       return localStorage.getItem("kiosk_machine_id") || "MCH-CAMPUS-01";
     }
     return "MCH-CAMPUS-01";

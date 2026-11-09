@@ -26,7 +26,7 @@ export function NoticeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150 select-none">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100 text-center animate-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border-0 text-center animate-in zoom-in-95 duration-150">
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs ${
             isSuccess

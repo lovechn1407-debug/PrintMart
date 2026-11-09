@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { KioskNavbar } from "../components/KioskNavbar";
 import { VendingQrView } from "../components/VendingQrView";
+import { GuillocheAura } from "../components/GuillocheAura";
 import { database, ref, onValue } from "../firebase";
 
 interface OtpScreenProps {
@@ -280,7 +281,10 @@ export function OtpScreen({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
+    <div className="min-h-screen flex flex-col bg-[#fbf9f3] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
+      {/* ── Top Aura & Delicate SVG Guilloché Curves (Matching Homepage) ── */}
+      <GuillocheAura />
+
       {/* ── Signature Navbar with iPhone Notch ── */}
       <KioskNavbar
         machineName={machineName}

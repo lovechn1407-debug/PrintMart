@@ -55,14 +55,16 @@ export default function App() {
         }
         if (val.status === "DISABLED") {
           setActiveOverlay({
-            overlayId: "OVL_DISABLED",
-            type: "MAINTENANCE",
+            active: true,
+            type: "SERVICE_DISABLED",
             title: "Kiosk Temporarily Disabled",
             message: "This vending machine is paused by administrator.",
-            active: true,
-            createdAt: Date.now(),
+            updatedAt: Date.now(),
           });
-          setCurrentScreen("overlay");
+          setCurrentScreen((prev) => (prev === "config" || prev === "printing" ? prev : "overlay"));
+        } else if (activeOverlay?.title === "Kiosk Temporarily Disabled") {
+          setActiveOverlay(null);
+          setCurrentScreen((prev) => (prev === "overlay" ? "otp" : prev));
         }
       }
     });
@@ -101,23 +103,25 @@ export default function App() {
 
     let unsubGlobal: (() => void) | null = null;
     const unsubMachine = onValue(machineOverlayRef, (snap) => {
-      if (snap.exists() && snap.val()?.active) {
-        setActiveOverlay(snap.val());
-        if (currentScreen !== "printing" && currentScreen !== "config") {
-          setCurrentScreen("overlay");
+      const mVal = snap.val() as MachineOverlay | null;
+      if (snap.exists() && mVal?.active) {
+        if (typeof unsubGlobal === "function") {
+          unsubGlobal();
+          unsubGlobal = null;
         }
+        setActiveOverlay(mVal);
+        setCurrentScreen((prev) => (prev === "config" || prev === "printing" ? prev : "overlay"));
       } else {
         // Fallback to check global
         if (typeof unsubGlobal === "function") unsubGlobal();
         unsubGlobal = onValue(globalOverlayRef, (gSnap) => {
-          if (gSnap.exists() && gSnap.val()?.active) {
-            setActiveOverlay(gSnap.val());
-            if (currentScreen !== "printing" && currentScreen !== "config") {
-              setCurrentScreen("overlay");
-            }
+          const gVal = gSnap.val() as MachineOverlay | null;
+          if (gSnap.exists() && gVal?.active) {
+            setActiveOverlay(gVal);
+            setCurrentScreen((prev) => (prev === "config" || prev === "printing" ? prev : "overlay"));
           } else {
             setActiveOverlay(null);
-            if (currentScreen === "overlay") setCurrentScreen("otp");
+            setCurrentScreen((prev) => (prev === "overlay" ? "otp" : prev));
           }
         });
       }
@@ -127,7 +131,7 @@ export default function App() {
       if (typeof unsubMachine === "function") unsubMachine();
       if (typeof unsubGlobal === "function") unsubGlobal();
     };
-  }, [machineId, currentScreen]);
+  }, [machineId]);
 
   return (
     <div className="w-screen h-screen flex flex-col bg-[#faf7ee] text-neutral-900 select-none overflow-hidden font-sans">
@@ -158,6 +162,7 @@ export default function App() {
       {currentScreen === "overlay" && activeOverlay && (
         <OverlayScreen
           overlay={activeOverlay}
+          machineName={machineName}
           onOpenConfig={() => setCurrentScreen("config")}
         />
       )}

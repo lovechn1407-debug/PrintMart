@@ -20,6 +20,8 @@ import { database, ref, onValue } from "@/lib/firebase";
 import { VendingQrView } from "./components/VendingQrView";
 import { GuillocheAura } from "./components/GuillocheAura";
 import { ConfigPanelScreen } from "./components/ConfigPanelScreen";
+import { OverlayScreen } from "./components/OverlayScreen";
+import { MachineOverlay } from "@printmart/shared";
 
 interface RemoteKioskPopup {
   enabled: boolean;
@@ -47,7 +49,8 @@ export default function OnlineKioskPage() {
   const [machineId, setMachineId] = useState<string>("MCH-CAMPUS-01");
   const [machineName, setMachineName] = useState<string>("Central Library Kiosk A");
   const [masterCode, setMasterCode] = useState<string>("998877");
-  const [currentScreen, setCurrentScreen] = useState<"otp" | "config">("otp");
+  const [currentScreen, setCurrentScreen] = useState<"otp" | "overlay" | "config">("otp");
+  const [activeOverlay, setActiveOverlay] = useState<MachineOverlay | null>(null);
 
   // Read machine ID / Name from localStorage or URL query params on mount
   useEffect(() => {
@@ -132,6 +135,47 @@ export default function OnlineKioskPage() {
     return () => {
       unsubGlobal();
       unsubMachine();
+    };
+  }, [machineId]);
+
+  // Listen to remote overlays from Firebase RTDB (Machine specific first, fallback to Global)
+  useEffect(() => {
+    if (!machineId) return;
+    const machineOverlayRef = ref(database, `overlays/machines/${machineId}`);
+    const globalOverlayRef = ref(database, "overlays/global");
+
+    let unsubGlobal: (() => void) | null = null;
+
+    const unsubMachine = onValue(machineOverlayRef, (mSnap) => {
+      const mVal = mSnap.val() as MachineOverlay | null;
+      if (mSnap.exists() && mVal?.active) {
+        if (typeof unsubGlobal === "function") {
+          unsubGlobal();
+          unsubGlobal = null;
+        }
+        setActiveOverlay(mVal);
+        setCurrentScreen((prev) => (prev === "config" ? "config" : "overlay"));
+      } else {
+        // Fallback to check global overlay
+        if (typeof unsubGlobal === "function") {
+          unsubGlobal();
+        }
+        unsubGlobal = onValue(globalOverlayRef, (gSnap) => {
+          const gVal = gSnap.val() as MachineOverlay | null;
+          if (gSnap.exists() && gVal?.active) {
+            setActiveOverlay(gVal);
+            setCurrentScreen((prev) => (prev === "config" ? "config" : "overlay"));
+          } else {
+            setActiveOverlay(null);
+            setCurrentScreen((prev) => (prev === "overlay" ? "otp" : prev));
+          }
+        });
+      }
+    });
+
+    return () => {
+      unsubMachine();
+      if (typeof unsubGlobal === "function") unsubGlobal();
     };
   }, [machineId]);
 
@@ -431,17 +475,75 @@ export default function OnlineKioskPage() {
     );
   };
 
+  const renderStaffModal = () => (
+    <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="w-11 h-11 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-6 h-6" />
+        </div>
+
+        <div>
+          <h3 className="font-bold text-base text-neutral-900">Staff Authorization</h3>
+          <p className="text-xs text-neutral-500 mt-0.5">Enter Master Maintenance PIN</p>
+        </div>
+
+        <input
+          type="password"
+          value={staffPinInput}
+          onChange={(e) => setStaffPinInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleVerifyStaffPin()}
+          placeholder="Enter PIN..."
+          autoFocus
+          className="w-full h-11 text-center font-mono text-xl tracking-widest bg-neutral-100 rounded-xl border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
+        />
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsStaffModalOpen(false)}
+            className="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-xl cursor-pointer border-0"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleVerifyStaffPin}
+            className="flex-1 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs rounded-xl cursor-pointer border-0"
+          >
+            Access
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (currentScreen === "config") {
     return (
       <ConfigPanelScreen
         machineId={machineId}
         machineName={machineName}
-        onExit={() => setCurrentScreen("otp")}
+        onExit={() => setCurrentScreen(activeOverlay?.active ? "overlay" : "otp")}
         onUpdateMachine={(newId, newName) => {
           setMachineId(newId);
           setMachineName(newName);
         }}
       />
+    );
+  }
+
+  if (currentScreen === "overlay" && activeOverlay?.active) {
+    return (
+      <>
+        <OverlayScreen
+          overlay={activeOverlay}
+          machineName={machineName}
+          onOpenConfig={() => {
+            setStaffPinInput("");
+            setIsStaffModalOpen(true);
+          }}
+        />
+        {isStaffModalOpen && renderStaffModal()}
+      </>
     );
   }
 
@@ -1006,47 +1108,7 @@ export default function OnlineKioskPage() {
       </main>
 
       {/* ── 4. Staff PIN Modal ── */}
-      {isStaffModalOpen && (
-        <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="w-11 h-11 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-
-            <div>
-              <h3 className="font-bold text-base text-neutral-900">Staff Authorization</h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Enter Master Maintenance PIN</p>
-            </div>
-
-            <input
-              type="password"
-              value={staffPinInput}
-              onChange={(e) => setStaffPinInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleVerifyStaffPin()}
-              placeholder="Enter PIN..."
-              autoFocus
-              className="w-full h-11 text-center font-mono text-xl tracking-widest bg-neutral-100 rounded-xl border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
-            />
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-xl cursor-pointer border-0"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleVerifyStaffPin}
-                className="flex-1 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs rounded-xl cursor-pointer border-0"
-              >
-                Access
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {isStaffModalOpen && renderStaffModal()}
     </div>
   );
 }

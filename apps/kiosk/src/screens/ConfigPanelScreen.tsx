@@ -15,6 +15,7 @@ import {
   Sliders,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { database, ref, onValue, set, update, get } from "../firebase";
 import { GuillocheAura } from "../components/GuillocheAura";
@@ -237,6 +238,35 @@ export function ConfigPanelScreen({
         message: `Error connecting to database: ${err.message}`,
       });
       addLog("ERROR", `Pairing error: ${err.message}`);
+    }
+  };
+
+  // Clear / Remove Remote Overlay from this terminal
+  const handleClearOverlay = async () => {
+    try {
+      await set(ref(database, `overlays/machines/${currentId}`), {
+        active: false,
+        updatedAt: Date.now(),
+      });
+      await set(ref(database, "overlays/global"), {
+        active: false,
+        updatedAt: Date.now(),
+      });
+      setModalNotice({
+        isOpen: true,
+        type: "success",
+        title: "Overlay Removed",
+        message: "Remote overlay has been removed. Terminal will return to customer OTP screen on exit.",
+      });
+      addLog("SUCCESS", "Manual override: Remote overlay removed by staff.");
+    } catch (err: any) {
+      setModalNotice({
+        isOpen: true,
+        type: "error",
+        title: "Clear Failed",
+        message: err.message || "Failed to remove overlay",
+      });
+      addLog("ERROR", `Failed to remove overlay: ${err.message}`);
     }
   };
 
@@ -491,6 +521,29 @@ export function ConfigPanelScreen({
                   Verify & Pair
                 </button>
               </div>
+            </div>
+
+            {/* Remote Overlay Clearance Card */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border-0 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900">
+                    Display Overlay & Service Mode
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    If this kiosk is showing a maintenance screen or remote overlay, clear it immediately
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleClearOverlay}
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-bold text-xs rounded-xl transition-all cursor-pointer border-0 flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Clear / Remove Active Overlay from Kiosk</span>
+              </button>
             </div>
           </div>
         )}

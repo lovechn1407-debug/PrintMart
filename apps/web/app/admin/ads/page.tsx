@@ -21,7 +21,7 @@ import { MachineRecord } from "@printmart/shared";
 interface AdSettings {
   enabled: boolean;
   mode: "video" | "slides" | "banner";
-  aspectRatio?: "9:16" | "16:9" | "3:4" | "4:3" | "custom";
+  aspectRatio?: "9:16" | "9:14" | "16:9" | "3:4" | "4:3" | "custom";
   customAspectRatio?: string;
   videoUrl?: string;
   slides?: string[];
@@ -38,7 +38,7 @@ export default function AdminAdsPage() {
   // Ad Settings State
   const [enabled, setEnabled] = useState<boolean>(true);
   const [mode, setMode] = useState<"video" | "slides" | "banner">("video");
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "3:4" | "4:3" | "custom">("16:9");
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "9:14" | "16:9" | "3:4" | "4:3" | "custom">("16:9");
   const [customAspectRatio, setCustomAspectRatio] = useState<string>("16:9");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [slides, setSlides] = useState<string[]>([]);
@@ -372,7 +372,7 @@ export default function AdminAdsPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {(["9:16", "16:9", "3:4", "4:3", "custom"] as const).map((ratio) => (
+            {(["9:16", "9:14", "16:9", "3:4", "4:3", "custom"] as const).map((ratio) => (
               <button
                 key={ratio}
                 type="button"

@@ -795,6 +795,28 @@ export default function MorePage() {
             </button>
           )}
         </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            BRAND SIGNATURE: PRINTMART | AS STUDIOS
+            ───────────────────────────────────────────────────────────── */}
+        <div className="pt-6 pb-2 flex flex-col items-center justify-center gap-2 select-none">
+          <div className="flex items-center justify-center gap-3">
+            <img
+              src="/brand/printmart-logo.webp"
+              alt="PrintMart"
+              className="h-7 w-auto object-contain"
+            />
+            <span className="text-neutral-300 font-light text-base leading-none">|</span>
+            <img
+              src="/brand/as-studios-logo.png"
+              alt="AS Studios"
+              className="h-6 w-auto object-contain"
+            />
+          </div>
+          <p className="text-[11px] font-medium text-neutral-400 tracking-tight">
+            a product of AS Studios
+          </p>
+        </div>
       </main>
 
       {/* ─────────────────────────────────────────────────────────────

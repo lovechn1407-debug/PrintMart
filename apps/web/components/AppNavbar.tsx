@@ -61,20 +61,18 @@ export function AppNavbar() {
           ───────────────────────────────────────────────────────────── */}
       {!isMorePage && (
         <header className="sticky top-0 z-50 bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] backdrop-blur-md border-b border-amber-300/30 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-colors shadow-2xs">
-          {/* Brand Logo & Title Tile */}
+          {/* Brand Logo */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5 tracking-tight shrink-0 group">
-              <div className="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
-                <Printer className="w-4 h-4 text-amber-300" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-base sm:text-lg text-neutral-950 tracking-tight leading-tight">
-                  Print<span className="text-[#0c831f]">Mart</span>
-                </span>
-                <span className="text-[10px] font-semibold text-neutral-700 leading-none hidden xs:inline-block">
-                  Campus Kiosk
-                </span>
-              </div>
+            <Link
+              href="/"
+              onClick={() => handleNavClick("/")}
+              className="flex items-center tracking-tight shrink-0 group py-1"
+            >
+              <img
+                src="/brand/printmart-logo.webp"
+                alt="PrintMart"
+                className="h-9 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform"
+              />
             </Link>
           </div>
 

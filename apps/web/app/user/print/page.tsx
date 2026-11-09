@@ -363,7 +363,7 @@ function RealDocumentViewer({
       {/* Subtle non-blocking indicator only when a non-cached page is being prepared */}
       {loading && !pageCacheRef.current.has(pageIndex) && (
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-xs border border-neutral-200/60 shadow-2xs">
-          <Arc className="size-3 text-[#0c831f]" />
+          <RotateCw className="w-3 h-3 animate-spin text-[#0c831f]" />
           <span className="text-[10px] font-semibold text-neutral-600">Page {pageIndex}</span>
         </div>
       )}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown } from "lucide-react";
+import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown, Menu } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { Arc } from "@/components/loading-ui/arc";
 export function AppNavbar() {
@@ -77,7 +77,7 @@ export function AppNavbar() {
             }`}
           >
             {pendingPath === "/" && (
-              <Arc className="size-3 text-[#0c831f]" />
+              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
             )}
             <span>Home</span>
           </Link>
@@ -89,7 +89,7 @@ export function AppNavbar() {
             }`}
           >
             {pendingPath === "/user/print" && (
-              <Arc className="size-3 text-[#0c831f]" />
+              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
             )}
             <span>Start Printing</span>
           </Link>
@@ -102,11 +102,23 @@ export function AppNavbar() {
               }`}
             >
               {pendingPath === "/user/history" && (
-                <Arc className="size-3 text-[#0c831f]" />
+                <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
               )}
               <span>My Print Jobs</span>
             </Link>
           )}
+          <Link
+            href="/user/more"
+            onClick={() => { if (pathname !== "/user/more") setPendingPath("/user/more"); }}
+            className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              pathname === "/user/more" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
+            }`}
+          >
+            {pendingPath === "/user/more" && (
+              <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+            )}
+            <span>More</span>
+          </Link>
           {isAdmin && (
             <Link
               href="/admin/dashboard"
@@ -114,7 +126,7 @@ export function AppNavbar() {
               className="text-xs font-bold flex items-center gap-1.5 text-rose-700 bg-white/70 hover:bg-white px-2.5 py-1 rounded-full border border-rose-300/60 shadow-2xs"
             >
               {pendingPath === "/admin/dashboard" ? (
-                <Arc className="size-3 text-rose-600" />
+                <div className="w-3 h-3 rounded-full border-2 border-rose-300 border-t-rose-600 animate-spin" />
               ) : (
                 <ShieldAlert className="w-3.5 h-3.5" />
               )}
@@ -173,6 +185,14 @@ export function AppNavbar() {
                       <Clock className="w-4 h-4 text-neutral-500" />
                       <span>My Print Jobs</span>
                     </Link>
+                    <Link
+                      href="/user/more"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 rounded-xl transition-colors"
+                    >
+                      <Menu className="w-4 h-4 text-neutral-500" />
+                      <span>More & Profile</span>
+                    </Link>
                     {isAdmin && (
                       <Link
                         href="/admin/dashboard"
@@ -226,7 +246,7 @@ export function AppNavbar() {
         >
           <div className="relative w-5 h-5 flex items-center justify-center">
             {pendingPath === "/" ? (
-              <Arc className="size-4 text-[#0c831f]" />
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
             ) : (
               <Home className="w-5 h-5" />
             )}
@@ -242,7 +262,7 @@ export function AppNavbar() {
         >
           <div className="relative w-5 h-5 flex items-center justify-center">
             {pendingPath === "/user/print" ? (
-              <Arc className="size-4 text-[#0c831f]" />
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
             ) : (
               <Printer className="w-5 h-5" />
             )}
@@ -259,7 +279,7 @@ export function AppNavbar() {
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
               {pendingPath === "/user/history" ? (
-                <Arc className="size-4 text-[#0c831f]" />
+                <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
               ) : (
                 <Clock className="w-5 h-5" />
               )}
@@ -267,6 +287,22 @@ export function AppNavbar() {
             <span>Jobs</span>
           </Link>
         )}
+        <Link
+          href="/user/more"
+          onClick={() => { if (pathname !== "/user/more") setPendingPath("/user/more"); }}
+          className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
+            pathname === "/user/more" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
+          }`}
+        >
+          <div className="relative w-5 h-5 flex items-center justify-center">
+            {pendingPath === "/user/more" ? (
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
+          </div>
+          <span>More</span>
+        </Link>
         {isAdmin && (
           <Link
             href="/admin/dashboard"
@@ -275,7 +311,7 @@ export function AppNavbar() {
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
               {pendingPath === "/admin/dashboard" ? (
-                <Arc className="size-4 text-rose-600" />
+                <div className="w-4 h-4 rounded-full border-2 border-rose-200 border-t-rose-600 animate-spin" />
               ) : (
                 <ShieldAlert className="w-5 h-5" />
               )}

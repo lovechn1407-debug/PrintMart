@@ -32,3 +32,4 @@ export function Arc({ className, style, ...props }: React.ComponentProps<"div">)
 export function ArcDemo() {
   return <Arc className="size-14" />;
 }
+

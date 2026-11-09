@@ -263,3 +263,37 @@ body {
   animation: page-turn-prev 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transform-origin: right center;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MORE TAB SLIDE TRANSITIONS (Native App Screen Swipe)
+   ───────────────────────────────────────────────────────────── */
+@keyframes screen-slide-in {
+  0% {
+    opacity: 0.85;
+    transform: translateX(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes screen-slide-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0.85;
+    transform: translateX(100%);
+  }
+}
+
+.animate-screen-slide-in {
+  animation: screen-slide-in 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-screen-slide-out {
+  animation: screen-slide-out 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   Check,
   X,
   Printer,
-  CreditCard,
   MessageSquare,
   LifeBuoy,
   Receipt,
@@ -20,7 +19,6 @@ import {
   FileText,
   ShieldCheck,
   RefreshCw,
-  FileWarning,
   AlertCircle,
   ChevronRight,
   ChevronDown,
@@ -29,7 +27,6 @@ import {
   Send,
   ExternalLink,
   Mail,
-  Lock,
   RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
@@ -41,7 +38,6 @@ import { PrintJob } from "@printmart/shared";
 type ModalType =
   | null
   | "transactions"
-  | "tickets"
   | "faq"
   | "contact"
   | "terms"
@@ -213,9 +209,9 @@ const FAQS_DATA = [
 function InstagramIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
     </svg>
   );
 }
@@ -228,8 +224,19 @@ export default function MorePage() {
   const router = useRouter();
   const { user, profile, signInWithGoogle, signOut } = useAuth();
 
+  // Exit Animation State
+  const [isExiting, setIsExiting] = useState<boolean>(false);
+
   // Active Bottom Sheet Modal
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  // Dedicated Help & Support Window (Requirement 7)
+  const [isHelpWindowOpen, setIsHelpWindowOpen] = useState<boolean>(false);
+  const [showActiveTicketsList, setShowActiveTicketsList] = useState<boolean>(false);
+  const [ticketSuccessSnackbar, setTicketSuccessSnackbar] = useState<string | null>(null);
+
+  // In-App Error Notification Popup (Requirement 10)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Profile Edit State
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
@@ -246,15 +253,29 @@ export default function MorePage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // Help & Support Ticket Form State
-  const [ticketCategory, setTicketCategory] = useState<string>("Page not printed");
+  const [ticketCategory, setTicketCategory] = useState<string>(COMMON_PROBLEMS[0]);
   const [ticketOtp, setTicketOtp] = useState<string>("");
   const [ticketDesc, setTicketDesc] = useState<string>("");
   const [ticketImageFile, setTicketImageFile] = useState<File | null>(null);
   const [ticketImagePreview, setTicketImagePreview] = useState<string | null>(null);
   const [ticketSubmitting, setTicketSubmitting] = useState<boolean>(false);
-  const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
   const [userTickets, setUserTickets] = useState<SupportTicket[]>([]);
   const ticketFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Back Navigation with Smooth Exit Swipe
+  const handleGoBack = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push("/");
+    }, 160);
+  };
+
+  // Listen for navigation exit from AppNavbar
+  useEffect(() => {
+    const handleExit = () => setIsExiting(true);
+    window.addEventListener("more-page-exit", handleExit);
+    return () => window.removeEventListener("more-page-exit", handleExit);
+  }, []);
 
   // Sync profile display name
   useEffect(() => {
@@ -301,6 +322,15 @@ export default function MorePage() {
     return () => unsub();
   }, [user]);
 
+  // Auto-dismiss success snackbar after 6 seconds
+  useEffect(() => {
+    if (!ticketSuccessSnackbar) return;
+    const timer = setTimeout(() => {
+      setTicketSuccessSnackbar(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [ticketSuccessSnackbar]);
+
   // Handle Save Name
   const handleSaveName = async () => {
     if (!nameInput.trim() || !auth.currentUser) return;
@@ -310,7 +340,7 @@ export default function MorePage() {
       await update(ref(database, `users/${auth.currentUser.uid}`), { displayName: nameInput.trim() });
       setIsEditingName(false);
     } catch (e: any) {
-      alert("Failed to update name: " + e.message);
+      setErrorMessage(e.message || "Failed to update profile name");
     } finally {
       setSavingProfile(false);
     }
@@ -321,7 +351,7 @@ export default function MorePage() {
     if (!e.target.files || !e.target.files[0] || !auth.currentUser) return;
     const file = e.target.files[0];
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be smaller than 5MB");
+      setErrorMessage("Profile image must be smaller than 5MB");
       return;
     }
     setSavingProfile(true);
@@ -332,7 +362,7 @@ export default function MorePage() {
         await updateProfile(auth.currentUser!, { photoURL: base64Url });
         await update(ref(database, `users/${auth.currentUser!.uid}`), { photoURL: base64Url });
       } catch (err: any) {
-        console.error("Photo update failed:", err);
+        setErrorMessage(err.message || "Failed to update profile photo");
       } finally {
         setSavingProfile(false);
       }
@@ -343,7 +373,10 @@ export default function MorePage() {
   // Handle Ticket Submit
   const handleRaiseTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketDesc.trim()) return;
+    if (!ticketDesc.trim()) {
+      setErrorMessage("Please enter a short description of the issue.");
+      return;
+    }
     setTicketSubmitting(true);
     try {
       let uploadedImageUrl = "";
@@ -371,13 +404,13 @@ export default function MorePage() {
       };
 
       await set(ref(database, `supportTickets/${ticketId}`), newTicket);
-      setSubmittedTicketId(ticketId);
+      setTicketSuccessSnackbar(ticketId);
       setTicketDesc("");
       setTicketOtp("");
       setTicketImageFile(null);
       setTicketImagePreview(null);
     } catch (err: any) {
-      alert("Failed to submit ticket: " + err.message);
+      setErrorMessage(err.message || "Failed to submit support ticket");
     } finally {
       setTicketSubmitting(false);
     }
@@ -388,24 +421,28 @@ export default function MorePage() {
   const subtext = user?.email || "8383090874 • PrintMart Campus";
 
   return (
-    <div className="min-h-screen bg-[#f3f4f7] text-neutral-900 pb-28 select-none">
+    <div
+      className={`min-h-screen bg-[#f3f4f7] text-neutral-900 pb-28 select-none overflow-x-hidden ${
+        isExiting ? "animate-screen-slide-out" : "animate-screen-slide-in"
+      }`}
+    >
       {/* ─────────────────────────────────────────────────────────────
           1. BLINKIT-STYLE TOP GOLDEN GRADIENT HERO BANNER
           ───────────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] pt-3 pb-6 px-4">
-        {/* Back Button */}
+        {/* Back Button (Requirement 1: No border) */}
         <div className="max-w-md mx-auto flex items-center justify-between mb-2">
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={handleGoBack}
             title="Go to Home"
-            className="w-9 h-9 rounded-full bg-white shadow-xs border border-amber-200/40 flex items-center justify-center text-neutral-800 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer"
+            className="w-9 h-9 rounded-full bg-white shadow-xs border-0 flex items-center justify-center text-neutral-800 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-800" />
           </button>
         </div>
 
-        {/* Profile Avatar & Name */}
+        {/* Profile Avatar & Centered Name (Requirement 5 & 6) */}
         <div className="max-w-md mx-auto flex flex-col items-center text-center">
           {/* Avatar with Camera badge */}
           <div className="relative group">
@@ -442,15 +479,15 @@ export default function MorePage() {
             />
           </div>
 
-          {/* Profile Name & Inline Edit */}
-          <div className="mt-3">
+          {/* Profile Name & Centered Inline Edit (Requirement 5 & 6) */}
+          <div className="mt-3 w-full flex flex-col items-center">
             {isEditingName ? (
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex items-center justify-center gap-1.5 mt-0.5">
                 <input
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  className="h-8 px-2.5 text-sm font-bold bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#0c831f]"
+                  className="h-8 px-2.5 text-sm font-semibold bg-white border-0 shadow-xs rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#0c831f]"
                   autoFocus
                 />
                 <button
@@ -470,21 +507,21 @@ export default function MorePage() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-1.5">
-                <h1 className="text-xl sm:text-2xl font-black text-[#1c1c1c] tracking-tight">
+              <div className="relative inline-flex items-center justify-center">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight text-center">
                   {displayName}
                 </h1>
                 <button
                   type="button"
                   onClick={() => setIsEditingName(true)}
                   title="Edit Name"
-                  className="p-1 rounded-md text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                  className="absolute -right-7 p-1 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
-            <p className="text-xs font-semibold text-neutral-600 mt-0.5">
+            <p className="text-xs font-medium text-neutral-600 mt-1">
               {subtext}
             </p>
           </div>
@@ -495,17 +532,15 @@ export default function MorePage() {
           2. MAIN BODY (BLINKIT 3-CARD ROW + GROUPED LISTS)
           ───────────────────────────────────────────────────────────── */}
       <main className="max-w-md mx-auto px-3.5 -mt-2 space-y-4">
-        {/* 3 Quick Action Cards Row (Blinkit Style) */}
+        {/* 3 Quick Action Cards Row (Requirement 4: reduced radius, no borders, no bg on icons) */}
         <div className="grid grid-cols-3 gap-2.5">
           {/* Card 1: Your orders */}
           <Link
             href="/user/history"
-            className="bg-white rounded-2xl p-3 sm:p-3.5 border border-neutral-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col items-center justify-center text-center gap-1.5 hover:shadow-md active:scale-95 transition-all"
+            className="bg-white rounded-xl p-3 sm:p-3.5 border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center gap-2 hover:shadow-md active:scale-95 transition-all"
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-              <Printer className="w-5 h-5 text-amber-700" />
-            </div>
-            <span className="text-xs font-bold text-neutral-900 leading-tight">
+            <Printer className="w-6 h-6 text-neutral-800" strokeWidth={1.75} />
+            <span className="text-xs font-semibold text-neutral-900 leading-tight">
               Your orders
             </span>
           </Link>
@@ -514,58 +549,56 @@ export default function MorePage() {
           <button
             type="button"
             onClick={() => setActiveModal("transactions")}
-            className="bg-white rounded-2xl p-3 sm:p-3.5 border border-neutral-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col items-center justify-center text-center gap-1.5 hover:shadow-md active:scale-95 transition-all cursor-pointer"
+            className="bg-white rounded-xl p-3 sm:p-3.5 border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center gap-2 hover:shadow-md active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#0c831f] flex items-center justify-center font-bold text-base">
+            <div className="w-6 h-6 flex items-center justify-center text-neutral-800 font-bold text-lg leading-none">
               ₹
             </div>
-            <span className="text-xs font-bold text-neutral-900 leading-tight">
+            <span className="text-xs font-semibold text-neutral-900 leading-tight">
               My transactions
             </span>
           </button>
 
-          {/* Card 3: Need help? */}
+          {/* Card 3: Need help? (Requirement 7: Opens dedicated new window) */}
           <button
             type="button"
-            onClick={() => setActiveModal("tickets")}
-            className="bg-white rounded-2xl p-3 sm:p-3.5 border border-neutral-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col items-center justify-center text-center gap-1.5 hover:shadow-md active:scale-95 transition-all cursor-pointer"
+            onClick={() => setIsHelpWindowOpen(true)}
+            className="bg-white rounded-xl p-3 sm:p-3.5 border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center gap-2 hover:shadow-md active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-sky-700" />
-            </div>
-            <span className="text-xs font-bold text-neutral-900 leading-tight">
+            <MessageSquare className="w-6 h-6 text-neutral-800" strokeWidth={1.75} />
+            <span className="text-xs font-semibold text-neutral-900 leading-tight">
               Need help?
             </span>
           </button>
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 1: YOUR INFORMATION
+            GROUP 1: YOUR INFORMATION (Requirement 1, 2, 3)
             ───────────────────────────────────────────────────────────── */}
         <div className="space-y-1.5">
-          <h2 className="text-xs font-extrabold text-neutral-900 tracking-tight uppercase px-1">
+          <h2 className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight px-1">
             Your information
           </h2>
-          <div className="bg-white rounded-2xl border border-neutral-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden divide-y divide-neutral-100">
-            {/* Help & Support */}
+          <div className="bg-white rounded-2xl border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-neutral-100">
+            {/* Help & Support (Opens dedicated new window) */}
             <button
               type="button"
-              onClick={() => setActiveModal("tickets")}
+              onClick={() => setIsHelpWindowOpen(true)}
               className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-neutral-50/80 active:bg-neutral-100 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <LifeBuoy className="w-5 h-5 text-neutral-700 shrink-0" />
                 <div>
-                  <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c] block">
+                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
                     Help and support
                   </span>
-                  <span className="text-[11px] text-neutral-400 block">
+                  <span className="text-[11px] text-neutral-400 block font-normal">
                     Raise tickets for failed prints, faded ink, paper jams
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="bg-[#0c831f] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md">
+                <span className="bg-[#0c831f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
                   NEW
                 </span>
                 <ChevronRight className="w-4 h-4 text-neutral-400" />
@@ -581,10 +614,10 @@ export default function MorePage() {
               <div className="flex items-center gap-3">
                 <Receipt className="w-5 h-5 text-neutral-700 shrink-0" />
                 <div>
-                  <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c] block">
+                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
                     My transactions & receipts
                   </span>
-                  <span className="text-[11px] text-neutral-400 block">
+                  <span className="text-[11px] text-neutral-400 block font-normal">
                     Order bills, Razorpay IDs, and UPI invoices
                   </span>
                 </div>
@@ -601,10 +634,10 @@ export default function MorePage() {
               <div className="flex items-center gap-3">
                 <PhoneCall className="w-5 h-5 text-neutral-700 shrink-0" />
                 <div>
-                  <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c] block">
+                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
                     Contact campus support
                   </span>
-                  <span className="text-[11px] text-neutral-400 block">
+                  <span className="text-[11px] text-neutral-400 block font-normal">
                     Mail: lovechn1407@gmail.com • Phone: 8383090874
                   </span>
                 </div>
@@ -621,10 +654,10 @@ export default function MorePage() {
               <div className="flex items-center gap-3">
                 <HelpCircle className="w-5 h-5 text-neutral-700 shrink-0" />
                 <div>
-                  <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c] block">
+                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
                     Frequently asked questions
                   </span>
-                  <span className="text-[11px] text-neutral-400 block">
+                  <span className="text-[11px] text-neutral-400 block font-normal">
                     Universal OTP, kiosk usage, refunds & privacy
                   </span>
                 </div>
@@ -635,13 +668,13 @@ export default function MorePage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 2: LEGAL AND POLICIES
+            GROUP 2: LEGAL AND POLICIES (Requirement 1, 2, 3)
             ───────────────────────────────────────────────────────────── */}
         <div className="space-y-1.5">
-          <h2 className="text-xs font-extrabold text-neutral-900 tracking-tight uppercase px-1">
+          <h2 className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight px-1">
             Legal and policies
           </h2>
-          <div className="bg-white rounded-2xl border border-neutral-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden divide-y divide-neutral-100">
+          <div className="bg-white rounded-2xl border-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-neutral-100">
             {/* Terms and Conditions */}
             <button
               type="button"
@@ -650,7 +683,7 @@ export default function MorePage() {
             >
               <div className="flex items-center gap-3">
                 <FileText className="w-5 h-5 text-neutral-700 shrink-0" />
-                <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c]">
+                <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c]">
                   Terms and conditions
                 </span>
               </div>
@@ -665,7 +698,7 @@ export default function MorePage() {
             >
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 text-neutral-700 shrink-0" />
-                <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c]">
+                <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c]">
                   Privacy policy
                 </span>
               </div>
@@ -681,10 +714,10 @@ export default function MorePage() {
               <div className="flex items-center gap-3">
                 <RefreshCw className="w-5 h-5 text-neutral-700 shrink-0" />
                 <div>
-                  <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c] block">
+                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
                     Refund policy
                   </span>
-                  <span className="text-[11px] text-neutral-400 block">
+                  <span className="text-[11px] text-neutral-400 block font-normal">
                     100% fairness guarantee for failed prints
                   </span>
                 </div>
@@ -705,7 +738,7 @@ export default function MorePage() {
             >
               <div className="flex items-center gap-3">
                 <RotateCcw className="w-5 h-5 text-neutral-700 shrink-0" />
-                <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c]">
+                <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c]">
                   Return policy
                 </span>
               </div>
@@ -720,7 +753,7 @@ export default function MorePage() {
             >
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-neutral-700 shrink-0" />
-                <span className="text-xs sm:text-[13px] font-bold text-[#1c1c1c]">
+                <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c]">
                   Disclaimer
                 </span>
               </div>
@@ -730,23 +763,23 @@ export default function MorePage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            GROUP 3: ACCOUNT ACTIONS
+            GROUP 3: ACCOUNT ACTIONS (Requirement 11: reduced radius, black, no border)
             ───────────────────────────────────────────────────────────── */}
         <div className="pt-2">
           {user ? (
             <button
               type="button"
               onClick={() => signOut()}
-              className="w-full h-12 bg-white rounded-2xl border border-neutral-200/70 shadow-xs flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-rose-600 hover:bg-rose-50 active:scale-98 transition-all cursor-pointer"
+              className="w-full h-12 bg-neutral-950 hover:bg-black text-white rounded-xl border-0 shadow-xs flex items-center justify-center gap-2 text-xs sm:text-sm font-bold active:scale-98 transition-all cursor-pointer"
             >
-              <LogOut className="w-4 h-4 text-rose-600" />
+              <LogOut className="w-4 h-4 text-white" />
               <span>Log out</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => signInWithGoogle()}
-              className="w-full h-12 bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-2xl shadow-xs flex items-center justify-center gap-2 text-xs sm:text-sm font-bold active:scale-98 transition-all cursor-pointer"
+              className="w-full h-12 bg-[#0c831f] hover:bg-[#0a6e1a] text-white rounded-xl border-0 shadow-xs flex items-center justify-center gap-2 text-xs sm:text-sm font-bold active:scale-98 transition-all cursor-pointer"
             >
               <span>Sign in with Google</span>
             </button>
@@ -755,30 +788,276 @@ export default function MorePage() {
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 1: TRANSACTIONS & RECEIPTS (BOTTOM SHEET)
+          REQUIREMENT 7: DEDICATED HELP & SUPPORT FULL WINDOW
+          (Not a swipe popup! Has dropdown, borderless green snackbar,
+          and green active ticket button)
+          ───────────────────────────────────────────────────────────── */}
+      {isHelpWindowOpen && (
+        <div className="fixed inset-0 z-50 bg-[#f3f4f7] overflow-y-auto animate-in slide-in-from-right duration-200 flex flex-col pb-12">
+          {/* Header */}
+          <header className="sticky top-0 z-30 bg-white border-0 shadow-2xs px-4 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHelpWindowOpen(false);
+                  setTicketSuccessSnackbar(null);
+                }}
+                className="w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-800 transition-colors cursor-pointer border-0"
+              >
+                <ArrowLeft className="w-5 h-5 text-neutral-800" />
+              </button>
+              <div>
+                <h2 className="text-sm font-bold text-neutral-900 leading-tight">Help and Support</h2>
+                <p className="text-[11px] text-neutral-500">Raise campus issue or check tickets</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsHelpWindowOpen(false);
+                setTicketSuccessSnackbar(null);
+              }}
+              className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:text-neutral-800 transition-colors cursor-pointer border-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </header>
+
+          {/* Body Content */}
+          <div className="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+            {/* Green Button of My Active Tickets (Homepage style) */}
+            <button
+              type="button"
+              onClick={() => setShowActiveTicketsList((prev) => !prev)}
+              className="w-full h-12 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold text-xs sm:text-sm rounded-xl border-0 shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <LifeBuoy className="w-4 h-4 text-white" />
+              <span>
+                {showActiveTicketsList
+                  ? "Hide Active Tickets"
+                  : `My Active Tickets (${userTickets.length})`}
+              </span>
+            </button>
+
+            {/* Active Tickets Drawer List */}
+            {showActiveTicketsList && (
+              <div className="bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border-0 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+                  <span className="text-xs font-bold text-neutral-900">Your Campus Tickets</span>
+                  <span className="text-[11px] font-medium text-neutral-500">{userTickets.length} total</span>
+                </div>
+                {userTickets.length === 0 ? (
+                  <p className="text-xs text-neutral-400 py-4 text-center">No active tickets right now.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {userTickets.map((t) => (
+                      <div key={t.ticketId} className="p-3 bg-neutral-50 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-bold text-neutral-800">{t.ticketId}</span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              t.status === "RESOLVED"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {t.status}
+                          </span>
+                        </div>
+                        <div className="text-xs font-semibold text-neutral-700">{t.category}</div>
+                        <p className="text-[11px] text-neutral-500 line-clamp-2">{t.description}</p>
+                        {t.otp && (
+                          <div className="text-[10px] text-neutral-400">
+                            Universal OTP: <span className="font-mono font-bold text-neutral-600">{t.otp}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Ticket Creation Card */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border-0 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900">Raise a Support Ticket</h3>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  Faced a paper jam, faded ink, or print failure? We review and resolve within 15 minutes.
+                </p>
+              </div>
+
+              <form onSubmit={handleRaiseTicket} className="space-y-4">
+                {/* Requirement 7: Common problem shown in DROPDOWN */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Common Problem <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={ticketCategory}
+                      onChange={(e) => setTicketCategory(e.target.value)}
+                      className="w-full h-11 px-3.5 pr-10 text-xs font-medium bg-neutral-50 rounded-xl text-neutral-900 border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white appearance-none cursor-pointer"
+                    >
+                      {COMMON_PROBLEMS.map((prob) => (
+                        <option key={prob} value={prob}>
+                          {prob}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-neutral-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* OTP Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Universal OTP (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={ticketOtp}
+                    onChange={(e) => setTicketOtp(e.target.value.toUpperCase())}
+                    placeholder="e.g. 748291"
+                    className="w-full h-11 px-3.5 text-xs font-mono font-bold bg-neutral-50 rounded-xl text-neutral-900 border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
+                  />
+                </div>
+
+                {/* Problem Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Describe the issue <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={ticketDesc}
+                    onChange={(e) => setTicketDesc(e.target.value)}
+                    placeholder="Explain what went wrong (e.g. 3 of 10 pages printed, ink was faded, paper jammed in kiosk tray)..."
+                    className="w-full p-3 text-xs bg-neutral-50 rounded-xl text-neutral-900 border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white resize-none"
+                  />
+                </div>
+
+                {/* Photo Upload */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700 block">
+                    Attach Photo Proof (Recommended)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => ticketFileInputRef.current?.click()}
+                      className="h-10 px-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer border-0"
+                    >
+                      <Camera className="w-4 h-4 text-neutral-600" />
+                      <span>{ticketImageFile ? "Change Photo" : "Upload Image"}</span>
+                    </button>
+                    <input
+                      ref={ticketFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const f = e.target.files[0];
+                          if (f.size > 5 * 1024 * 1024) {
+                            setErrorMessage("Photo proof must be smaller than 5MB");
+                            return;
+                          }
+                          setTicketImageFile(f);
+                          setTicketImagePreview(URL.createObjectURL(f));
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    {ticketImageFile && (
+                      <span className="text-xs text-neutral-500 truncate max-w-[150px]">
+                        {ticketImageFile.name}
+                      </span>
+                    )}
+                  </div>
+                  {ticketImagePreview && (
+                    <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border-0 shadow-2xs">
+                      <img src={ticketImagePreview} alt="Proof" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Ticket Button */}
+                <button
+                  type="submit"
+                  disabled={ticketSubmitting}
+                  className="w-full h-11 bg-neutral-950 hover:bg-black disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl border-0 shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {ticketSubmitting ? (
+                    <span>Submitting Ticket...</span>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Submit Ticket</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Requirement 7: Green Snackbar with No Border */}
+          {ticketSuccessSnackbar && (
+            <div className="fixed bottom-6 inset-x-4 max-w-md mx-auto z-60 animate-in slide-in-from-bottom duration-200">
+              <div className="bg-[#0c831f] text-white p-4 rounded-2xl shadow-xl flex items-center justify-between gap-3 border-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                  <div className="text-xs leading-tight">
+                    <span className="font-extrabold block">Ticket Created Successfully!</span>
+                    <span className="text-white/80 text-[11px] font-mono">
+                      ID: {ticketSuccessSnackbar} • We will resolve shortly.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTicketSuccessSnackbar(null)}
+                  className="w-7 h-7 rounded-full bg-black/15 hover:bg-black/25 flex items-center justify-center text-white shrink-0 cursor-pointer border-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          REQUIREMENT 9: MY TRANSACTIONS (BOTTOM SHEET)
+          - No list boxes, just simple line separators (divide-y)
+          - Remove PAID pill
+          - Show amount in red with - (or green with + if refund)
+          - Remove OTP info
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "transactions" && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border border-neutral-100 overflow-hidden animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-[#0c831f]" />
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
+                <h3 className="font-bold text-sm sm:text-base text-neutral-900">
                   My Transactions
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors"
+                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-3">
+            {/* Modal Body: Line separated list (divide-y), no boxes */}
+            <div className="p-4 sm:p-5 overflow-y-auto divide-y divide-neutral-100">
               {txLoading ? (
                 <div className="py-12 text-center text-xs text-neutral-400">Loading orders...</div>
               ) : !user ? (
@@ -798,233 +1077,60 @@ export default function MorePage() {
                   </Link>
                 </div>
               ) : (
-                transactions.map((tx) => (
-                  <div
-                    key={tx.jobId}
-                    className="p-3.5 rounded-xl border border-neutral-200/70 bg-neutral-50/60 hover:bg-neutral-50 flex items-center justify-between gap-3 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-neutral-900 truncate">
-                          {tx.documentName || "Document.pdf"}
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                          PAID
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-1">
-                        <span>
-                          {new Date(tx.createdAt).toLocaleDateString([], {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                        <span>•</span>
-                        <span>OTP: {tx.otp || (tx as any).otpCode || "------"}</span>
-                        <span>•</span>
-                        <span>{tx.configuration?.totalPagesToPrint || (tx as any).pageCount || 1} pages</span>
-                      </div>
-                    </div>
+                transactions.map((tx) => {
+                  const isRefund =
+                    tx.payment?.status === "REFUNDED" || (tx as any).status === "REFUNDED";
+                  const amountPaise =
+                    tx.pricing?.finalPayablePaise || (tx.payment as any)?.amountPaise || 150;
+                  const formattedAmt = formatRupees(amountPaise);
+                  const pageCount =
+                    tx.configuration?.totalPagesToPrint || (tx as any).pageCount || 1;
 
-                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                      <span className="text-sm font-black text-neutral-900">
-                        {formatRupees(tx.pricing?.finalPayablePaise || (tx.payment as any)?.amountPaise || 150)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTx(tx)}
-                        className="text-[11px] font-bold text-[#0c831f] hover:underline cursor-pointer"
-                      >
-                        View Receipt
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          MODAL 2: HELP & SUPPORT / RAISE TICKETS (BOTTOM SHEET)
-          ───────────────────────────────────────────────────────────── */}
-      {activeModal === "tickets" && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[88vh] sm:max-h-[82vh] flex flex-col shadow-2xl border border-neutral-100 overflow-hidden animate-in slide-in-from-bottom duration-200">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
-              <div className="flex items-center gap-2">
-                <LifeBuoy className="w-5 h-5 text-amber-600" />
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
-                  Raise Support Ticket
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
-              {submittedTicketId && (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-1.5 animate-in zoom-in-95">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="font-extrabold text-xs">Ticket Created Successfully!</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    Ticket ID: <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-300">{submittedTicketId}</strong>.
-                    Our campus team will resolve this within 15 minutes.
-                  </p>
-                </div>
-              )}
-
-              <form onSubmit={handleRaiseTicket} className="space-y-3.5">
-                {/* Issue Category Chips */}
-                <div>
-                  <label className="text-xs font-extrabold uppercase text-neutral-600 tracking-wider block mb-2">
-                    Select Common Problem
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COMMON_PROBLEMS.map((prob) => (
-                      <button
-                        key={prob}
-                        type="button"
-                        onClick={() => setTicketCategory(prob)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          ticketCategory === prob
-                            ? "bg-[#0c831f] text-white shadow-xs font-bold"
-                            : "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
-                        }`}
-                      >
-                        {prob}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* OTP Input */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-600 block mb-1">
-                    Universal OTP (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={ticketOtp}
-                    onChange={(e) => setTicketOtp(e.target.value.toUpperCase())}
-                    placeholder="e.g. 748291"
-                    className="w-full h-10 px-3 text-xs font-mono font-bold bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0c831f]"
-                  />
-                </div>
-
-                {/* Problem Description */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-600 block mb-1">
-                    Describe the issue <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={ticketDesc}
-                    onChange={(e) => setTicketDesc(e.target.value)}
-                    placeholder="Explain what went wrong (e.g. 3 of 10 pages printed, ink was faded, paper jammed in tray)..."
-                    className="w-full p-3 text-xs bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0c831f]"
-                  />
-                </div>
-
-                {/* Image Upload for Proof */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-600 block mb-1">
-                    Attach Photo Proof (Recommended)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => ticketFileInputRef.current?.click()}
-                      className="h-9 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-neutral-200"
+                  return (
+                    <div
+                      key={tx.jobId}
+                      className="py-3 flex items-center justify-between gap-3"
                     >
-                      <Camera className="w-4 h-4 text-neutral-600" />
-                      <span>{ticketImageFile ? "Change Photo" : "Upload Image"}</span>
-                    </button>
-                    <input
-                      ref={ticketFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setTicketImageFile(e.target.files[0]);
-                          setTicketImagePreview(URL.createObjectURL(e.target.files[0]));
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    {ticketImageFile && (
-                      <span className="text-xs text-neutral-500 truncate max-w-[150px]">
-                        {ticketImageFile.name}
-                      </span>
-                    )}
-                  </div>
-                  {ticketImagePreview && (
-                    <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border border-neutral-200 shadow-2xs">
-                      <img src={ticketImagePreview} alt="Proof" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={ticketSubmitting}
-                  className="w-full h-11 bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {ticketSubmitting ? (
-                    <span>Submitting Ticket...</span>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>Submit Ticket</span>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* User's Past Tickets */}
-              {userTickets.length > 0 && (
-                <div className="pt-3 border-t border-neutral-100 space-y-2">
-                  <span className="text-[10px] font-extrabold uppercase text-neutral-400 tracking-wider">
-                    My Active Tickets
-                  </span>
-                  <div className="space-y-2">
-                    {userTickets.map((t) => (
-                      <div
-                        key={t.ticketId}
-                        className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-bold text-neutral-800">{t.ticketId}</span>
-                            <span className="font-semibold text-neutral-600">• {t.category}</span>
-                          </div>
-                          <p className="text-[11px] text-neutral-400 mt-0.5 line-clamp-1">{t.description}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-neutral-900 truncate">
+                          {tx.documentName || "Document.pdf"}
                         </div>
+                        {/* Requirement 9: OTP removed, clean date and page info */}
+                        <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 mt-0.5">
+                          <span>
+                            {new Date(tx.createdAt).toLocaleDateString([], {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {pageCount} {pageCount === 1 ? "page" : "pages"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Requirement 9: Amount in red (-) or green (+) with View Receipt button */}
+                      <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            t.status === "RESOLVED"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
+                          className={`text-sm font-bold ${
+                            isRefund ? "text-[#0c831f]" : "text-rose-600"
                           }`}
                         >
-                          {t.status}
+                          {isRefund ? `+${formattedAmt}` : `-${formattedAmt}`}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTx(tx)}
+                          className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 underline underline-offset-2 cursor-pointer"
+                        >
+                          View Receipt
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -1032,34 +1138,35 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 3: CONTACT SUPPORT (BOTTOM SHEET)
+          REQUIREMENT 8: CONTACT SUPPORT (BOTTOM SHEET)
+          - Remove borders from list boxes
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "contact" && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg flex flex-col shadow-2xl border border-neutral-100 overflow-hidden animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
               <div className="flex items-center gap-2">
                 <PhoneCall className="w-5 h-5 text-emerald-700" />
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
+                <h3 className="font-bold text-sm sm:text-base text-neutral-900">
                   Contact Campus Support
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors"
+                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Body */}
-            <div className="p-4 sm:p-5 space-y-3">
+            {/* Body (Requirement 8: No borders on list boxes) */}
+            <div className="p-4 sm:p-5 space-y-2.5">
               {/* Mail */}
               <a
                 href="mailto:lovechn1407@gmail.com?subject=PrintMart%20Support%20Request"
-                className="p-3.5 rounded-xl border border-neutral-200/80 bg-neutral-50/60 hover:bg-emerald-50 hover:border-emerald-300 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl bg-neutral-100/70 hover:bg-neutral-100 transition-all flex items-center justify-between group border-0"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center">
@@ -1069,7 +1176,7 @@ export default function MorePage() {
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                       Email Support
                     </span>
-                    <span className="text-xs font-bold text-[#1c1c1c]">lovechn1407@gmail.com</span>
+                    <span className="text-xs font-semibold text-[#1c1c1c]">lovechn1407@gmail.com</span>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-[#0c831f]" />
@@ -1078,7 +1185,7 @@ export default function MorePage() {
               {/* Phone */}
               <a
                 href="tel:8383090874"
-                className="p-3.5 rounded-xl border border-neutral-200/80 bg-neutral-50/60 hover:bg-sky-50 hover:border-sky-300 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl bg-neutral-100/70 hover:bg-neutral-100 transition-all flex items-center justify-between group border-0"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
@@ -1088,7 +1195,7 @@ export default function MorePage() {
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                       Phone Call
                     </span>
-                    <span className="text-xs font-bold text-[#1c1c1c]">8383090874</span>
+                    <span className="text-xs font-semibold text-[#1c1c1c]">8383090874</span>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-sky-700" />
@@ -1099,7 +1206,7 @@ export default function MorePage() {
                 href="https://wa.me/918383090874?text=Hi%20PrintMart%20Support,%20I%20need%20help%20with%20my%20print"
                 target="_blank"
                 rel="noreferrer"
-                className="p-3.5 rounded-xl border border-neutral-200/80 bg-neutral-50/60 hover:bg-emerald-50 hover:border-emerald-300 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl bg-neutral-100/70 hover:bg-neutral-100 transition-all flex items-center justify-between group border-0"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center">
@@ -1109,7 +1216,7 @@ export default function MorePage() {
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                       WhatsApp Chat
                     </span>
-                    <span className="text-xs font-bold text-[#1c1c1c]">8383090874</span>
+                    <span className="text-xs font-semibold text-[#1c1c1c]">8383090874</span>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-[#0c831f]" />
@@ -1120,7 +1227,7 @@ export default function MorePage() {
                 href="https://instagram.com/love_chn.14"
                 target="_blank"
                 rel="noreferrer"
-                className="p-3.5 rounded-xl border border-neutral-200/80 bg-neutral-50/60 hover:bg-pink-50 hover:border-pink-300 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl bg-neutral-100/70 hover:bg-neutral-100 transition-all flex items-center justify-between group border-0"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center">
@@ -1130,7 +1237,7 @@ export default function MorePage() {
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                       Instagram Direct
                     </span>
-                    <span className="text-xs font-bold text-[#1c1c1c]">@love_chn.14</span>
+                    <span className="text-xs font-semibold text-[#1c1c1c]">@love_chn.14</span>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-pink-700" />
@@ -1141,23 +1248,23 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 4: FAQ (BOTTOM SHEET)
+          MODAL 4: FAQ (BOTTOM SHEET, NO BORDERS)
           ───────────────────────────────────────────────────────────── */}
       {activeModal === "faq" && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border border-neutral-100 overflow-hidden animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-600" />
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
+                <h3 className="font-bold text-sm sm:text-base text-neutral-900">
                   Frequently Asked Questions
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors"
+                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1168,17 +1275,21 @@ export default function MorePage() {
               {FAQS_DATA.map((faq, idx) => {
                 const isOpen = openFaqIndex === idx;
                 return (
-                  <div key={idx} className="rounded-xl border border-neutral-200/70 overflow-hidden bg-neutral-50/60">
+                  <div key={idx} className="rounded-xl border-0 overflow-hidden bg-neutral-100/70">
                     <button
                       type="button"
                       onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="w-full p-3.5 text-left flex items-center justify-between gap-3 font-bold text-xs text-[#1c1c1c] hover:bg-neutral-50 cursor-pointer"
+                      className="w-full p-3.5 text-left flex items-center justify-between gap-3 font-semibold text-xs text-[#1c1c1c] hover:bg-neutral-200/40 cursor-pointer"
                     >
                       <span>{faq.q}</span>
-                      <ChevronDown className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${isOpen ? "rotate-180 text-[#0c831f]" : ""}`} />
+                      <ChevronDown
+                        className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${
+                          isOpen ? "rotate-180 text-[#0c831f]" : ""
+                        }`}
+                      />
                     </button>
                     {isOpen && (
-                      <div className="px-3.5 pb-3.5 text-xs text-neutral-600 leading-relaxed border-t border-neutral-100 pt-2 animate-in fade-in">
+                      <div className="px-3.5 pb-3.5 text-xs text-neutral-600 leading-relaxed border-t border-neutral-200/50 pt-2 animate-in fade-in">
                         {faq.a}
                       </div>
                     )}
@@ -1191,7 +1302,7 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 5: POLICIES VIEWER (BOTTOM SHEET)
+          MODAL 5: POLICIES VIEWER (BOTTOM SHEET, NO BORDERS)
           ───────────────────────────────────────────────────────────── */}
       {(activeModal === "terms" ||
         activeModal === "privacy" ||
@@ -1199,19 +1310,19 @@ export default function MorePage() {
         activeModal === "return" ||
         activeModal === "disclaimer") && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border border-neutral-100 overflow-hidden animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-neutral-800" />
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
+                <h3 className="font-bold text-sm sm:text-base text-neutral-900">
                   {POLICIES_DATA[activeModal].title}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors"
+                className="w-8 h-8 rounded-full bg-neutral-200/60 flex items-center justify-center text-neutral-700 hover:bg-neutral-300 transition-colors border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1225,8 +1336,8 @@ export default function MorePage() {
               <div className="space-y-3">
                 {POLICIES_DATA[activeModal].sections.map((sec, idx) => (
                   <div key={idx} className="space-y-1">
-                    <h4 className="text-xs font-bold text-neutral-900">{sec.h}</h4>
-                    <p className="text-xs text-neutral-600 leading-relaxed">{sec.p}</p>
+                    <h4 className="text-xs font-semibold text-neutral-900">{sec.h}</h4>
+                    <p className="text-xs text-neutral-600 leading-relaxed font-normal">{sec.p}</p>
                   </div>
                 ))}
               </div>
@@ -1236,20 +1347,20 @@ export default function MorePage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL 6: ITEMIZED RECEIPT (POPUP)
+          MODAL 6: ITEMIZED RECEIPT (POPUP, NO BORDERS)
           ───────────────────────────────────────────────────────────── */}
       {selectedTx && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border border-neutral-200 shadow-2xl space-y-4 animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border-0 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-[#0c831f]" />
-                <span className="font-extrabold text-sm text-neutral-900">Payment Receipt</span>
+                <span className="font-bold text-sm text-neutral-900">Payment Receipt</span>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedTx(null)}
-                className="text-neutral-400 hover:text-neutral-700"
+                className="text-neutral-400 hover:text-neutral-700 border-0 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1258,7 +1369,7 @@ export default function MorePage() {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-neutral-100">
                 <span className="text-neutral-500">Document</span>
-                <span className="font-bold text-neutral-900 truncate max-w-[170px]">
+                <span className="font-semibold text-neutral-900 truncate max-w-[170px]">
                   {selectedTx.documentName}
                 </span>
               </div>
@@ -1270,19 +1381,23 @@ export default function MorePage() {
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100">
                 <span className="text-neutral-500">Total Pages</span>
-                <span className="font-bold text-neutral-900">
+                <span className="font-semibold text-neutral-900">
                   {selectedTx.configuration?.totalPagesToPrint || (selectedTx as any).pageCount || 1}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100">
                 <span className="text-neutral-500">Amount Paid</span>
-                <span className="font-black text-sm text-neutral-900">
-                  {formatRupees(selectedTx.pricing?.finalPayablePaise || (selectedTx.payment as any)?.amountPaise || 150)}
+                <span className="font-bold text-sm text-neutral-900">
+                  {formatRupees(
+                    selectedTx.pricing?.finalPayablePaise ||
+                      (selectedTx.payment as any)?.amountPaise ||
+                      150
+                  )}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100">
                 <span className="text-neutral-500">Payment Status</span>
-                <span className="font-bold text-emerald-700">PAID (Razorpay)</span>
+                <span className="font-semibold text-emerald-700">PAID (Razorpay)</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-neutral-500">Date</span>
@@ -1298,9 +1413,32 @@ export default function MorePage() {
             <button
               type="button"
               onClick={() => setSelectedTx(null)}
-              className="w-full h-10 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all"
+              className="w-full h-10 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-xl shadow-xs transition-all border-0 cursor-pointer"
             >
               Close Receipt
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          REQUIREMENT 10: IN-APP ERROR NOTIFICATION POPUP
+          (Replaces browser alert() dialogs with elegant native popup)
+          ───────────────────────────────────────────────────────────── */}
+      {errorMessage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border-0 space-y-3 animate-in zoom-in-95">
+            <div className="flex items-center gap-2.5 text-rose-600">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <h4 className="font-bold text-sm text-neutral-900">Notification</h4>
+            </div>
+            <p className="text-xs text-neutral-600 leading-relaxed font-normal">{errorMessage}</p>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="w-full h-10 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-xl transition-all border-0 cursor-pointer"
+            >
+              Okay, Got It
             </button>
           </div>
         </div>

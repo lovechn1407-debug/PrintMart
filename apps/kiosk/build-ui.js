@@ -17,6 +17,12 @@ try {
   console.warn('Tailwind CLI build warning:', cssErr);
 }
 
+function resolvePkg(pkg) {
+  const rootPkg = path.resolve(__dirname, '../../node_modules', pkg);
+  if (fs.existsSync(rootPkg)) return rootPkg;
+  return path.resolve(__dirname, '../web/node_modules', pkg);
+}
+
 // Bundle TypeScript/React UI
 esbuild.buildSync({
   entryPoints: [path.resolve(__dirname, 'src/main.tsx')],
@@ -28,9 +34,10 @@ esbuild.buildSync({
     '@': path.resolve(__dirname, 'src'),
     '@heroui/react': path.resolve(__dirname, 'src/heroui-adapter.tsx'),
     '@printmart/shared': path.resolve(__dirname, '../../packages/shared/dist/index.js'),
-    'react': path.resolve(__dirname, '../web/node_modules/react'),
-    'react-dom': path.resolve(__dirname, '../web/node_modules/react-dom'),
-    'lucide-react': path.resolve(__dirname, '../web/node_modules/lucide-react'),
+    'react': resolvePkg('react'),
+    'react-dom': resolvePkg('react-dom'),
+    'lucide-react': resolvePkg('lucide-react'),
+    'qrcode': resolvePkg('qrcode'),
   },
   define: {
     'process.env.NODE_ENV': '"production"',

@@ -12,15 +12,18 @@ import {
   VolumeX,
 } from "lucide-react";
 import { database, ref, onValue } from "@/lib/firebase";
+import { VendingQrView } from "./components/VendingQrView";
 
 interface AdConfig {
   enabled: boolean;
+  mode?: "video" | "slides" | "banner" | "vending-qr";
   aspectRatio?: "9:16" | "9:14" | "16:9" | "3:4" | "4:3" | "custom";
   customAspectRatio?: string;
   videoUrl?: string;
   slides?: string[];
   title?: string;
   subtitle?: string;
+  targetUrl?: string;
 }
 
 export default function OnlineKioskPage() {
@@ -86,6 +89,28 @@ export default function OnlineKioskPage() {
       unsubMachineAd();
     };
   }, [machineId]);
+
+  // Dynamic Pricing from Firebase RTDB (pricing/global)
+  const [globalPricing, setGlobalPricing] = useState({
+    bwPerSidePaise: 150,
+    colorPerSidePaise: 500,
+    serviceChargePaise: 0,
+  });
+
+  useEffect(() => {
+    const pricingRef = ref(database, "pricing/global");
+    const unsubPricing = onValue(pricingRef, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        setGlobalPricing({
+          bwPerSidePaise: val.bwPerSidePaise ?? 150,
+          colorPerSidePaise: val.colorPerSidePaise ?? 500,
+          serviceChargePaise: val.serviceChargePaise ?? 0,
+        });
+      }
+    });
+    return () => unsubPricing();
+  }, []);
 
   // Slides rotator
   useEffect(() => {
@@ -209,7 +234,10 @@ export default function OnlineKioskPage() {
 
   const hasAds =
     Boolean(adConfig.enabled) &&
-    (Boolean(adConfig.videoUrl) || (adConfig.slides && adConfig.slides.length > 0));
+    (adConfig.mode === "vending-qr" ||
+      Boolean(adConfig.videoUrl) ||
+      Boolean(adConfig.slides && adConfig.slides.length > 0) ||
+      Boolean(adConfig.title || adConfig.subtitle));
 
   // Compute CSS Aspect Ratio style for the ad box
   const getAdAspectRatioStyle = (): React.CSSProperties => {
@@ -272,9 +300,9 @@ export default function OnlineKioskPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-center z-10 overflow-hidden">
         {hasAds ? (
           /* UNIFIED SINGLE OUTER CARD: Encloses OTP area & Ad area */
-          <div className="bg-white rounded-[16px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]">
+          <div className="bg-white rounded-tl-none rounded-bl-none rounded-tr-[14px] rounded-br-[14px] sm:rounded-tr-[16px] sm:rounded-br-[16px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]">
             {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Relative Container for Localized Blur) */}
-            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 relative overflow-hidden">
+            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 rounded-tl-none rounded-bl-none relative overflow-hidden">
               <div className="flex flex-col items-center pt-0.5">
                 <img
                   src="/brand/printmart-logo.webp"
@@ -284,7 +312,7 @@ export default function OnlineKioskPage() {
               </div>
 
               <div className="text-center">
-                <h1 className="text-base sm:text-lg font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
+                <h1 className="text-lg sm:text-xl font-bold text-neutral-950 tracking-normal leading-tight uppercase font-sans">
                   ENTER YOUR OTP
                 </h1>
               </div>
@@ -484,13 +512,21 @@ export default function OnlineKioskPage() {
               )}
             </div>
 
-            {/* RIGHT: AD AREA (Inside the outer box, with slight gap/padding from top, bottom, and right) */}
-            <div className="h-full flex items-center justify-center py-2.5 pr-2.5 pl-0 sm:py-3 sm:pr-3 shrink-0">
+            {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
+            <div className="h-full flex items-center justify-center py-[3px] pr-[3px] pl-0 sm:py-[4px] sm:pr-[4px] shrink-0">
               <div
-                className="h-full bg-[#00bcd4] rounded-[12px] relative flex items-center justify-center overflow-hidden select-none border-0"
+                className="h-full bg-neutral-950 rounded-tr-[12px] rounded-br-[12px] rounded-l-none relative flex items-center justify-center overflow-hidden select-none border-0"
                 style={getAdAspectRatioStyle()}
               >
-                {adConfig.videoUrl ? (
+                {adConfig.mode === "vending-qr" ? (
+                  <VendingQrView
+                    targetUrl={adConfig.targetUrl || "https://itsprintmart.vercel.app"}
+                    title={adConfig.title}
+                    subtitle={adConfig.subtitle}
+                    pricing={globalPricing}
+                    aspectRatio={adConfig.aspectRatio || "16:9"}
+                  />
+                ) : adConfig.videoUrl ? (
                   <div className="w-full h-full relative">
                     <video
                       src={adConfig.videoUrl}
@@ -553,7 +589,7 @@ export default function OnlineKioskPage() {
           </div>
         ) : (
           /* Centered Card (No Ads, Strictly 3:4 Portrait Ratio) */
-          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-6.5rem)] aspect-[3/4] mx-auto bg-white rounded-[16px] p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
+          <div className="w-full max-w-[370px] h-auto md:h-[510px] max-h-[calc(100vh-6.5rem)] aspect-[3/4] mx-auto bg-white rounded-tl-none rounded-bl-none rounded-tr-[14px] rounded-br-[14px] sm:rounded-tr-[16px] sm:rounded-br-[16px] p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
             <div className="flex flex-col items-center pt-0.5">
               <img
                 src="/brand/printmart-logo.webp"
@@ -563,7 +599,7 @@ export default function OnlineKioskPage() {
             </div>
 
             <div className="text-center">
-              <h1 className="text-base sm:text-lg font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
+              <h1 className="text-lg sm:text-xl font-bold text-neutral-950 tracking-normal leading-tight uppercase font-sans">
                 ENTER YOUR OTP
               </h1>
             </div>

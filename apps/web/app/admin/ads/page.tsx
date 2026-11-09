@@ -14,13 +14,17 @@ import {
   ExternalLink,
   Volume2,
   VolumeX,
+  QrCode,
+  Zap,
+  Smartphone,
+  Coins,
 } from "lucide-react";
 import { database, ref, onValue, set, get } from "@/lib/firebase";
-import { MachineRecord } from "@printmart/shared";
+import { MachineRecord, DEFAULT_GLOBAL_PRICING, GlobalPricing } from "@printmart/shared";
 
 interface AdSettings {
   enabled: boolean;
-  mode: "video" | "slides" | "banner";
+  mode: "video" | "slides" | "banner" | "vending-qr";
   aspectRatio?: "9:16" | "9:14" | "16:9" | "3:4" | "4:3" | "custom";
   customAspectRatio?: string;
   videoUrl?: string;
@@ -28,6 +32,7 @@ interface AdSettings {
   slideDuration?: number;
   title?: string;
   subtitle?: string;
+  targetUrl?: string;
   updatedAt?: number;
 }
 
@@ -37,16 +42,21 @@ export default function AdminAdsPage() {
 
   // Ad Settings State
   const [enabled, setEnabled] = useState<boolean>(true);
-  const [mode, setMode] = useState<"video" | "slides" | "banner">("video");
+  const [mode, setMode] = useState<"video" | "slides" | "banner" | "vending-qr">("vending-qr");
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "9:14" | "16:9" | "3:4" | "4:3" | "custom">("16:9");
   const [customAspectRatio, setCustomAspectRatio] = useState<string>("16:9");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [slides, setSlides] = useState<string[]>([]);
   const [slideDuration, setSlideDuration] = useState<number>(5);
-  const [title, setTitle] = useState<string>("Print on Campus in Seconds");
+  const [title, setTitle] = useState<string>("Print from Your Phone in 30 Seconds");
   const [subtitle, setSubtitle] = useState<string>(
-    "Upload from your phone at printmart.in and dispense prints instantly at any kiosk."
+    "Scan the QR code with your camera, upload your document, and enter the OTP on this screen to dispense."
   );
+  const [targetUrl, setTargetUrl] = useState<string>("https://itsprintmart.vercel.app");
+  const [globalPricing, setGlobalPricing] = useState<GlobalPricing>(DEFAULT_GLOBAL_PRICING);
+  const adminQrPreview = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(
+    targetUrl.trim() || "https://itsprintmart.vercel.app"
+  )}`;
 
   // Upload & Save State
   const [uploading, setUploading] = useState<boolean>(false);
@@ -55,6 +65,17 @@ export default function AdminAdsPage() {
   const [slideInput, setSlideInput] = useState<string>("");
   const videoInputRef = useRef<HTMLInputElement>(null);
   const slideFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Listen to Global Pricing from Firebase RTDB (pricing/global)
+  useEffect(() => {
+    const pricingRef = ref(database, "pricing/global");
+    const unsub = onValue(pricingRef, (snap) => {
+      if (snap.exists()) {
+        setGlobalPricing(snap.val() as GlobalPricing);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Listen to Machines list
   useEffect(() => {
@@ -79,22 +100,24 @@ export default function AdminAdsPage() {
       if (snap.exists()) {
         const val = snap.val() as AdSettings;
         setEnabled(val.enabled ?? true);
-        setMode(val.mode || "video");
+        setMode(val.mode || "vending-qr");
         setAspectRatio(val.aspectRatio || "16:9");
         setCustomAspectRatio(val.customAspectRatio || "16:9");
         setVideoUrl(val.videoUrl || "");
         setSlides(val.slides || []);
         setSlideDuration(val.slideDuration || 5);
-        setTitle(val.title || "Print on Campus in Seconds");
+        setTitle(val.title || "Print from Your Phone in 30 Seconds");
         setSubtitle(
           val.subtitle ||
-            "Upload from your phone at printmart.in and dispense prints instantly at any kiosk."
+            "Scan the QR code with your camera, upload your document, and enter the OTP on this screen to dispense."
         );
+        setTargetUrl(val.targetUrl || "https://itsprintmart.vercel.app");
       } else {
         // Defaults
         setEnabled(false);
         setVideoUrl("");
         setSlides([]);
+        setTargetUrl("https://itsprintmart.vercel.app");
       }
     });
 
@@ -194,6 +217,7 @@ export default function AdminAdsPage() {
         slideDuration: Number(slideDuration) || 5,
         title: title.trim(),
         subtitle: subtitle.trim(),
+        targetUrl: targetUrl.trim(),
         updatedAt: Date.now(),
       };
 
@@ -322,7 +346,17 @@ export default function AdminAdsPage() {
         </div>
 
         {/* Mode Tabs */}
-        <div className="flex gap-2 p-1 bg-neutral-100 rounded-xl max-w-md">
+        <div className="flex gap-2 p-1 bg-neutral-100 rounded-xl max-w-xl">
+          <button
+            type="button"
+            onClick={() => setMode("vending-qr")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              mode === "vending-qr" ? "bg-white text-neutral-950 shadow-xs" : "text-neutral-600 hover:text-black"
+            }`}
+          >
+            <QrCode className="w-3.5 h-3.5 text-[#0c831f]" />
+            <span>Vending QR</span>
+          </button>
           <button
             type="button"
             onClick={() => setMode("video")}
@@ -401,6 +435,144 @@ export default function AdminAdsPage() {
             </div>
           )}
         </div>
+
+        {/* 0. Vending QR Section */}
+        {mode === "vending-qr" && (
+          <div className="space-y-4 pt-2">
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs">
+                  <QrCode className="w-4 h-4 text-[#0c831f]" />
+                  <span>Interactive Mobile Vending QR Mode Active</span>
+                </div>
+                <p className="text-[11px] text-emerald-800 mt-0.5">
+                  Displays an interactive website promo banner with a scannable QR code directing students to the website homescreen, along with live dynamic print rates.
+                </p>
+              </div>
+              <a
+                href="/admin/pricing"
+                className="px-3 py-1.5 bg-[#0c831f] hover:bg-[#0a701a] text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1 transition-colors"
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>Configure Live Pricing</span>
+              </a>
+            </div>
+
+            {/* Target Website URL Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-800 block">
+                Website Homescreen URL (QR Code Destination)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={targetUrl}
+                  onChange={(e) => setTargetUrl(e.target.value)}
+                  placeholder="https://itsprintmart.vercel.app"
+                  className="flex-1 h-10 px-3 text-xs bg-neutral-50 rounded-xl border border-neutral-200 text-neutral-900 focus:ring-2 focus:ring-[#0c831f]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTargetUrl("https://itsprintmart.vercel.app")}
+                  className="px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl border border-neutral-200 cursor-pointer"
+                >
+                  Default Vercel
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-400">
+                When students scan this QR code with their mobile phone camera, they will be redirected to this site to upload documents and order prints.
+              </p>
+            </div>
+
+            {/* Live Dynamic Pricing Info Cards */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Dynamic Print Pricing (Synced Live from Firebase)</span>
+                </label>
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  ● Real-time Sync
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-neutral-500">Black & White</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-lg font-black text-neutral-900">
+                      ₹{((globalPricing.bwPerSidePaise ?? 150) / 100).toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-neutral-500">/ side</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700">Vibrant Color</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-lg font-black text-emerald-700">
+                      ₹{((globalPricing.colorPerSidePaise ?? 500) / 100).toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-neutral-500">/ side</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-neutral-500">Convenience Fee</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-lg font-black text-neutral-900">
+                      ₹{(((globalPricing.serviceChargePaise || 0)) / 100).toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-neutral-500">/ order</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Preview of the Vending QR Ad */}
+            <div className="space-y-1.5 pt-2">
+              <span className="text-[11px] font-bold text-neutral-700 block">
+                Live Vending QR Ad Display Preview
+              </span>
+              <div className="p-4 bg-gradient-to-r from-[#111827] via-[#0f172a] to-[#0a1120] rounded-2xl text-white flex flex-col sm:flex-row items-center justify-between gap-4 border border-neutral-800 shadow-md">
+                <div className="space-y-2 flex-1">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Campus Mobile Vending</span>
+                  </div>
+                  <h3 className="text-base font-black uppercase text-white tracking-tight">
+                    {title || "Print from Your Phone in 30 Seconds"}
+                  </h3>
+                  <p className="text-xs text-neutral-300 max-w-sm">
+                    {subtitle || "Scan the QR code with your camera, upload your document, and enter the OTP on this screen to dispense."}
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 text-[11px] text-neutral-300">
+                    <span className="px-2 py-0.5 rounded bg-white/10 font-bold">
+                      B&W: ₹{((globalPricing.bwPerSidePaise ?? 150) / 100).toFixed(2)}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                      Color: ₹{((globalPricing.colorPerSidePaise ?? 500) / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex flex-col items-center gap-1.5 bg-white p-3 rounded-2xl text-neutral-900 shadow-lg">
+                  {adminQrPreview ? (
+                    <img src={adminQrPreview} alt="QR Preview" className="w-28 h-28 object-contain rounded-lg" />
+                  ) : (
+                    <div className="w-28 h-28 bg-neutral-100 flex items-center justify-center rounded-lg text-[10px] text-neutral-400">
+                      Generating...
+                    </div>
+                  )}
+                  <span className="text-[10px] font-bold text-emerald-700 tracking-tight flex items-center gap-1">
+                    <Smartphone className="w-3 h-3" />
+                    <span>Scan to Print</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 1. Video Ad Section */}
         {mode === "video" && (

@@ -264,6 +264,21 @@ export function OtpScreen({
     return { aspectRatio: "16 / 9" };
   };
 
+  // Dynamically compute card height to ensure 16:9 and wide formats fit comfortably on all screens
+  const getCardDimensions = () => {
+    if (!hasAds) {
+      return "h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]";
+    }
+    const ratio = adConfig.aspectRatio || "16:9";
+    if (ratio === "16:9") {
+      return "h-auto md:h-[390px] lg:h-[420px] xl:h-[450px] max-h-[calc(100vh-6.5rem)]";
+    }
+    if (ratio === "4:3") {
+      return "h-auto md:h-[430px] lg:h-[460px] xl:h-[490px] max-h-[calc(100vh-6.5rem)]";
+    }
+    return "h-auto md:h-[480px] lg:h-[510px] xl:h-[530px] max-h-[calc(100vh-6.5rem)]";
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
       {/* ── Signature Navbar with iPhone Notch ── */}
@@ -287,9 +302,9 @@ export function OtpScreen({
              - Right: Ad Area has a slight gap from top, bottom, and right of the outer box
              - Height-locked to viewport: fits screen 100% without overflow
              ══════════════════════════════════════════════════════════════════════ */
-          <div className="bg-white rounded-tl-none rounded-bl-none rounded-tr-[14px] rounded-br-[14px] sm:rounded-tr-[16px] sm:rounded-br-[16px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]">
-            {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Relative Container for Localized Blur) */}
-            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 rounded-tl-none rounded-bl-none relative overflow-hidden">
+          <div className={`bg-white rounded-[18px] sm:rounded-[22px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full ${getCardDimensions()}`}>
+            {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Rounded Left Corners) */}
+            <div className="w-full max-w-[360px] md:max-w-none md:w-auto h-auto md:h-full aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 rounded-l-[18px] sm:rounded-l-[22px] relative overflow-hidden">
               {/* Brand Logo */}
               <div className="flex flex-col items-center pt-0.5">
                 <img
@@ -301,7 +316,7 @@ export function OtpScreen({
 
               {/* Title: ENTER YOUR OTP */}
               <div className="text-center">
-                <h1 className="text-lg sm:text-xl font-bold text-neutral-950 tracking-normal leading-tight uppercase font-sans">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
                   ENTER YOUR OTP
                 </h1>
               </div>
@@ -509,9 +524,11 @@ export function OtpScreen({
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
-            <div className="h-full flex items-center justify-center py-[3px] pr-[3px] pl-0 sm:py-[4px] sm:pr-[4px] shrink-0">
+            <div className="h-full flex items-center justify-center py-[3px] pr-[3px] pl-0 sm:py-[4px] sm:pr-[4px] shrink-0 max-w-full">
               <div
-                className="h-full bg-neutral-950 rounded-tr-[12px] rounded-br-[12px] rounded-l-none relative flex items-center justify-center overflow-hidden select-none border-0"
+                className={`h-full rounded-r-[15px] sm:rounded-r-[19px] relative flex items-center justify-center overflow-hidden select-none border-0 ${
+                  adConfig.mode === "vending-qr" ? "bg-[#fbf9f3]" : "bg-neutral-950"
+                }`}
                 style={getAdAspectRatioStyle()}
               >
                 {adConfig.mode === "vending-qr" ? (
@@ -523,15 +540,15 @@ export function OtpScreen({
                     aspectRatio={adConfig.aspectRatio || "16:9"}
                   />
                 ) : adConfig.videoUrl ? (
-                  /* Video Player */
-                  <div className="w-full h-full relative">
+                  /* Video Player - object-contain so full video fits without cut-off */
+                  <div className="w-full h-full relative flex items-center justify-center bg-black">
                     <video
                       src={adConfig.videoUrl}
                       autoPlay
                       loop
                       muted={isMuted}
                       playsInline
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                     <button
                       type="button"
@@ -543,18 +560,18 @@ export function OtpScreen({
                     </button>
                   </div>
                 ) : adConfig.slides && adConfig.slides.length > 0 ? (
-                  /* Image Slides Carousel with Smooth Page Sliding Animation */
-                  <div className="w-full h-full relative overflow-hidden">
+                  /* Image Slides Carousel - object-contain so entire banner fits without cut-off */
+                  <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
                     <div
                       className="flex h-full w-full transition-transform duration-700 ease-in-out"
                       style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
                     >
                       {adConfig.slides.map((slideUrl, idx) => (
-                        <div key={idx} className="w-full h-full shrink-0 relative">
+                        <div key={idx} className="w-full h-full shrink-0 relative flex items-center justify-center bg-black">
                           <img
                             src={slideUrl}
                             alt={`Slide ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         </div>
                       ))}
@@ -602,7 +619,7 @@ export function OtpScreen({
 
             {/* Title: ENTER YOUR OTP */}
             <div className="text-center">
-              <h1 className="text-lg sm:text-xl font-bold text-neutral-950 tracking-normal leading-tight uppercase font-sans">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
                 ENTER YOUR OTP
               </h1>
             </div>

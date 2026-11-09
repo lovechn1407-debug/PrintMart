@@ -534,37 +534,37 @@ export default function AdminAdsPage() {
               <span className="text-[11px] font-bold text-neutral-700 block">
                 Live Vending QR Ad Display Preview
               </span>
-              <div className="p-4 bg-gradient-to-r from-[#111827] via-[#0f172a] to-[#0a1120] rounded-2xl text-white flex flex-col sm:flex-row items-center justify-between gap-4 border border-neutral-800 shadow-md">
+              <div className="p-4 bg-[#fbf9f3] rounded-2xl text-[#1c1c1c] flex flex-col sm:flex-row items-center justify-between gap-4 border border-neutral-200 shadow-xs font-sans">
                 <div className="space-y-2 flex-1">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Campus Mobile Vending</span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#e8f5e9] text-[#0c831f] text-[11px] font-semibold tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f]" />
+                    <span>Self-Service Kiosk</span>
                   </div>
-                  <h3 className="text-base font-black uppercase text-white tracking-tight">
-                    {title || "Print from Your Phone in 30 Seconds"}
+                  <h3 className="text-base font-bold text-[#1c1c1c] tracking-tight">
+                    {title || "Print from Your Phone"}
                   </h3>
-                  <p className="text-xs text-neutral-300 max-w-sm">
+                  <p className="text-xs text-neutral-600 max-w-sm leading-relaxed">
                     {subtitle || "Scan the QR code with your camera, upload your document, and enter the OTP on this screen to dispense."}
                   </p>
-                  <div className="flex items-center gap-2 pt-1 text-[11px] text-neutral-300">
-                    <span className="px-2 py-0.5 rounded bg-white/10 font-bold">
-                      B&W: ₹{((globalPricing.bwPerSidePaise ?? 150) / 100).toFixed(2)}
+                  <div className="flex items-center gap-2 pt-1 text-[11px]">
+                    <span className="px-2.5 py-1 rounded-lg bg-white shadow-xs font-bold text-[#1c1c1c]">
+                      B&W: ₹{((globalPricing.bwPerSidePaise ?? 150) / 100).toFixed(2)}/page
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                      Color: ₹{((globalPricing.colorPerSidePaise ?? 500) / 100).toFixed(2)}
+                    <span className="px-2.5 py-1 rounded-lg bg-white shadow-xs font-bold text-[#0c831f]">
+                      Color: ₹{((globalPricing.colorPerSidePaise ?? 500) / 100).toFixed(2)}/page
                     </span>
                   </div>
                 </div>
 
-                <div className="shrink-0 flex flex-col items-center gap-1.5 bg-white p-3 rounded-2xl text-neutral-900 shadow-lg">
+                <div className="shrink-0 flex flex-col items-center gap-1 bg-white p-3 rounded-2xl text-neutral-900 shadow-sm border-0">
                   {adminQrPreview ? (
-                    <img src={adminQrPreview} alt="QR Preview" className="w-28 h-28 object-contain rounded-lg" />
+                    <img src={adminQrPreview} alt="QR Preview" className="w-28 h-28 object-contain rounded-xl" />
                   ) : (
-                    <div className="w-28 h-28 bg-neutral-100 flex items-center justify-center rounded-lg text-[10px] text-neutral-400">
+                    <div className="w-28 h-28 bg-neutral-100 flex items-center justify-center rounded-xl text-[10px] text-neutral-400">
                       Generating...
                     </div>
                   )}
-                  <span className="text-[10px] font-bold text-emerald-700 tracking-tight flex items-center gap-1">
+                  <span className="text-[11px] font-semibold text-[#0c831f] tracking-tight flex items-center gap-1">
                     <Smartphone className="w-3 h-3" />
                     <span>Scan to Print</span>
                   </span>

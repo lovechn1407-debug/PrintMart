@@ -29,13 +29,17 @@ type FilterTab = "all" | "active" | "completed";
 export default function UserHistoryPage() {
   const { user, signInWithGoogle, loading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<PrintJob[]>([]);
+  const [jobsLoading, setJobsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selectedJob, setSelectedJob] = useState<PrintJob | null>(null);
   const [copiedJobOtp, setCopiedJobOtp] = useState<string | null>(null);
   const [copiedReceiptOtp, setCopiedReceiptOtp] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setJobsLoading(false);
+      return;
+    }
 
     const jobsQuery = query(ref(database, "printJobs"), limitToLast(100));
     const unsub = onValue(jobsQuery, (snapshot) => {
@@ -48,6 +52,7 @@ export default function UserHistoryPage() {
       } else {
         setJobs([]);
       }
+      setJobsLoading(false);
     });
 
     return () => unsub();
@@ -255,8 +260,13 @@ export default function UserHistoryPage() {
           </button>
         </div>
 
-        {/* Empty State */}
-        {filteredJobs.length === 0 ? (
+        {/* Loading Buffer or Empty State or List */}
+        {jobsLoading ? (
+          <div className="bg-white rounded-2xl p-12 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] text-center my-4 flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+            <p className="text-xs font-medium text-neutral-500">Loading your print jobs...</p>
+          </div>
+        ) : filteredJobs.length === 0 ? (
           <div className="bg-white rounded-2xl p-6 sm:p-8 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] text-center my-4 flex flex-col items-center">
             {/* Layered Document Graphic from Homepage */}
             <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center select-none pointer-events-none mb-3">

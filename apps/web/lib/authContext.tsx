@@ -18,6 +18,7 @@ interface AuthContextType {
   isAdmin: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfileState: (data: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   signInWithGoogle: async () => { },
   signOut: async () => { },
+  updateProfileState: () => { },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,11 +37,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const updateProfileState = (data: Partial<UserProfile>) => {
+    setProfile((prev) => (prev ? { ...prev, ...data } : null));
+  };
+
   useEffect(() => {
     let unsubscribeDraftSync = () => {};
+    let unsubscribeProfile = () => {};
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       unsubscribeDraftSync();
+      unsubscribeProfile();
       if (fbUser) {
         setUser(fbUser);
         // Automatically synchronize drafts across devices for this authenticated user
@@ -80,6 +88,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await set(userRef, newProfile);
             setProfile(newProfile);
           }
+
+          // Real-time listener: immediate updates on photo, name, stats across app
+          unsubscribeProfile = onValue(userRef, (snap) => {
+            if (snap.exists()) {
+              setProfile(snap.val());
+            }
+          });
         } catch (err) {
           console.error("Error loading user profile:", err);
         }
@@ -98,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       clearTimeout(timeout);
       unsubscribeDraftSync();
+      unsubscribeProfile();
       unsubscribe();
     };
   }, []);
@@ -134,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         signInWithGoogle,
         signOut,
+        updateProfileState,
       }}
     >
       {children}

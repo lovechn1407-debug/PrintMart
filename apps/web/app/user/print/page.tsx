@@ -396,6 +396,9 @@ function UserPrintContent() {
   const searchParams = useSearchParams();
   const isNewUpload = searchParams.get("new") === "1" || searchParams.get("mode") === "new";
   const requestedDraftId = searchParams.get("draftId");
+  const requestedDocId = searchParams.get("docId") || searchParams.get("publicDocId");
+  const requestedTitle = searchParams.get("title") || "Public Document.pdf";
+  const requestedPages = parseInt(searchParams.get("pages") || "1", 10);
 
   // State: Active Draft ID tracking
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
@@ -498,6 +501,25 @@ function UserPrintContent() {
 
   // Restore draft or initialize clean upload based on URL query
   useEffect(() => {
+    // 0. If a document was clicked from the Public tab, load it directly into Print Studio
+    if (requestedDocId) {
+      const publicDocRecord: UploadedDocumentRecord = {
+        fileId: requestedDocId,
+        originalFilename: requestedTitle,
+        fileSizeBytes: 0,
+        mimeType: "application/pdf",
+        pageCount: Math.max(1, requestedPages),
+        isColorDocument: false,
+        telegramFileId: requestedDocId,
+        previewUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
+        blobUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
+      };
+      setDocuments([publicDocRecord]);
+      setStep("studio");
+      setActiveDraftId(null);
+      return;
+    }
+
     // Requirement 1: If user clicked "Upload Files" on homepage (isNewUpload),
     // NEVER load draft files into print studio; show clean upload panel!
     if (isNewUpload) {
@@ -529,7 +551,7 @@ function UserPrintContent() {
     setDocuments([]);
     setStep("upload");
     setActiveDraftId(null);
-  }, [isNewUpload, requestedDraftId]);
+  }, [isNewUpload, requestedDraftId, requestedDocId, requestedTitle, requestedPages]);
 
   // Listener to auto-load requested draft if it was populated via cloud sync
   useEffect(() => {

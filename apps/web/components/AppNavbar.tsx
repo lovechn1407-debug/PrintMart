@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown, Menu } from "lucide-react";
+import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown, Menu, Globe } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { Arc } from "@/components/loading-ui/arc";
+import { OfflineNotch } from "@/components/OfflineNotch";
 export function AppNavbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,13 +64,16 @@ export function AppNavbar() {
 
   return (
     <>
+      {/* Offline Connectivity Detection Notch */}
+      <OfflineNotch />
+
       {/* ─────────────────────────────────────────────────────────────
           WARM HONEY-GOLDEN HEADER (Yellow on bottom to match homepage)
           ───────────────────────────────────────────────────────────── */}
       {!isMorePage && (
         <header className="sticky top-0 z-50 bg-gradient-to-b from-[#f7d968] via-[#f8dc72] to-[#fae07c] backdrop-blur-md border-b border-amber-300/30 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-colors shadow-2xs">
-          {/* Brand Logo */}
-          <div className="flex items-center gap-3">
+          {/* Brand Logo with slight left gap and slightly reduced size */}
+          <div className="flex items-center gap-3 pl-1.5 sm:pl-2.5">
             <Link
               href="/"
               onClick={(e) => handleNavClick(e, "/")}
@@ -78,7 +82,7 @@ export function AppNavbar() {
               <img
                 src="/brand/printmart-logo.webp"
                 alt="PrintMart"
-                className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
+                className="h-8.5 sm:h-9.5 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
           </div>
@@ -108,6 +112,18 @@ export function AppNavbar() {
                 <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
               )}
               <span>Start Printing</span>
+            </Link>
+            <Link
+              href="/public"
+              onClick={(e) => handleNavClick(e, "/public")}
+              className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                pathname === "/public" || pathname === "/user/public" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
+              }`}
+            >
+              {pendingPath === "/public" && (
+                <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+              )}
+              <span>Public</span>
             </Link>
             {user && (
               <Link
@@ -285,6 +301,22 @@ export function AppNavbar() {
             )}
           </div>
           <span>Print</span>
+        </Link>
+        <Link
+          href="/public"
+          onClick={(e) => handleNavClick(e, "/public")}
+          className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
+            pathname === "/public" || pathname === "/user/public" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
+          }`}
+        >
+          <div className="relative w-5 h-5 flex items-center justify-center">
+            {pendingPath === "/public" ? (
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+            ) : (
+              <Globe className="w-5 h-5" />
+            )}
+          </div>
+          <span>Public</span>
         </Link>
         {user && (
           <Link

@@ -220,9 +220,51 @@ function formatRupees(paise: number = 0): string {
   return `₹${(paise / 100).toFixed(2)}`;
 }
 
+function resizeImageToDataUrl(file: File, maxWidth = 160, maxHeight = 160, quality = 0.75): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function MorePage() {
   const router = useRouter();
-  const { user, profile, signInWithGoogle, signOut } = useAuth();
+  const { user, profile, signInWithGoogle, signOut, updateProfileState } = useAuth();
+
+  // Local immediate updates for profile photo and name
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
+  const [localDisplayName, setLocalDisplayName] = useState<string | null>(null);
 
   // Exit Animation State
   const [isExiting, setIsExiting] = useState<boolean>(false);
@@ -234,6 +276,7 @@ export default function MorePage() {
   const [isHelpWindowOpen, setIsHelpWindowOpen] = useState<boolean>(false);
   const [showActiveTicketsList, setShowActiveTicketsList] = useState<boolean>(false);
   const [ticketSuccessSnackbar, setTicketSuccessSnackbar] = useState<string | null>(null);
+  const [ticketsLoading, setTicketsLoading] = useState<boolean>(true);
 
   // In-App Error Notification Popup
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -321,7 +364,10 @@ export default function MorePage() {
 
   // Load User's Tickets
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setTicketsLoading(false);
+      return;
+    }
     const ticketsRef = ref(database, "supportTickets");
     const unsub = onValue(ticketsRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -333,6 +379,7 @@ export default function MorePage() {
       } else {
         setUserTickets([]);
       }
+      setTicketsLoading(false);
     });
     return () => unsub();
   }, [user]);
@@ -346,14 +393,21 @@ export default function MorePage() {
     return () => clearTimeout(timer);
   }, [ticketSuccessSnackbar]);
 
-  // Handle Save Name
+  // Handle Save Name with Real-Time Reflection
   const handleSaveName = async () => {
-    if (!nameInput.trim() || !auth.currentUser) return;
+    if (!nameInput.trim()) return;
+    const newName = nameInput.trim();
     setSavingProfile(true);
+    setLocalDisplayName(newName);
+    if (updateProfileState) {
+      updateProfileState({ displayName: newName });
+    }
+    setIsEditingName(false);
     try {
-      await updateProfile(auth.currentUser, { displayName: nameInput.trim() });
-      await update(ref(database, `users/${auth.currentUser.uid}`), { displayName: nameInput.trim() });
-      setIsEditingName(false);
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: newName }).catch(() => {});
+        await update(ref(database, `users/${auth.currentUser.uid}`), { displayName: newName });
+      }
     } catch (e: any) {
       setErrorMessage(e.message || "Failed to update profile name");
     } finally {
@@ -361,28 +415,33 @@ export default function MorePage() {
     }
   };
 
-  // Handle Photo Select
+  // Handle Photo Select with Client-side Canvas Thumbnail (Fixes "URL too long")
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !auth.currentUser) return;
     const file = e.target.files[0];
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage("Profile image must be smaller than 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage("Profile image must be smaller than 10MB");
       return;
     }
     setSavingProfile(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Url = reader.result as string;
-      try {
-        await updateProfile(auth.currentUser!, { photoURL: base64Url });
-        await update(ref(database, `users/${auth.currentUser!.uid}`), { photoURL: base64Url });
-      } catch (err: any) {
-        setErrorMessage(err.message || "Failed to update profile photo");
-      } finally {
-        setSavingProfile(false);
+    try {
+      const resizedBase64 = await resizeImageToDataUrl(file, 160, 160, 0.75);
+      setLocalPhoto(resizedBase64);
+      if (updateProfileState) {
+        updateProfileState({ photoURL: resizedBase64 });
       }
-    };
-    reader.readAsDataURL(file);
+      const uid = auth.currentUser.uid;
+      // Store in Realtime Database where there is no 2048 character length limit
+      await update(ref(database, `users/${uid}`), { photoURL: resizedBase64 });
+      // Update Auth Profile if within 2000 chars, ignore error if string exceeds limit
+      if (resizedBase64.length <= 2000) {
+        await updateProfile(auth.currentUser, { photoURL: resizedBase64 }).catch(() => {});
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update profile photo");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   // Handle Ticket Submit
@@ -431,8 +490,8 @@ export default function MorePage() {
     }
   };
 
-  const displayName = profile?.displayName || user?.displayName || nameInput || "Love Chauhan";
-  const userPhoto = profile?.photoURL || user?.photoURL;
+  const displayName = localDisplayName || profile?.displayName || user?.displayName || nameInput || "Love Chauhan";
+  const userPhoto = localPhoto || profile?.photoURL || user?.photoURL;
   const subtext = user?.email || "8383090874 • PrintMart Campus";
 
   return (
@@ -456,12 +515,12 @@ export default function MorePage() {
             <ArrowLeft className="w-5 h-5 text-neutral-800" />
           </button>
 
-          {/* 1:1 Brand Logo Badge */}
-          <div className="w-9 h-9 rounded-full bg-white shadow-xs border-0 flex items-center justify-center p-1.5 overflow-hidden">
+          {/* Top Right Logo - naked without circle container or background */}
+          <div className="flex items-center justify-center shrink-0">
             <img
-              src="/brand/printmart-logo.webp"
+              src="/brand/pm-icon.png"
               alt="PrintMart"
-              className="w-full h-full object-contain"
+              className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-xs"
             />
           </div>
         </div>
@@ -882,7 +941,12 @@ export default function MorePage() {
                   <span className="text-xs font-bold text-neutral-900">Your Campus Tickets</span>
                   <span className="text-[11px] font-medium text-neutral-500">{userTickets.length} total</span>
                 </div>
-                {userTickets.length === 0 ? (
+                {ticketsLoading ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2">
+                    <div className="w-6 h-6 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+                    <p className="text-[11px] text-neutral-400">Loading your tickets...</p>
+                  </div>
+                ) : userTickets.length === 0 ? (
                   <p className="text-xs text-neutral-400 py-4 text-center">No active tickets right now.</p>
                 ) : (
                   <div className="space-y-2.5">
@@ -1110,7 +1174,10 @@ export default function MorePage() {
               onTouchMove={(e) => e.stopPropagation()}
             >
               {txLoading ? (
-                <div className="py-12 text-center text-xs text-neutral-400">Loading orders...</div>
+                <div className="py-16 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+                  <p className="text-xs font-medium text-neutral-400">Loading transactions...</p>
+                </div>
               ) : !user ? (
                 <div className="py-8 text-center text-xs text-neutral-500">
                   Please sign in to view your past transactions.

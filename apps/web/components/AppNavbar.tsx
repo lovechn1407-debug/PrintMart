@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Printer, User, LogOut, ShieldAlert, Home, Clock, ChevronDown, Menu } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { Arc } from "@/components/loading-ui/arc";
 export function AppNavbar() {
+  const router = useRouter();
   const pathname = usePathname();
   const isMorePage = pathname === "/user/more" || pathname === "/more";
   const { user, profile, isAdmin, signInWithGoogle, signOut, loading } = useAuth();
@@ -20,10 +21,16 @@ export function AppNavbar() {
     setPendingPath(null);
   }, [pathname]);
 
-  const handleNavClick = (target: string) => {
+  const handleNavClick = (e: React.MouseEvent, target: string) => {
     if (pathname !== target) {
       if (isMorePage && typeof window !== "undefined") {
+        e.preventDefault();
         window.dispatchEvent(new Event("more-page-exit"));
+        setTimeout(() => {
+          setPendingPath(target);
+          router.push(target);
+        }, 180);
+        return;
       }
       setPendingPath(target);
     }
@@ -65,13 +72,13 @@ export function AppNavbar() {
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              onClick={() => handleNavClick("/")}
+              onClick={(e) => handleNavClick(e, "/")}
               className="flex items-center tracking-tight shrink-0 group py-1"
             >
               <img
                 src="/brand/printmart-logo.webp"
                 alt="PrintMart"
-                className="h-9 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform"
+                className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
           </div>
@@ -80,7 +87,7 @@ export function AppNavbar() {
           <nav className="hidden sm:flex items-center gap-6">
             <Link
               href="/"
-              onClick={() => handleNavClick("/")}
+              onClick={(e) => handleNavClick(e, "/")}
               className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 pathname === "/" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
               }`}
@@ -92,7 +99,7 @@ export function AppNavbar() {
             </Link>
             <Link
               href="/user/print"
-              onClick={() => handleNavClick("/user/print")}
+              onClick={(e) => handleNavClick(e, "/user/print")}
               className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 pathname === "/user/print" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
               }`}
@@ -105,7 +112,7 @@ export function AppNavbar() {
             {user && (
               <Link
                 href="/user/history"
-                onClick={() => handleNavClick("/user/history")}
+                onClick={(e) => handleNavClick(e, "/user/history")}
                 className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                   pathname === "/user/history" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
                 }`}
@@ -118,7 +125,7 @@ export function AppNavbar() {
             )}
             <Link
               href="/user/more"
-              onClick={() => handleNavClick("/user/more")}
+              onClick={(e) => handleNavClick(e, "/user/more")}
               className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 pathname === "/user/more" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
               }`}
@@ -131,7 +138,7 @@ export function AppNavbar() {
             {isAdmin && (
               <Link
                 href="/admin/dashboard"
-                onClick={() => handleNavClick("/admin/dashboard")}
+                onClick={(e) => handleNavClick(e, "/admin/dashboard")}
                 className="text-xs font-bold flex items-center gap-1.5 text-rose-700 bg-white/70 hover:bg-white px-2.5 py-1 rounded-full border border-rose-300/60 shadow-2xs"
               >
                 {pendingPath === "/admin/dashboard" ? (
@@ -249,7 +256,7 @@ export function AppNavbar() {
       <nav className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-lg border-t border-neutral-200/80 z-40 sm:hidden flex items-center justify-around py-2 px-3 shadow-lg">
         <Link
           href="/"
-          onClick={() => handleNavClick("/")}
+          onClick={(e) => handleNavClick(e, "/")}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
             pathname === "/" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
           }`}
@@ -265,7 +272,7 @@ export function AppNavbar() {
         </Link>
         <Link
           href="/user/print"
-          onClick={() => handleNavClick("/user/print")}
+          onClick={(e) => handleNavClick(e, "/user/print")}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
             pathname === "/user/print" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
           }`}
@@ -282,7 +289,7 @@ export function AppNavbar() {
         {user && (
           <Link
             href="/user/history"
-            onClick={() => handleNavClick("/user/history")}
+            onClick={(e) => handleNavClick(e, "/user/history")}
             className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
               pathname === "/user/history" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
             }`}
@@ -299,7 +306,7 @@ export function AppNavbar() {
         )}
         <Link
           href="/user/more"
-          onClick={() => handleNavClick("/user/more")}
+          onClick={(e) => handleNavClick(e, "/user/more")}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
             pathname === "/user/more" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
           }`}
@@ -316,7 +323,7 @@ export function AppNavbar() {
         {isAdmin && (
           <Link
             href="/admin/dashboard"
-            onClick={() => handleNavClick("/admin/dashboard")}
+            onClick={(e) => handleNavClick(e, "/admin/dashboard")}
             className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-rose-600"
           >
             <div className="relative w-5 h-5 flex items-center justify-center">

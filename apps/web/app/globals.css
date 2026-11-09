@@ -282,8 +282,8 @@ body {
    ───────────────────────────────────────────────────────────── */
 @keyframes screen-slide-in {
   0% {
-    opacity: 0.9;
-    transform: translate3d(24px, 0, 0);
+    opacity: 0.85;
+    transform: translate3d(50px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -297,16 +297,17 @@ body {
     transform: translate3d(0, 0, 0);
   }
   100% {
-    opacity: 0.9;
-    transform: translate3d(24px, 0, 0);
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
   }
 }
 
 .animate-screen-slide-in {
-  animation: screen-slide-in 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: screen-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-screen-slide-out {
-  animation: screen-slide-out 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: screen-slide-out 200ms cubic-bezier(0.32, 0.72, 0, 1) forwards !important;
+  pointer-events: none;
 }
 

@@ -238,7 +238,7 @@ export default function HomePage() {
                 disabled
                 className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#e5e7eb] text-[#9ca3af] text-xs sm:text-[13px] font-semibold rounded-lg cursor-not-allowed select-none shadow-none text-center"
               >
-                Unavailable
+                Coming soon
               </button>
             </div>
 
@@ -303,7 +303,7 @@ export default function HomePage() {
                 disabled
                 className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#e5e7eb] text-[#9ca3af] text-xs sm:text-[13px] font-semibold rounded-lg cursor-not-allowed select-none shadow-none text-center"
               >
-                Unavailable
+                Coming soon
               </button>
             </div>
 

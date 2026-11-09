@@ -264,10 +264,11 @@ export default function MorePage() {
 
   // Back Navigation with Smooth Exit
   const handleGoBack = () => {
+    if (isExiting) return;
     setIsExiting(true);
     setTimeout(() => {
       router.push("/");
-    }, 160);
+    }, 200);
   };
 
   // Listen for navigation exit from AppNavbar
@@ -444,7 +445,7 @@ export default function MorePage() {
           1. BLINKIT-STYLE TOP GOLDEN GRADIENT HERO BANNER
           ───────────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] pt-3 pb-6 px-4 w-full overflow-hidden">
-        {/* Back Button */}
+        {/* Back Button & Top Right 1:1 Logo */}
         <div className="max-w-md mx-auto flex items-center justify-between mb-2">
           <button
             type="button"
@@ -454,6 +455,15 @@ export default function MorePage() {
           >
             <ArrowLeft className="w-5 h-5 text-neutral-800" />
           </button>
+
+          {/* 1:1 Brand Logo Badge */}
+          <div className="w-9 h-9 rounded-full bg-white shadow-xs border-0 flex items-center justify-center p-1.5 overflow-hidden">
+            <img
+              src="/brand/printmart-logo.webp"
+              alt="PrintMart"
+              className="w-full h-full object-contain"
+            />
+          </div>
         </div>
 
         {/* Profile Avatar & Centered Name */}
@@ -720,7 +730,7 @@ export default function MorePage() {
               <ChevronRight className="w-4 h-4 text-neutral-400" />
             </button>
 
-            {/* Refund Policy (Requirement 3: GUARANTEE pill removed) */}
+            {/* Refund Policy */}
             <button
               type="button"
               onClick={() => setActiveModal("refund")}
@@ -728,14 +738,9 @@ export default function MorePage() {
             >
               <div className="flex items-center gap-3">
                 <RefreshCw className="w-5 h-5 text-neutral-700 shrink-0" />
-                <div>
-                  <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c] block">
-                    Refund policy
-                  </span>
-                  <span className="text-[11px] text-neutral-400 block font-normal">
-                    100% fairness guarantee for failed prints
-                  </span>
-                </div>
+                <span className="text-xs sm:text-[13.5px] font-medium text-[#1c1c1c]">
+                  Refund policy
+                </span>
               </div>
               <ChevronRight className="w-4 h-4 text-neutral-400" />
             </button>
@@ -813,8 +818,8 @@ export default function MorePage() {
               className="h-6 w-auto object-contain"
             />
           </div>
-          <p className="text-[11px] font-medium text-neutral-400 tracking-tight">
-            a product of AS Studios
+          <p className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">
+            A PRODUCT BY AS STUDIOS
           </p>
         </div>
       </main>

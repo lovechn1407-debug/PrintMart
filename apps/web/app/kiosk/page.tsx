@@ -15,6 +15,8 @@ import { database, ref, onValue } from "@/lib/firebase";
 
 interface AdConfig {
   enabled: boolean;
+  aspectRatio?: "9:16" | "16:9" | "3:4" | "4:3" | "custom";
+  customAspectRatio?: string;
   videoUrl?: string;
   slides?: string[];
   title?: string;
@@ -40,6 +42,7 @@ export default function OnlineKioskPage() {
   // Ad Area State from Admin / Firebase
   const [adConfig, setAdConfig] = useState<AdConfig>({
     enabled: false,
+    aspectRatio: "16:9",
     videoUrl: "",
     slides: [],
   });
@@ -208,6 +211,20 @@ export default function OnlineKioskPage() {
     Boolean(adConfig.enabled) &&
     (Boolean(adConfig.videoUrl) || (adConfig.slides && adConfig.slides.length > 0));
 
+  // Compute CSS Aspect Ratio style for the ad box
+  const getAdAspectRatioStyle = (): React.CSSProperties => {
+    const ratio = adConfig.aspectRatio || "16:9";
+    if (ratio === "9:16") return { aspectRatio: "9 / 16" };
+    if (ratio === "16:9") return { aspectRatio: "16 / 9" };
+    if (ratio === "3:4") return { aspectRatio: "3 / 4" };
+    if (ratio === "4:3") return { aspectRatio: "4 / 3" };
+    if (ratio === "custom" && adConfig.customAspectRatio) {
+      const clean = adConfig.customAspectRatio.replace(":", " / ");
+      return { aspectRatio: clean };
+    }
+    return { aspectRatio: "16 / 9" };
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
       {/* ── 1. Top iPhone-Style Dynamic Notch ── */}
@@ -250,69 +267,318 @@ export default function OnlineKioskPage() {
         </div>
       </header>
 
-      {/* ── 3. Exact User Site In-App Notification Modal Dialog on Error ── */}
-      {noticeMessage && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overscroll-none touch-none animate-in fade-in"
-          onClick={() => setNoticeMessage(null)}
-        >
-          <div
-            className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border-0 space-y-3 touch-auto overscroll-contain animate-in zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2.5 text-rose-600">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <h4 className="font-bold text-sm text-neutral-900">Notification</h4>
-            </div>
-            <p className="text-xs text-neutral-600 leading-relaxed font-normal">
-              {noticeMessage}
-            </p>
-            <button
-              type="button"
-              onClick={() => setNoticeMessage(null)}
-              className="w-full h-10 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-xl transition-all border-0 cursor-pointer"
-            >
-              Okay, Got It
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── 3. Main Workspace: Scaled 20% More, Strictly 0 Gap between OTP and Ad ── */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex items-center justify-center z-10">
+        <div className="w-full flex items-center justify-center transform scale-100 sm:scale-105 md:scale-110 lg:scale-[1.20] origin-center transition-transform duration-200">
+          {hasAds ? (
+            /* Split Card: Left 3:4 OTP area + Right Ad Area with Zero Gap */
+            <div className="bg-white rounded-[16px] shadow-[0_12px_45px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-stretch p-0 m-0 gap-0">
+              {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Relative Container) */}
+              <div className="w-full md:w-[420px] aspect-[3/4] p-5 sm:p-6 flex flex-col items-center justify-between gap-2.5 bg-white shrink-0 border-0 m-0 relative overflow-hidden">
+                <div className="flex flex-col items-center pt-1">
+                  <img
+                    src="/brand/printmart-logo.webp"
+                    alt="PrintMart"
+                    className="h-9 sm:h-10 w-auto object-contain"
+                  />
+                </div>
 
-      {/* ── 4. Main Workspace: Unified Card ── */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex items-center justify-center z-10">
-        {hasAds ? (
-          /* Split Card with Ad Area flush on right */
-          <div className="w-full max-w-4xl bg-white rounded-[16px] shadow-[0_12px_45px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-stretch transition-all duration-300">
-            {/* LEFT: OTP Input Modal */}
-            <div className="w-full md:w-[410px] lg:w-[430px] p-6 sm:p-7 flex flex-col items-center justify-between gap-3 bg-white shrink-0 border-0">
+                <div className="text-center">
+                  <h1 className="text-lg sm:text-xl font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
+                    ENTER YOUR OTP
+                  </h1>
+                </div>
+
+                {/* 6 OTP Input Boxes */}
+                <div className="w-full flex justify-center py-0.5 min-h-[58px] items-center">
+                  {isSuccess ? (
+                    <div className="flex flex-col items-center gap-1.5 animate-in zoom-in-75 duration-300">
+                      <div className="w-14 h-14 rounded-full bg-[#0c831f] text-white flex items-center justify-center shadow-xl animate-morph-circle">
+                        <Check className="w-8 h-8 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <span className="text-xs font-bold text-[#0c831f] tracking-tight">
+                        OTP Verified! Dispensing prints...
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex gap-1.5 sm:gap-2 justify-center w-full transition-all duration-300 ${
+                        hasError ? "animate-shake" : ""
+                      }`}
+                    >
+                      {[0, 1, 2, 3, 4, 5].map((index) => {
+                        const digit = digits[index];
+                        const isFilled = digit !== undefined;
+                        const isCurrent = index === digits.length;
+
+                        return (
+                          <div
+                            key={index}
+                            className={`w-10 h-12 sm:w-11 sm:h-13 rounded-[5px] flex items-center justify-center font-bold text-xl transition-all duration-200 select-none border-0 relative overflow-hidden ${
+                              isFilled
+                                ? "bg-slate-200 text-neutral-950"
+                                : isCurrent
+                                ? "bg-slate-200/90 text-neutral-900 ring-2 ring-neutral-950/20"
+                                : "bg-slate-100 text-neutral-400"
+                            }`}
+                          >
+                            {isFilled ? (
+                              <span
+                                className={`font-sans ${
+                                  loading
+                                    ? "animate-shimmer-text"
+                                    : "animate-digit-bounce inline-block"
+                                }`}
+                              >
+                                {digit}
+                              </span>
+                            ) : isCurrent ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 animate-pulse" />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {loading && !isSuccess && (
+                  <div className="flex items-center gap-2 text-xs font-semibold text-neutral-700">
+                    <RotateCw className="w-3.5 h-3.5 animate-spin text-[#0c831f]" />
+                    <span>Verifying code...</span>
+                  </div>
+                )}
+
+                {/* On-Screen Keypad */}
+                <div className="w-full max-w-[290px] mx-auto select-none pt-0.5">
+                  <div className="grid grid-cols-3 gap-[1px] bg-neutral-800 p-[1px] rounded-[6px] overflow-hidden shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("1")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tl-[5px] rounded-tr-none rounded-bl-none rounded-br-none disabled:opacity-50"
+                    >
+                      1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("2")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("3")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tr-[5px] rounded-tl-none rounded-bl-none rounded-br-none disabled:opacity-50"
+                    >
+                      3
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("4")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("5")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      5
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("6")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      6
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("7")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      7
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("8")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      8
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("9")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      9
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-neutral-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border-0 rounded-bl-[5px] rounded-tl-none rounded-tr-none rounded-br-none disabled:opacity-50"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeyPress("0")}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBackspace}
+                      disabled={loading || isSuccess}
+                      className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white flex items-center justify-center cursor-pointer transition-colors border-0 rounded-br-[5px] rounded-tl-none rounded-tr-none rounded-bl-none disabled:opacity-50"
+                      title="Backspace"
+                    >
+                      <Delete className="w-4 h-4 text-neutral-200" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── 5 & 6. ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
+                {noticeMessage && (
+                  <div
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in"
+                    onClick={() => setNoticeMessage(null)}
+                  >
+                    <div
+                      className="bg-white rounded-[10px] p-4 sm:p-5 max-w-[270px] sm:max-w-[290px] w-full shadow-2xl border-0 space-y-2.5 animate-in zoom-in-95"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-2 text-rose-600">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <h4 className="font-bold text-xs sm:text-sm text-neutral-900">Notification</h4>
+                      </div>
+                      <p className="text-[11px] sm:text-xs text-neutral-600 leading-relaxed font-normal">
+                        {noticeMessage}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setNoticeMessage(null)}
+                        className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[6px] transition-all border-0 cursor-pointer"
+                      >
+                        Okay, Got It
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT: BLUE AD AREA (Configurable Aspect Ratio, Zero Gap) */}
+              <div
+                className="flex-1 min-h-[360px] md:min-h-full bg-[#00bcd4] relative flex items-center justify-center overflow-hidden select-none border-0 m-0 p-0"
+                style={getAdAspectRatioStyle()}
+              >
+                {adConfig.videoUrl ? (
+                  <div className="w-full h-full relative">
+                    <video
+                      src={adConfig.videoUrl}
+                      autoPlay
+                      loop
+                      muted={isMuted}
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsMuted((prev) => !prev)}
+                      className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-xs cursor-pointer border-0"
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                ) : adConfig.slides && adConfig.slides.length > 0 ? (
+                  /* 7. Image Slides Carousel with Smooth Page Sliding Animation */
+                  <div className="w-full h-full relative overflow-hidden">
+                    <div
+                      className="flex h-full w-full transition-transform duration-700 ease-in-out"
+                      style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
+                    >
+                      {adConfig.slides.map((slideUrl, idx) => (
+                        <div key={idx} className="w-full h-full shrink-0 relative">
+                          <img
+                            src={slideUrl}
+                            alt={`Slide ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {adConfig.slides.length > 1 && (
+                      <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
+                        {adConfig.slides.map((_, i) => (
+                          <div
+                            key={i}
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              i === activeSlideIndex
+                                ? "bg-white w-5 shadow-sm"
+                                : "bg-white/50 w-1.5"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-white space-y-2">
+                    <span className="text-xl sm:text-2xl font-black tracking-tight text-white/95 uppercase">
+                      AD AREA
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Centered Card (No Ads, Strictly 3:4 Portrait Ratio) */
+            <div className="w-full max-w-[420px] aspect-[3/4] mx-auto bg-white rounded-[16px] p-5 sm:p-6 shadow-[0_12px_45px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center justify-between gap-2.5 transition-all duration-300 relative overflow-hidden">
               <div className="flex flex-col items-center pt-1">
                 <img
                   src="/brand/printmart-logo.webp"
                   alt="PrintMart"
-                  className="h-10 sm:h-12 w-auto object-contain"
+                  className="h-9 sm:h-10 w-auto object-contain"
                 />
               </div>
 
               <div className="text-center">
-                <h1 className="text-xl sm:text-2xl font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
+                <h1 className="text-lg sm:text-xl font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
                   ENTER YOUR OTP
                 </h1>
               </div>
 
-              {/* 6 OTP Input Boxes */}
-              <div className="w-full flex justify-center py-1 min-h-[64px] items-center">
+              <div className="w-full flex justify-center py-0.5 min-h-[58px] items-center">
                 {isSuccess ? (
-                  <div className="flex flex-col items-center gap-2 animate-in zoom-in-75 duration-300">
-                    <div className="w-16 h-16 rounded-full bg-[#0c831f] text-white flex items-center justify-center shadow-xl animate-morph-circle">
-                      <Check className="w-9 h-9 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
+                  <div className="flex flex-col items-center gap-1.5 animate-in zoom-in-75 duration-300">
+                    <div className="w-14 h-14 rounded-full bg-[#0c831f] text-white flex items-center justify-center shadow-xl animate-morph-circle">
+                      <Check className="w-8 h-8 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
                     </div>
-                    <span className="text-xs sm:text-sm font-bold text-[#0c831f] tracking-tight">
+                    <span className="text-xs font-bold text-[#0c831f] tracking-tight">
                       OTP Verified! Dispensing prints...
                     </span>
                   </div>
                 ) : (
                   <div
-                    className={`flex gap-2 sm:gap-2.5 justify-center w-full transition-all duration-300 ${
+                    className={`flex gap-1.5 sm:gap-2 justify-center w-full transition-all duration-300 ${
                       hasError ? "animate-shake" : ""
                     }`}
                   >
@@ -324,7 +590,7 @@ export default function OnlineKioskPage() {
                       return (
                         <div
                           key={index}
-                          className={`w-11 h-13 sm:w-12 sm:h-14 rounded-[5px] flex items-center justify-center font-bold text-xl sm:text-2xl transition-all duration-200 select-none border-0 relative overflow-hidden ${
+                          className={`w-10 h-12 sm:w-11 sm:h-13 rounded-[5px] flex items-center justify-center font-bold text-xl transition-all duration-200 select-none border-0 relative overflow-hidden ${
                             isFilled
                               ? "bg-slate-200 text-neutral-950"
                               : isCurrent
@@ -359,14 +625,13 @@ export default function OnlineKioskPage() {
                 </div>
               )}
 
-              {/* On-Screen Keypad */}
-              <div className="w-full max-w-[310px] mx-auto select-none pt-1">
+              <div className="w-full max-w-[290px] mx-auto select-none pt-0.5">
                 <div className="grid grid-cols-3 gap-[1px] bg-neutral-800 p-[1px] rounded-[6px] overflow-hidden shadow-sm">
                   <button
                     type="button"
                     onClick={() => handleKeyPress("1")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tl-[5px] rounded-tr-none rounded-bl-none rounded-br-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tl-[5px] rounded-tr-none rounded-bl-none rounded-br-none disabled:opacity-50"
                   >
                     1
                   </button>
@@ -374,7 +639,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("2")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     2
                   </button>
@@ -382,7 +647,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("3")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tr-[5px] rounded-tl-none rounded-bl-none rounded-br-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tr-[5px] rounded-tl-none rounded-bl-none rounded-br-none disabled:opacity-50"
                   >
                     3
                   </button>
@@ -391,7 +656,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("4")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     4
                   </button>
@@ -399,7 +664,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("5")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     5
                   </button>
@@ -407,7 +672,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("6")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     6
                   </button>
@@ -416,7 +681,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("7")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     7
                   </button>
@@ -424,7 +689,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("8")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     8
                   </button>
@@ -432,7 +697,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("9")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     9
                   </button>
@@ -441,7 +706,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={handleClear}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-neutral-300 text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border-0 rounded-bl-[5px] rounded-tl-none rounded-tr-none rounded-br-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-neutral-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border-0 rounded-bl-[5px] rounded-tl-none rounded-tr-none rounded-br-none disabled:opacity-50"
                   >
                     Clear
                   </button>
@@ -449,7 +714,7 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={() => handleKeyPress("0")}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
                   >
                     0
                   </button>
@@ -457,252 +722,47 @@ export default function OnlineKioskPage() {
                     type="button"
                     onClick={handleBackspace}
                     disabled={loading || isSuccess}
-                    className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white flex items-center justify-center cursor-pointer transition-colors border-0 rounded-br-[5px] rounded-tl-none rounded-tr-none rounded-bl-none disabled:opacity-50"
+                    className="h-11 sm:h-12 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white flex items-center justify-center cursor-pointer transition-colors border-0 rounded-br-[5px] rounded-tl-none rounded-tr-none rounded-bl-none disabled:opacity-50"
                     title="Backspace"
                   >
-                    <Delete className="w-5 h-5 text-neutral-200" />
+                    <Delete className="w-4 h-4 text-neutral-200" />
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* RIGHT: BLUE AD AREA */}
-            <div className="flex-1 min-h-[380px] md:min-h-full bg-[#00bcd4] relative flex items-center justify-center overflow-hidden select-none border-0">
-              {adConfig.videoUrl ? (
-                <div className="w-full h-full relative">
-                  <video
-                    src={adConfig.videoUrl}
-                    autoPlay
-                    loop
-                    muted={isMuted}
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsMuted((prev) => !prev)}
-                    className="absolute bottom-4 right-4 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-xs cursor-pointer border-0"
-                    title={isMuted ? "Unmute" : "Mute"}
-                  >
-                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              ) : adConfig.slides && adConfig.slides.length > 0 ? (
-                <div className="w-full h-full relative">
-                  <img
-                    src={adConfig.slides[activeSlideIndex]}
-                    alt="Advertisement"
-                    className="w-full h-full object-cover animate-in fade-in duration-500"
-                  />
-                  {adConfig.slides.length > 1 && (
-                    <div className="absolute bottom-4 inset-x-0 flex justify-center gap-1.5">
-                      {adConfig.slides.map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
-                            i === activeSlideIndex
-                              ? "bg-white w-5 shadow-sm"
-                              : "bg-white/50"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-white space-y-2">
-                  <span className="text-xl sm:text-2xl font-black tracking-tight text-white/95 uppercase">
-                    AD AREA
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Centered Card (No Ads) */
-          <div className="w-full max-w-[420px] mx-auto bg-white rounded-[16px] p-6 sm:p-7 shadow-[0_12px_45px_rgba(0,0,0,0.08)] border-0 flex flex-col items-center gap-3.5 transition-all duration-300">
-            <div className="flex flex-col items-center pt-1">
-              <img
-                src="/brand/printmart-logo.webp"
-                alt="PrintMart"
-                className="h-10 sm:h-12 w-auto object-contain"
-              />
-            </div>
-
-            <div className="text-center">
-              <h1 className="text-xl sm:text-2xl font-black text-neutral-950 tracking-tight leading-tight uppercase font-sans">
-                ENTER YOUR OTP
-              </h1>
-            </div>
-
-            <div className="w-full flex justify-center py-1 min-h-[64px] items-center">
-              {isSuccess ? (
-                <div className="flex flex-col items-center gap-2 animate-in zoom-in-75 duration-300">
-                  <div className="w-16 h-16 rounded-full bg-[#0c831f] text-white flex items-center justify-center shadow-xl animate-morph-circle">
-                    <Check className="w-9 h-9 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
-                  </div>
-                  <span className="text-xs sm:text-sm font-bold text-[#0c831f] tracking-tight">
-                    OTP Verified! Dispensing prints...
-                  </span>
-                </div>
-              ) : (
+              {/* ── 5 & 6. ERROR POPUP: Blurs ONLY the OTP Area, Centered, Reduced Corner Radius ── */}
+              {noticeMessage && (
                 <div
-                  className={`flex gap-2 sm:gap-2.5 justify-center w-full transition-all duration-300 ${
-                    hasError ? "animate-shake" : ""
-                  }`}
+                  className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in"
+                  onClick={() => setNoticeMessage(null)}
                 >
-                  {[0, 1, 2, 3, 4, 5].map((index) => {
-                    const digit = digits[index];
-                    const isFilled = digit !== undefined;
-                    const isCurrent = index === digits.length;
-
-                    return (
-                      <div
-                        key={index}
-                        className={`w-11 h-13 sm:w-12 sm:h-14 rounded-[5px] flex items-center justify-center font-bold text-xl sm:text-2xl transition-all duration-200 select-none border-0 relative overflow-hidden ${
-                          isFilled
-                            ? "bg-slate-200 text-neutral-950"
-                            : isCurrent
-                            ? "bg-slate-200/90 text-neutral-900 ring-2 ring-neutral-950/20"
-                            : "bg-slate-100 text-neutral-400"
-                        }`}
-                      >
-                        {isFilled ? (
-                          <span
-                            className={`font-sans ${
-                              loading
-                                ? "animate-shimmer-text"
-                                : "animate-digit-bounce inline-block"
-                            }`}
-                          >
-                            {digit}
-                          </span>
-                        ) : isCurrent ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 animate-pulse" />
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                  <div
+                    className="bg-white rounded-[10px] p-4 sm:p-5 max-w-[270px] sm:max-w-[290px] w-full shadow-2xl border-0 space-y-2.5 animate-in zoom-in-95"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2 text-rose-600">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <h4 className="font-bold text-xs sm:text-sm text-neutral-900">Notification</h4>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-neutral-600 leading-relaxed font-normal">
+                      {noticeMessage}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setNoticeMessage(null)}
+                      className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[6px] transition-all border-0 cursor-pointer"
+                    >
+                      Okay, Got It
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-
-            {loading && !isSuccess && (
-              <div className="flex items-center gap-2 text-xs font-semibold text-neutral-700">
-                <RotateCw className="w-3.5 h-3.5 animate-spin text-[#0c831f]" />
-                <span>Verifying code...</span>
-              </div>
-            )}
-
-            <div className="w-full max-w-[310px] mx-auto select-none pt-1">
-              <div className="grid grid-cols-3 gap-[1px] bg-neutral-800 p-[1px] rounded-[6px] overflow-hidden shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("1")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tl-[5px] rounded-tr-none rounded-bl-none rounded-br-none disabled:opacity-50"
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("2")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("3")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-tr-[5px] rounded-tl-none rounded-bl-none rounded-br-none disabled:opacity-50"
-                >
-                  3
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("4")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  4
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("5")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("6")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  6
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("7")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  7
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("8")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  8
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("9")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  9
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-neutral-300 text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border-0 rounded-bl-[5px] rounded-tl-none rounded-tr-none rounded-br-none disabled:opacity-50"
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeyPress("0")}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white font-bold text-xl sm:text-2xl flex items-center justify-center cursor-pointer transition-colors border-0 rounded-none disabled:opacity-50"
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBackspace}
-                  disabled={loading || isSuccess}
-                  className="h-12 sm:h-13 bg-black hover:bg-neutral-900 active:bg-neutral-800 text-white flex items-center justify-center cursor-pointer transition-colors border-0 rounded-br-[5px] rounded-tl-none rounded-tr-none rounded-bl-none disabled:opacity-50"
-                  title="Backspace"
-                >
-                  <Delete className="w-5 h-5 text-neutral-200" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
-      {/* ── 5. Staff PIN Modal ── */}
+      {/* ── STAFF PIN MODAL ── */}
       {isStaffModalOpen && (
         <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95 duration-150">

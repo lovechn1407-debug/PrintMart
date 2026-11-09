@@ -21,6 +21,8 @@ import { MachineRecord } from "@printmart/shared";
 interface AdSettings {
   enabled: boolean;
   mode: "video" | "slides" | "banner";
+  aspectRatio?: "9:16" | "16:9" | "3:4" | "4:3" | "custom";
+  customAspectRatio?: string;
   videoUrl?: string;
   slides?: string[];
   slideDuration?: number;
@@ -36,6 +38,8 @@ export default function AdminAdsPage() {
   // Ad Settings State
   const [enabled, setEnabled] = useState<boolean>(true);
   const [mode, setMode] = useState<"video" | "slides" | "banner">("video");
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "3:4" | "4:3" | "custom">("16:9");
+  const [customAspectRatio, setCustomAspectRatio] = useState<string>("16:9");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [slides, setSlides] = useState<string[]>([]);
   const [slideDuration, setSlideDuration] = useState<number>(5);
@@ -76,6 +80,8 @@ export default function AdminAdsPage() {
         const val = snap.val() as AdSettings;
         setEnabled(val.enabled ?? true);
         setMode(val.mode || "video");
+        setAspectRatio(val.aspectRatio || "16:9");
+        setCustomAspectRatio(val.customAspectRatio || "16:9");
         setVideoUrl(val.videoUrl || "");
         setSlides(val.slides || []);
         setSlideDuration(val.slideDuration || 5);
@@ -181,6 +187,8 @@ export default function AdminAdsPage() {
       const payload: AdSettings = {
         enabled,
         mode,
+        aspectRatio,
+        customAspectRatio: customAspectRatio.trim(),
         videoUrl: videoUrl.trim(),
         slides: slides || [],
         slideDuration: Number(slideDuration) || 5,
@@ -345,6 +353,53 @@ export default function AdminAdsPage() {
             <Sparkles className="w-3.5 h-3.5" />
             <span>Promo Banner</span>
           </button>
+        </div>
+
+        {/* Aspect Ratio Area Selector [9:16, 16:9, 3:4, 4:3, custom] */}
+        <div className="space-y-2 pt-2 border-t border-neutral-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-bold text-neutral-900 block">
+                Ad Area Aspect Ratio
+              </label>
+              <span className="text-[11px] text-neutral-500">
+                Choose the display proportion for the ad space on the kiosk terminal.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-[#0c831f] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              {aspectRatio === "custom" ? customAspectRatio : aspectRatio}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(["9:16", "16:9", "3:4", "4:3", "custom"] as const).map((ratio) => (
+              <button
+                key={ratio}
+                type="button"
+                onClick={() => setAspectRatio(ratio)}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                  aspectRatio === ratio
+                    ? "bg-[#0c831f] text-white border-[#0c831f] shadow-xs"
+                    : "bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100"
+                }`}
+              >
+                {ratio}
+              </button>
+            ))}
+          </div>
+
+          {aspectRatio === "custom" && (
+            <div className="flex items-center gap-2 pt-1 max-w-sm animate-in fade-in">
+              <input
+                type="text"
+                value={customAspectRatio}
+                onChange={(e) => setCustomAspectRatio(e.target.value)}
+                placeholder="e.g. 1:1, 21:9, 1080/1920"
+                className="flex-1 h-9 px-3 text-xs bg-neutral-50 rounded-xl border border-neutral-200 text-neutral-900 focus:ring-2 focus:ring-[#0c831f]"
+              />
+              <span className="text-[11px] text-neutral-500 font-mono">Custom Ratio</span>
+            </div>
+          )}
         </div>
 
         {/* 1. Video Ad Section */}

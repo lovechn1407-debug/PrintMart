@@ -14,25 +14,29 @@ const printerService = new printerService_1.PrinterService();
 const preloadAgent = new preloadAgent_1.PreloadAgent(SERVER_URL, CURRENT_MACHINE_ID);
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
-        width: 1024,
-        height: 768,
-        fullscreen: process.env.NODE_ENV === "production",
-        autoHideMenuBar: true,
+        title: "PrintMart Kiosk Terminal",
+        width: 1200,
+        height: 800,
+        fullscreen: false,
+        autoHideMenuBar: false,
+        alwaysOnTop: true,
+        center: true,
         webPreferences: {
             preload: path_1.default.join(__dirname, "preload.js"),
             nodeIntegration: false,
             contextIsolation: true,
         },
     });
+    mainWindow.maximize();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.on("did-fail-load", () => {
+        mainWindow?.loadFile(path_1.default.join(__dirname, "../dist/index.html"));
+    });
     const devUrl = "http://localhost:5173";
-    if (process.env.NODE_ENV !== "production") {
-        mainWindow.loadURL(devUrl).catch(() => {
-            mainWindow?.loadFile(path_1.default.join(__dirname, "../dist/index.html"));
-        });
-    }
-    else {
-        mainWindow.loadFile(path_1.default.join(__dirname, "../dist/index.html"));
-    }
+    mainWindow.loadURL(devUrl).catch(() => {
+        mainWindow?.loadFile(path_1.default.join(__dirname, "../dist/index.html"));
+    });
 }
 electron_1.app.whenReady().then(() => {
     createWindow();

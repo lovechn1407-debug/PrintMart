@@ -569,7 +569,7 @@ export default function OnlineKioskPage() {
 
   // Dynamically compute card height to ensure 16:9 and wide formats fit comfortably on all screens
   const getCardDimensions = () => {
-    if (!hasAds) {
+    if (!hasAds || !isPaired) {
       return "h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]";
     }
     const ratio = adConfig.aspectRatio || "16:9";
@@ -795,7 +795,7 @@ export default function OnlineKioskPage() {
 
       {/* ── 3. Main Workspace: Unified Single Outer Box, Fits Screen ── */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-center z-10 overflow-hidden">
-        {hasAds ? (
+        {isPaired && hasAds ? (
           /* UNIFIED SINGLE OUTER CARD: Encloses OTP area & Ad area */
           <div className={`bg-white rounded-[18px] sm:rounded-[22px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] border-0 overflow-hidden flex flex-col md:flex-row items-center max-w-full ${getCardDimensions()}`}>
             {/* LEFT: OTP Input Modal (Strictly 3:4 Portrait Ratio, Rounded Left Corners) */}

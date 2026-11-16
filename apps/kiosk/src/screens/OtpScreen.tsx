@@ -407,7 +407,7 @@ export function OtpScreen({
 
   // Dynamically compute card height to ensure 16:9 and wide formats fit comfortably on all screens
   const getCardDimensions = () => {
-    if (!hasAds) {
+    if (!hasAds || !isPaired) {
       return "h-auto md:h-[480px] lg:h-[510px] max-h-[calc(100vh-6.5rem)]";
     }
     const ratio = adConfig.aspectRatio || "16:9";
@@ -511,7 +511,7 @@ export function OtpScreen({
 
       {/* ── Main Workspace: Naturally Sized, Unified Single Outer Box, Fits Screen ── */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-center z-10 overflow-hidden">
-        {hasAds ? (
+        {isPaired && hasAds ? (
           /* ══════════════════════════════════════════════════════════════════════
              UNIFIED SINGLE OUTER CARD:
              - Encloses both OTP area & Ad area in ONE cohesive white card

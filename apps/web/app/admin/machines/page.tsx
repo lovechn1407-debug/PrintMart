@@ -83,6 +83,7 @@ export default function AdminMachinesPage() {
   const [editLocation, setEditLocation] = useState<string>("");
   const [editAutoPair, setEditAutoPair] = useState<boolean>(true);
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [editSavedSuccess, setEditSavedSuccess] = useState<boolean>(false);
   const [regeneratingCode, setRegeneratingCode] = useState<boolean>(false);
 
   // Remote Control command state
@@ -234,6 +235,8 @@ export default function AdminMachinesPage() {
         location: editLocation.trim(),
         autoPairEnabled: editAutoPair,
       }));
+      setEditSavedSuccess(true);
+      setTimeout(() => setEditSavedSuccess(false), 2500);
     } finally {
       setSavingEdit(false);
     }
@@ -687,15 +690,22 @@ export default function AdminMachinesPage() {
                           </Button>
                         </div>
 
-                        <Button
-                          size="sm"
-                          color="primary"
-                          className="h-8 text-xs font-bold"
-                          isLoading={savingEdit}
-                          onPress={handleSaveMachineDetails}
-                        >
-                          Save Machine Details
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {editSavedSuccess && (
+                            <span className="text-xs font-bold text-emerald-600 animate-in fade-in flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" /> Details Saved!
+                            </span>
+                          )}
+                          <Button
+                            size="sm"
+                            color="primary"
+                            className="h-8 text-xs font-bold"
+                            isLoading={savingEdit}
+                            onPress={handleSaveMachineDetails}
+                          >
+                            Save Machine Details
+                          </Button>
+                        </div>
                       </div>
                     </Card>
 

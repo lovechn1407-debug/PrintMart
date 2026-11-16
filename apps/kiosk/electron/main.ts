@@ -13,8 +13,8 @@ const preloadAgent = new PreloadAgent(SERVER_URL, CURRENT_MACHINE_ID);
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: "PrintMart Kiosk Terminal",
-    width: 1200,
-    height: 800,
+    width: 1024,
+    height: 768,
     fullscreen: false,
     autoHideMenuBar: false,
     alwaysOnTop: true,
@@ -26,13 +26,13 @@ function createWindow() {
     },
   });
 
-  mainWindow.maximize();
   mainWindow.show();
   mainWindow.focus();
 
-  mainWindow.webContents.on("did-fail-load", () => {
-    mainWindow?.loadFile(path.join(__dirname, "../dist/index.html"));
-  });
+  // Reset alwaysOnTop after 3 seconds
+  setTimeout(() => {
+    mainWindow?.setAlwaysOnTop(false);
+  }, 3000);
 
   const devUrl = "http://localhost:5173";
   mainWindow.loadURL(devUrl).catch(() => {

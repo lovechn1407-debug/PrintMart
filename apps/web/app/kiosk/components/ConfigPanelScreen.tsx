@@ -26,6 +26,7 @@ interface ConfigPanelScreenProps {
   machineName: string;
   onExit: () => void;
   onUpdateMachine: (newId: string, newName: string) => void;
+  onUnpair?: () => void;
 }
 
 interface LogEntry {
@@ -40,6 +41,7 @@ export function ConfigPanelScreen({
   machineName,
   onExit,
   onUpdateMachine,
+  onUnpair,
 }: ConfigPanelScreenProps) {
   const [activeTab, setActiveTab] = useState<"identity" | "hardware" | "logs">("identity");
 
@@ -47,6 +49,7 @@ export function ConfigPanelScreen({
   const [currentId, setCurrentId] = useState<string>(machineId);
   const [nameInput, setNameInput] = useState<string>(machineName);
   const [locationInput, setLocationInput] = useState<string>("Ground Floor, Central Library");
+  const [autoPairPolicy, setAutoPairPolicy] = useState<boolean>(true);
   const [pairCodeInput, setPairCodeInput] = useState<string>("");
   const [modalNotice, setModalNotice] = useState<{
     isOpen: boolean;
@@ -112,6 +115,7 @@ export function ConfigPanelScreen({
         const val = snap.val();
         if (val.name) setNameInput(val.name);
         if (val.location) setLocationInput(val.location);
+        if (val.autoPairEnabled !== undefined) setAutoPairPolicy(val.autoPairEnabled !== false);
       }
     });
 
@@ -439,60 +443,90 @@ export function ConfigPanelScreen({
         {/* ════ TAB 1: MACHINE IDENTITY & PAIRING ════ */}
         {activeTab === "identity" && (
           <div className="space-y-4 animate-in fade-in duration-150">
-            {/* Machine Name & Location Card (Zero Borders, Clean Soft Shadow) */}
+            {/* Machine Identity Card (Strictly Read-Only, Controlled by Admin) */}
             <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border-0 space-y-4">
-              <div className="flex items-center justify-between pb-3">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                 <div>
-                  <h2 className="font-bold text-base text-neutral-900">
-                    Vending Machine Details
+                  <h2 className="font-bold text-base text-neutral-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#0c831f]" />
+                    Vending Machine Identity
                   </h2>
                   <p className="text-xs text-neutral-500 mt-0.5">
-                    Edit the terminal display name and physical location shown on kiosk screen
+                    Terminal name, location, and parameters are centrally controlled by the Admin Panel
                   </p>
                 </div>
-                <span className="text-[11px] font-mono font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-lg border-0">
-                  {currentId}
+                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  Controlled by Admin
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700 block">
+                <div className="bg-neutral-50 p-3.5 rounded-xl border border-neutral-200/60 space-y-1">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
                     Vending Machine Name
-                  </label>
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="e.g. Central Library Kiosk A"
-                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-xl bg-neutral-100 border-0 focus:outline-none focus:ring-2 focus:ring-[#0c831f] focus:bg-white transition-all font-semibold"
-                  />
+                  </span>
+                  <p className="text-sm font-extrabold text-neutral-900">
+                    {nameInput || machineName}
+                  </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700 block">
+                <div className="bg-neutral-50 p-3.5 rounded-xl border border-neutral-200/60 space-y-1">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
                     Physical Campus Location
-                  </label>
-                  <input
-                    type="text"
-                    value={locationInput}
-                    onChange={(e) => setLocationInput(e.target.value)}
-                    placeholder="e.g. Ground Floor, Central Library"
-                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-xl bg-neutral-100 border-0 focus:outline-none focus:ring-2 focus:ring-[#0c831f] focus:bg-white transition-all font-semibold"
-                  />
+                  </span>
+                  <p className="text-sm font-semibold text-neutral-800">
+                    {locationInput || "Ground Floor, Central Library"}
+                  </p>
+                </div>
+
+                <div className="bg-neutral-50 p-3.5 rounded-xl border border-neutral-200/60 space-y-1">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                    Assigned Machine ID
+                  </span>
+                  <p className="text-xs font-mono font-bold text-neutral-800">
+                    {currentId}
+                  </p>
+                </div>
+
+                <div className="bg-neutral-50 p-3.5 rounded-xl border border-neutral-200/60 space-y-1">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                    Startup Pairing Mode
+                  </span>
+                  <p className={`text-xs font-bold ${autoPairPolicy ? "text-emerald-700" : "text-amber-700"}`}>
+                    {autoPairPolicy ? "Auto-Pair Enabled" : "Strict: Pair Code on Startup"}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end pt-3">
-                <button
-                  type="button"
-                  onClick={handleSaveIdentity}
-                  className="py-2.5 px-5 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer border-0"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save Machine Details</span>
-                </button>
+              <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/60 text-xs text-amber-900 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  Machine display name and physical location cannot be modified from the kiosk. Use the Admin Dashboard (Vending Machines) to update terminal identity.
+                </span>
               </div>
+
+              {onUnpair && (
+                <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+                  <span className="text-xs text-neutral-500">Need to link this terminal to a different machine?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to unpair this terminal? It will require entering a pair code to reactivate.")) {
+                        if (typeof window !== "undefined") {
+                          localStorage.removeItem("kiosk_pair_code");
+                          localStorage.removeItem("kiosk_machine_id");
+                          localStorage.removeItem("kiosk_machine_name");
+                        }
+                        onUnpair();
+                      }
+                    }}
+                    className="py-2 px-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all border border-rose-200 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Unpair Terminal</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Pair Code Login Card */}

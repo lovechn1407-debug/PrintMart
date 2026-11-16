@@ -22,6 +22,8 @@ export interface MachineRecord {
     location: string;
     pairedAt: number;
     pairingStatus: "paired" | "pending" | "revoked";
+    pairCode?: string;
+    autoPairEnabled?: boolean;
     status: MachineConnectionStatus;
     lastHeartbeat: number;
     agentVersion: string;

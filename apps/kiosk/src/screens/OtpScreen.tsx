@@ -66,6 +66,38 @@ export function OtpScreen({
   const [hasError, setHasError] = useState<boolean>(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
+  // Offline / Connectivity State
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    if (typeof navigator !== "undefined" && typeof navigator.onLine === "boolean") {
+      return !navigator.onLine;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    const connectedRef = ref(database, ".info/connected");
+    const unsubConn = onValue(connectedRef, (snap) => {
+      const isConnected = snap.val() === true;
+      if (!isConnected && typeof navigator !== "undefined" && !navigator.onLine) {
+        setIsOffline(true);
+      } else if (isConnected) {
+        setIsOffline(false);
+      }
+    });
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      unsubConn();
+    };
+  }, []);
+
   // Broadcast Remote Notice Popup State
   const [remotePopup, setRemotePopup] = useState<RemoteKioskPopup | null>(null);
   const [dismissedRemotePopupAt, setDismissedRemotePopupAt] = useState<number | null>(null);
@@ -398,6 +430,31 @@ export function OtpScreen({
     );
   };
 
+  // Offline Sticky Modal (Covering OTP Area, No Button)
+  const renderOfflineModal = () => (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
+      <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
+        <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
+          <AlertCircle className="w-7 h-7" />
+        </div>
+
+        <div className="space-y-1.5">
+          <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
+            Alert
+          </h3>
+          <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
+            No internet connection, try after some time
+          </p>
+        </div>
+
+        <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
+          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+          <span>Disconnected • Auto-reconnecting</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
       {/* ── Signature Navbar with iPhone Notch ── */}
@@ -643,6 +700,9 @@ export function OtpScreen({
 
               {/* ── REMOTE NOTICE POPUP (Covering OTP Area) ── */}
               {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupModal()}
+
+              {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering OTP Area, Sticky, No Button) ── */}
+              {isOffline && renderOfflineModal()}
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
@@ -949,6 +1009,9 @@ export function OtpScreen({
 
             {/* ── REMOTE NOTICE POPUP (Covering Centered Card) ── */}
             {isRemotePopupActive && renderPopupModal()}
+
+            {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering Centered Card, Sticky, No Button) ── */}
+            {isOffline && renderOfflineModal()}
           </div>
         )}
       </main>

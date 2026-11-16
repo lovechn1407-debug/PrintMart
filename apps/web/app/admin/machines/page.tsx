@@ -34,6 +34,7 @@ import {
   Sliders,
   AlertTriangle,
   RotateCcw,
+  RotateCw,
   CheckCircle,
   Eye,
   Copy,
@@ -71,10 +72,18 @@ export default function AdminMachinesPage() {
     onOpenChange: onDetailOpenChange,
   } = useDisclosure();
 
-  // Add Machine Form State (Simplified: Name + Location)
+  // Add Machine Form State (Simplified: Name + Location + Auto-Pair)
   const [newName, setNewName] = useState<string>("");
   const [newLocation, setNewLocation] = useState<string>("");
+  const [newAutoPair, setNewAutoPair] = useState<boolean>(true);
   const [justAddedMachine, setJustAddedMachine] = useState<{ name: string; pairCode: string } | null>(null);
+
+  // Edit Machine Form State (Admin Exclusive)
+  const [editName, setEditName] = useState<string>("");
+  const [editLocation, setEditLocation] = useState<string>("");
+  const [editAutoPair, setEditAutoPair] = useState<boolean>(true);
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [regeneratingCode, setRegeneratingCode] = useState<boolean>(false);
 
   // Remote Control command state
   const [commandLoading, setCommandLoading] = useState<boolean>(false);
@@ -139,6 +148,7 @@ export default function AdminMachinesPage() {
       name: newName.trim(),
       location: newLocation.trim() || "Main Campus Hall",
       pairCode,
+      autoPairEnabled: newAutoPair,
       pairedAt: Date.now(),
       pairingStatus: "paired",
       status: "ONLINE",
@@ -173,7 +183,60 @@ export default function AdminMachinesPage() {
     setJustAddedMachine({ name: newMachine.name, pairCode });
     setNewName("");
     setNewLocation("");
+    setNewAutoPair(true);
     onClose();
+  };
+
+  // Toggle Auto-Pair for a machine
+  const handleToggleAutoPair = async (machineId: string, currentVal: boolean) => {
+    const newVal = !currentVal;
+    await update(ref(database, `machines/${machineId}`), {
+      autoPairEnabled: newVal,
+      updatedAt: Date.now(),
+    });
+    if (selectedMachine?.machineId === machineId) {
+      setSelectedMachine((prev: any) => ({ ...prev, autoPairEnabled: newVal }));
+      setEditAutoPair(newVal);
+    }
+  };
+
+  // Regenerate 6-Digit Pair Code
+  const handleRegeneratePairCode = async (machineId: string) => {
+    try {
+      setRegeneratingCode(true);
+      const newCode = String(Math.floor(100000 + Math.random() * 900000));
+      await update(ref(database, `machines/${machineId}`), {
+        pairCode: newCode,
+        updatedAt: Date.now(),
+      });
+      if (selectedMachine?.machineId === machineId) {
+        setSelectedMachine((prev: any) => ({ ...prev, pairCode: newCode }));
+      }
+    } finally {
+      setRegeneratingCode(false);
+    }
+  };
+
+  // Save Machine Details (Name, Location, Auto-Pair) by Admin
+  const handleSaveMachineDetails = async () => {
+    if (!selectedMachine || !editName.trim()) return;
+    try {
+      setSavingEdit(true);
+      await update(ref(database, `machines/${selectedMachine.machineId}`), {
+        name: editName.trim(),
+        location: editLocation.trim(),
+        autoPairEnabled: editAutoPair,
+        updatedAt: Date.now(),
+      });
+      setSelectedMachine((prev: any) => ({
+        ...prev,
+        name: editName.trim(),
+        location: editLocation.trim(),
+        autoPairEnabled: editAutoPair,
+      }));
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   // Delete Machine
@@ -195,6 +258,7 @@ export default function AdminMachinesPage() {
       name: "Central Library Kiosk A",
       location: "Ground Floor, Central Library",
       pairCode,
+      autoPairEnabled: true,
       pairedAt: Date.now(),
       pairingStatus: "paired",
       status: "ONLINE",
@@ -328,6 +392,7 @@ export default function AdminMachinesPage() {
               <TableColumn>MACHINE NAME & ID</TableColumn>
               <TableColumn>LOCATION</TableColumn>
               <TableColumn>PAIR CODE (LOGIN)</TableColumn>
+              <TableColumn>AUTO-PAIR (STARTUP)</TableColumn>
               <TableColumn>STATUS</TableColumn>
               <TableColumn>PRINTER STATUS</TableColumn>
               <TableColumn>LAST ACTIVE</TableColumn>
@@ -337,6 +402,7 @@ export default function AdminMachinesPage() {
               {filteredMachines.map((machine) => {
                 const printer = printerStatuses[machine.machineId];
                 const pairCode = machine.pairCode || "123456";
+                const isAutoPair = machine.autoPairEnabled !== false;
                 return (
                   <TableRow key={machine.machineId}>
                     <TableCell>
@@ -367,6 +433,21 @@ export default function AdminMachinesPage() {
                             <Copy className="w-4 h-4" />
                           )}
                         </button>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          size="sm"
+                          color="success"
+                          isSelected={isAutoPair}
+                          onValueChange={() => handleToggleAutoPair(machine.machineId, isAutoPair)}
+                          aria-label="Toggle auto-pair"
+                        />
+                        <span className={`text-xs font-semibold ${isAutoPair ? "text-emerald-700" : "text-amber-700"}`}>
+                          {isAutoPair ? "Auto-Pair ON" : "Pair Every Startup"}
+                        </span>
                       </div>
                     </TableCell>
 
@@ -413,6 +494,9 @@ export default function AdminMachinesPage() {
                           color="primary"
                           onPress={() => {
                             setSelectedMachine(machine);
+                            setEditName(machine.name || "");
+                            setEditLocation(machine.location || "");
+                            setEditAutoPair(machine.autoPairEnabled !== false);
                             onDetailOpen();
                           }}
                         >
@@ -462,6 +546,21 @@ export default function AdminMachinesPage() {
                   onChange={(e: any) => setNewLocation(e.target.value)}
                   description="Where this kiosk is physically installed on campus"
                 />
+                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-semibold text-neutral-800">Auto-Pair on Startup</span>
+                    <p className="text-xs text-neutral-500">
+                      When enabled, this kiosk auto-pairs on reboot. When disabled, strict pair code is required every startup.
+                    </p>
+                  </div>
+                  <Switch
+                    size="sm"
+                    color="success"
+                    isSelected={newAutoPair}
+                    onValueChange={setNewAutoPair}
+                    aria-label="Toggle auto-pair on startup"
+                  />
+                </div>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
@@ -508,6 +607,98 @@ export default function AdminMachinesPage() {
                     </div>
                   </ModalHeader>
                   <ModalBody className="flex flex-col gap-5">
+                    {/* Admin Exclusive: Machine Identity & Configuration */}
+                    <Card className="border border-neutral-200 bg-white p-4 shadow-none">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Sliders className="w-4 h-4 text-neutral-800" />
+                          <h4 className="font-bold text-sm text-neutral-900">Machine Identity & Remote Policies</h4>
+                        </div>
+                        <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Admin Control Only
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <Input
+                          size="sm"
+                          label="Machine Display Name"
+                          value={editName}
+                          onChange={(e: any) => setEditName(e.target.value)}
+                          placeholder="e.g. Central Library Kiosk A"
+                        />
+                        <Input
+                          size="sm"
+                          label="Physical Location"
+                          value={editLocation}
+                          onChange={(e: any) => setEditLocation(e.target.value)}
+                          placeholder="e.g. Ground Floor, Central Library"
+                        />
+                      </div>
+
+                      {/* Auto-Pair Policy Row */}
+                      <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex items-center justify-between mb-3">
+                        <div className="space-y-0.5 pr-4">
+                          <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+                            <KeyRound className="w-3.5 h-3.5 text-neutral-700" />
+                            Startup Auto-Pair Mode
+                          </span>
+                          <p className="text-[11px] text-neutral-500">
+                            {editAutoPair
+                              ? "Enabled: Terminal automatically pairs on startup using its saved pair code."
+                              : "Strict: Staff must enter the 6-digit pair code on every terminal startup."}
+                          </p>
+                        </div>
+                        <Switch
+                          size="sm"
+                          color="success"
+                          isSelected={editAutoPair}
+                          onValueChange={setEditAutoPair}
+                          aria-label="Toggle auto-pair"
+                        />
+                      </div>
+
+                      {/* Pair Code & Actions */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-neutral-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-500">Pair Code:</span>
+                          <span className="font-mono font-bold text-sm bg-emerald-50 text-[#0c831f] px-2.5 py-1 rounded-lg border border-emerald-200">
+                            {pairCode}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            className="h-8 text-xs"
+                            startContent={<Copy className="w-3.5 h-3.5" />}
+                            onPress={() => handleCopy(pairCode)}
+                          >
+                            {copiedCode === pairCode ? "Copied!" : "Copy"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="warning"
+                            className="h-8 text-xs"
+                            isLoading={regeneratingCode}
+                            startContent={<RotateCw className="w-3.5 h-3.5" />}
+                            onPress={() => handleRegeneratePairCode(selectedMachine.machineId)}
+                          >
+                            New Code
+                          </Button>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          color="primary"
+                          className="h-8 text-xs font-bold"
+                          isLoading={savingEdit}
+                          onPress={handleSaveMachineDetails}
+                        >
+                          Save Machine Details
+                        </Button>
+                      </div>
+                    </Card>
+
                     {/* Hardware Telemetry Card */}
                     <Card className="border border-neutral-200 bg-neutral-50/50 p-4">
                       <div className="flex items-center gap-2 mb-3">

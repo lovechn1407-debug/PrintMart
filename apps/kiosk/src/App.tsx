@@ -5,34 +5,117 @@ import { OtpScreen } from "./screens/OtpScreen";
 import { PrintingProgressScreen } from "./screens/PrintingProgressScreen";
 import { OverlayScreen } from "./screens/OverlayScreen";
 import { ConfigPanelScreen } from "./screens/ConfigPanelScreen";
-import { database, ref, onValue } from "./firebase";
-import { MachineOverlay, MachinePrinterStatus, PrintJob } from "@printmart/shared";
+import { PairingCodeScreen } from "./screens/PairingCodeScreen";
+import { database, ref, onValue, get } from "./firebase";
+import { MachineOverlay } from "@printmart/shared";
 
 export default function App() {
-  const [machineId, setMachineId] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlId = params.get("machineId") || params.get("id");
-      if (urlId) return urlId;
-      return localStorage.getItem("kiosk_machine_id") || "MCH-CAMPUS-01";
-    }
-    return "MCH-CAMPUS-01";
-  });
-
-  const [machineName, setMachineName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("kiosk_machine_name") || "Central Library Kiosk A";
-    }
-    return "Central Library Kiosk A";
-  });
-
+  const [machineId, setMachineId] = useState<string>("");
+  const [machineName, setMachineName] = useState<string>("PrintMart Kiosk Terminal");
   const [masterCode, setMasterCode] = useState<string>("998877");
-  const [currentScreen, setCurrentScreen] = useState<"otp" | "printing" | "overlay" | "config">("otp");
+  const [currentScreen, setCurrentScreen] = useState<"pairing" | "otp" | "printing" | "overlay" | "config">("pairing");
   const [activeJob, setActiveJob] = useState<any>(null);
   const [activeOverlay, setActiveOverlay] = useState<MachineOverlay | null>(null);
   const [printerState, setPrinterState] = useState<string>("READY");
+  const [isCheckingStartup, setIsCheckingStartup] = useState<boolean>(true);
+  const [isPaired, setIsPaired] = useState<boolean>(false);
 
-  // 1. Listen to dynamic Master PIN from Firebase RTDB (configured in Admin -> Settings)
+  // 1. Strict Startup Pairing & Auto-Pair Check
+  useEffect(() => {
+    const checkStartupPairing = async () => {
+      if (typeof window === "undefined") return;
+
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get("pairCode") || params.get("code");
+      const urlId = params.get("machineId") || params.get("id");
+      const storedCode = localStorage.getItem("kiosk_pair_code");
+      const storedId = localStorage.getItem("kiosk_machine_id");
+
+      const targetCode = urlCode || storedCode;
+      const targetId = urlId || storedId;
+
+      if (!targetCode && !targetId) {
+        setIsCheckingStartup(false);
+        setIsPaired(false);
+        setCurrentScreen("pairing");
+        return;
+      }
+
+      try {
+        const machinesSnap = await get(ref(database, "machines"));
+        if (!machinesSnap.exists()) {
+          setIsCheckingStartup(false);
+          setIsPaired(false);
+          setCurrentScreen("pairing");
+          return;
+        }
+
+        const allMachines = machinesSnap.val();
+        let matched: any = null;
+
+        for (const [id, m] of Object.entries(allMachines)) {
+          const mach = m as any;
+          if (
+            (targetCode && (mach.pairCode === targetCode || id === targetCode || mach.machineId === targetCode)) ||
+            (targetId && (id === targetId || mach.machineId === targetId))
+          ) {
+            matched = { ...mach, machineId: mach.machineId || id };
+            break;
+          }
+        }
+
+        if (matched) {
+          const autoPairAllowed = matched.autoPairEnabled !== false;
+
+          if (autoPairAllowed) {
+            // Auto-Pair Succeeded!
+            setMachineId(matched.machineId);
+            setMachineName(matched.name || "Kiosk Terminal");
+            setIsPaired(true);
+            setCurrentScreen("otp");
+          } else {
+            // Admin requires pair code on every startup!
+            setMachineId(matched.machineId);
+            setMachineName(matched.name || "Kiosk Terminal");
+            setIsPaired(false);
+            setCurrentScreen("pairing");
+          }
+        } else {
+          setIsPaired(false);
+          setCurrentScreen("pairing");
+        }
+      } catch {
+        setIsPaired(false);
+        setCurrentScreen("pairing");
+      } finally {
+        setIsCheckingStartup(false);
+      }
+    };
+
+    checkStartupPairing();
+  }, []);
+
+  const handleTerminalPaired = (machine: {
+    machineId: string;
+    name: string;
+    location: string;
+    pairCode: string;
+    autoPairEnabled?: boolean;
+  }) => {
+    setMachineId(machine.machineId);
+    setMachineName(machine.name);
+    setIsPaired(true);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("kiosk_pair_code", machine.pairCode);
+      localStorage.setItem("kiosk_machine_id", machine.machineId);
+      localStorage.setItem("kiosk_machine_name", machine.name);
+    }
+
+    setCurrentScreen(activeOverlay?.active ? "overlay" : "otp");
+  };
+
+  // 2. Listen to dynamic Master PIN from Firebase RTDB (configured in Admin -> Settings)
   useEffect(() => {
     const masterCodeRef = ref(database, "systemSettings/masterKioskCode");
     const unsub = onValue(masterCodeRef, (snap) => {
@@ -43,8 +126,9 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // 2. Listen to Machine record in Firebase RTDB to keep display name in sync
+  // 3. Listen to Machine record in Firebase RTDB to keep display name in sync
   useEffect(() => {
+    if (!machineId) return;
     const machineRef = ref(database, `machines/${machineId}`);
     const unsubMachine = onValue(machineRef, (snap) => {
       if (snap.exists()) {
@@ -83,21 +167,9 @@ export default function App() {
     };
   }, [machineId]);
 
-  // 3. Read terminal config from Electron main process if available
-  useEffect(() => {
-    const kioskApi = (window as any).kioskApi;
-    if (kioskApi?.getConfig) {
-      kioskApi.getConfig().then((cfg: any) => {
-        if (cfg?.machineId) {
-          setMachineId(cfg.machineId);
-          localStorage.setItem("kiosk_machine_id", cfg.machineId);
-        }
-      });
-    }
-  }, []);
-
   // 4. Listen to remote overlays from Firebase RTDB
   useEffect(() => {
+    if (!machineId) return;
     const machineOverlayRef = ref(database, `overlays/machines/${machineId}`);
     const globalOverlayRef = ref(database, "overlays/global");
 
@@ -132,6 +204,26 @@ export default function App() {
       if (typeof unsubGlobal === "function") unsubGlobal();
     };
   }, [machineId]);
+
+  if (isCheckingStartup) {
+    return (
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#fbf9f3] text-neutral-800 font-sans">
+        <div className="w-9 h-9 border-3 border-[#0c831f] border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="text-xs font-bold text-neutral-600 tracking-wide uppercase">
+          Initializing Terminal...
+        </span>
+      </div>
+    );
+  }
+
+  if (currentScreen === "pairing" || !isPaired) {
+    return (
+      <PairingCodeScreen
+        lastMachineName={machineName}
+        onPaired={handleTerminalPaired}
+      />
+    );
+  }
 
   return (
     <div className="w-screen h-screen flex flex-col bg-[#faf7ee] text-neutral-900 select-none overflow-hidden font-sans">
@@ -177,6 +269,10 @@ export default function App() {
             setMachineName(newName);
             localStorage.setItem("kiosk_machine_id", newId);
             localStorage.setItem("kiosk_machine_name", newName);
+          }}
+          onUnpair={() => {
+            setIsPaired(false);
+            setCurrentScreen("pairing");
           }}
         />
       )}

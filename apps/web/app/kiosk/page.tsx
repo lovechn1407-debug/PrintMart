@@ -16,11 +16,12 @@ import {
   Wrench,
   Sparkles,
 } from "lucide-react";
-import { database, ref, onValue } from "@/lib/firebase";
+import { database, ref, onValue, get } from "@/lib/firebase";
 import { VendingQrView } from "./components/VendingQrView";
 import { GuillocheAura } from "./components/GuillocheAura";
 import { ConfigPanelScreen } from "./components/ConfigPanelScreen";
 import { OverlayScreen } from "./components/OverlayScreen";
+import { PairingCodeScreen } from "./components/PairingCodeScreen";
 import { MachineOverlay } from "@printmart/shared";
 
 interface RemoteKioskPopup {
@@ -47,30 +48,142 @@ interface AdConfig {
 }
 
 export default function OnlineKioskPage() {
-  const [machineId, setMachineId] = useState<string>("MCH-CAMPUS-01");
-  const [machineName, setMachineName] = useState<string>("Central Library Kiosk A");
+  const [machineId, setMachineId] = useState<string>("");
+  const [machineName, setMachineName] = useState<string>("PrintMart Kiosk Terminal");
   const [masterCode, setMasterCode] = useState<string>("998877");
-  const [currentScreen, setCurrentScreen] = useState<"otp" | "overlay" | "config">("otp");
+  const [currentScreen, setCurrentScreen] = useState<"pairing" | "otp" | "overlay" | "config">("pairing");
   const [activeOverlay, setActiveOverlay] = useState<MachineOverlay | null>(null);
+  const [isCheckingStartup, setIsCheckingStartup] = useState<boolean>(true);
+  const [isPaired, setIsPaired] = useState<boolean>(false);
 
-  // Read machine ID / Name from localStorage or URL query params on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlId = params.get("machineId") || params.get("id");
-      const storedId = localStorage.getItem("kiosk_machine_id");
-      const storedName = localStorage.getItem("kiosk_machine_name");
-
-      if (urlId) {
-        setMachineId(urlId);
-      } else if (storedId) {
-        setMachineId(storedId);
-      }
-      if (storedName) {
-        setMachineName(storedName);
-      }
+  // Offline / Connectivity Detection State
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    if (typeof navigator !== "undefined" && typeof navigator.onLine === "boolean") {
+      return !navigator.onLine;
     }
+    return false;
+  });
+
+  // Listen to network status and Firebase connection
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    const connectedRef = ref(database, ".info/connected");
+    const unsubConn = onValue(connectedRef, (snap) => {
+      const isConnected = snap.val() === true;
+      if (!isConnected && typeof navigator !== "undefined" && !navigator.onLine) {
+        setIsOffline(true);
+      } else if (isConnected) {
+        setIsOffline(false);
+      }
+    });
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      unsubConn();
+    };
   }, []);
+
+  // Strict Startup Pairing & Auto-Pair Check
+  useEffect(() => {
+    const checkStartupPairing = async () => {
+      if (typeof window === "undefined") return;
+
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get("pairCode") || params.get("code");
+      const urlId = params.get("machineId") || params.get("id");
+      const storedCode = localStorage.getItem("kiosk_pair_code");
+      const storedId = localStorage.getItem("kiosk_machine_id");
+
+      const targetCode = urlCode || storedCode;
+      const targetId = urlId || storedId;
+
+      if (!targetCode && !targetId) {
+        setIsCheckingStartup(false);
+        setIsPaired(false);
+        setCurrentScreen("pairing");
+        return;
+      }
+
+      try {
+        const machinesSnap = await get(ref(database, "machines"));
+        if (!machinesSnap.exists()) {
+          setIsCheckingStartup(false);
+          setIsPaired(false);
+          setCurrentScreen("pairing");
+          return;
+        }
+
+        const allMachines = machinesSnap.val();
+        let matched: any = null;
+
+        for (const [id, m] of Object.entries(allMachines)) {
+          const mach = m as any;
+          if (
+            (targetCode && (mach.pairCode === targetCode || id === targetCode || mach.machineId === targetCode)) ||
+            (targetId && (id === targetId || mach.machineId === targetId))
+          ) {
+            matched = { ...mach, machineId: mach.machineId || id };
+            break;
+          }
+        }
+
+        if (matched) {
+          // Check if admin has enabled auto-pair for this machine
+          const autoPairAllowed = matched.autoPairEnabled !== false;
+
+          if (autoPairAllowed) {
+            // Auto-Pair Succeeded!
+            setMachineId(matched.machineId);
+            setMachineName(matched.name || "Kiosk Terminal");
+            setIsPaired(true);
+            setCurrentScreen("otp");
+          } else {
+            // Admin requires pair code on every startup!
+            setMachineId(matched.machineId);
+            setMachineName(matched.name || "Kiosk Terminal");
+            setIsPaired(false);
+            setCurrentScreen("pairing");
+          }
+        } else {
+          setIsPaired(false);
+          setCurrentScreen("pairing");
+        }
+      } catch (err) {
+        setIsPaired(false);
+        setCurrentScreen("pairing");
+      } finally {
+        setIsCheckingStartup(false);
+      }
+    };
+
+    checkStartupPairing();
+  }, []);
+
+  const handleTerminalPaired = (machine: {
+    machineId: string;
+    name: string;
+    location: string;
+    pairCode: string;
+    autoPairEnabled?: boolean;
+  }) => {
+    setMachineId(machine.machineId);
+    setMachineName(machine.name);
+    setIsPaired(true);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("kiosk_pair_code", machine.pairCode);
+      localStorage.setItem("kiosk_machine_id", machine.machineId);
+      localStorage.setItem("kiosk_machine_name", machine.name);
+    }
+
+    setCurrentScreen(activeOverlay?.active ? "overlay" : "otp");
+  };
 
   // Listen to remote machine details and master pin in real-time from Firebase RTDB
   useEffect(() => {
@@ -524,6 +637,26 @@ export default function OnlineKioskPage() {
     </div>
   );
 
+  if (isCheckingStartup) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fbf9f3] text-neutral-800 font-sans">
+        <div className="w-9 h-9 border-3 border-[#0c831f] border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="text-xs font-bold text-neutral-600 tracking-wide uppercase">
+          Initializing Terminal...
+        </span>
+      </div>
+    );
+  }
+
+  if (currentScreen === "pairing" || !isPaired) {
+    return (
+      <PairingCodeScreen
+        lastMachineName={machineName}
+        onPaired={handleTerminalPaired}
+      />
+    );
+  }
+
   if (currentScreen === "config") {
     return (
       <ConfigPanelScreen
@@ -533,6 +666,10 @@ export default function OnlineKioskPage() {
         onUpdateMachine={(newId, newName) => {
           setMachineId(newId);
           setMachineName(newName);
+        }}
+        onUnpair={() => {
+          setIsPaired(false);
+          setCurrentScreen("pairing");
         }}
       />
     );
@@ -813,6 +950,31 @@ export default function OnlineKioskPage() {
 
               {/* ── REMOTE NOTICE POPUP (Covering OTP Area) ── */}
               {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupModal()}
+
+              {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering OTP Area, Sticky, No Button) ── */}
+              {isOffline && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
+                  <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
+                    <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
+                      <AlertCircle className="w-7 h-7" />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
+                        Alert
+                      </h3>
+                      <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
+                        No internet connection, try after some time
+                      </p>
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                      <span>Disconnected • Auto-reconnecting</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
@@ -1110,6 +1272,31 @@ export default function OnlineKioskPage() {
 
             {/* ── REMOTE NOTICE POPUP (Covering Centered Card) ── */}
             {isRemotePopupActive && renderPopupModal()}
+
+            {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering Centered Card, Sticky, No Button) ── */}
+            {isOffline && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
+                <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
+                  <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
+                    <AlertCircle className="w-7 h-7" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
+                      Alert
+                    </h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
+                      No internet connection, try after some time
+                    </p>
+                  </div>
+
+                  <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    <span>Disconnected • Auto-reconnecting</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

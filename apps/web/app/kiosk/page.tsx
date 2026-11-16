@@ -21,7 +21,6 @@ import { VendingQrView } from "./components/VendingQrView";
 import { GuillocheAura } from "./components/GuillocheAura";
 import { ConfigPanelScreen } from "./components/ConfigPanelScreen";
 import { OverlayScreen } from "./components/OverlayScreen";
-import { PairingCodeScreen } from "./components/PairingCodeScreen";
 import { MachineOverlay } from "@printmart/shared";
 
 interface RemoteKioskPopup {
@@ -432,10 +431,69 @@ export default function OnlineKioskPage() {
     }
   };
 
-  const handleSubmit = async (otpStr: string) => {
-    if (otpStr === masterCode || otpStr === "998877") {
+  const handleSubmit = async (codeStr: string) => {
+    if (codeStr === masterCode || codeStr === "998877") {
       setDigits([]);
       setIsStaffModalOpen(true);
+      return;
+    }
+
+    // When unpaired, typing on the keypad verifies the terminal pairing code
+    if (!isPaired) {
+      try {
+        setLoading(true);
+        setHasError(false);
+
+        const machinesSnap = await get(ref(database, "machines"));
+        if (!machinesSnap.exists()) {
+          setHasError(true);
+          setNoticeMessage("No vending machines registered in system. Contact Admin.");
+          setTimeout(() => setDigits([]), 350);
+          return;
+        }
+
+        const allMachines = machinesSnap.val();
+        let matched: any = null;
+
+        for (const [id, m] of Object.entries(allMachines)) {
+          const mach = m as any;
+          if (
+            mach.pairCode === codeStr ||
+            id === codeStr ||
+            mach.machineId === codeStr ||
+            (mach.pairCode && String(mach.pairCode).trim() === codeStr.trim())
+          ) {
+            matched = { ...mach, machineId: mach.machineId || id };
+            break;
+          }
+        }
+
+        if (matched) {
+          setIsSuccess(true);
+          setMachineId(matched.machineId);
+          setMachineName(matched.name || "Kiosk Terminal");
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kiosk_pair_code", codeStr);
+            localStorage.setItem("kiosk_machine_id", matched.machineId);
+            localStorage.setItem("kiosk_machine_name", matched.name || "Kiosk Terminal");
+          }
+          setTimeout(() => {
+            setIsPaired(true);
+            setIsSuccess(false);
+            setDigits([]);
+          }, 1200);
+        } else {
+          setHasError(true);
+          setNoticeMessage("Invalid Pair Code. Verify code in Admin > Vending Machines.");
+          setTimeout(() => setDigits([]), 350);
+        }
+      } catch (err: any) {
+        setHasError(true);
+        setNoticeMessage(err.message || "Unable to reach vending server. Try again.");
+        setTimeout(() => setDigits([]), 350);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -446,7 +504,7 @@ export default function OnlineKioskPage() {
       const response = await fetch("/api/machine/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machineId, otp: otpStr }),
+        body: JSON.stringify({ machineId, otp: codeStr }),
       });
       const res = await response.json();
 
@@ -530,11 +588,16 @@ export default function OnlineKioskPage() {
     Boolean(remotePopup?.updatedAt) &&
     remotePopup!.updatedAt > (dismissedRemotePopupAt || 0);
 
-  // Render Notice Popup with targeted blur and customized icons
-  const renderPopupModal = () => {
-    if (!isRemotePopupActive || !remotePopup) return null;
-
-    const iconType = remotePopup.icon || "alert";
+  // Render Notice / Alert Popup (Exact shared UI for both Broadcast Popups and Offline Alerts)
+  const renderPopupCard = (popup: {
+    icon?: string;
+    title: string;
+    description: string;
+    buttonEnabled?: boolean;
+    buttonText?: string;
+    onDismiss?: () => void;
+  }) => {
+    const iconType = popup.icon || "alert";
     let IconComp = AlertCircle;
     let iconClass = "text-rose-600 bg-rose-50";
 
@@ -555,13 +618,13 @@ export default function OnlineKioskPage() {
       iconClass = "text-amber-700 bg-amber-50";
     }
 
-    const canDismiss = remotePopup.buttonEnabled !== false;
+    const canDismiss = popup.buttonEnabled !== false && typeof popup.onDismiss === "function";
 
     return (
       <div
         className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none"
         onClick={() => {
-          if (canDismiss) setDismissedRemotePopupAt(remotePopup.updatedAt);
+          if (canDismiss && popup.onDismiss) popup.onDismiss();
         }}
       >
         <div
@@ -574,20 +637,20 @@ export default function OnlineKioskPage() {
 
           <div className="space-y-1">
             <h4 className="font-bold text-sm sm:text-base text-neutral-900 leading-snug">
-              {remotePopup.title || "Notification"}
+              {popup.title}
             </h4>
             <p className="text-[11px] sm:text-xs text-neutral-600 leading-relaxed font-normal">
-              {remotePopup.description}
+              {popup.description}
             </p>
           </div>
 
           {canDismiss && (
             <button
               type="button"
-              onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+              onClick={popup.onDismiss}
               className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[8px] transition-all border-0 cursor-pointer shadow-xs"
             >
-              {remotePopup.buttonText || "Okay, Got It"}
+              {popup.buttonText || "Okay, Got It"}
             </button>
           )}
         </div>
@@ -648,15 +711,6 @@ export default function OnlineKioskPage() {
     );
   }
 
-  if (currentScreen === "pairing" || !isPaired) {
-    return (
-      <PairingCodeScreen
-        lastMachineName={machineName}
-        onPaired={handleTerminalPaired}
-      />
-    );
-  }
-
   if (currentScreen === "config") {
     return (
       <ConfigPanelScreen
@@ -697,9 +751,15 @@ export default function OnlineKioskPage() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] bg-neutral-950 text-white px-5 py-1.5 rounded-b-2xl shadow-xl flex items-center justify-center gap-2.5 pointer-events-none select-none border-t-0">
         <div className="w-2.5 h-2.5 rounded-full bg-neutral-800 border border-neutral-700/80 shrink-0 shadow-inner" />
         <span className="text-[11px] font-semibold tracking-tight text-neutral-200">
-          {machineName}
+          {isPaired ? machineName : "Terminal Setup • Pairing Required"}
         </span>
-        <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+        <div
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+            isPaired
+              ? "bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+              : "bg-amber-400 animate-pulse shadow-[0_0_6px_rgba(251,191,36,0.8)]"
+          }`}
+        />
       </div>
 
       {/* ── 2. Desktop Mode Header ── */}
@@ -750,7 +810,7 @@ export default function OnlineKioskPage() {
 
               <div className="text-center">
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
-                  ENTER YOUR OTP
+                  {isPaired ? "ENTER YOUR OTP" : "ENTER PAIRING CODE"}
                 </h1>
               </div>
 
@@ -762,7 +822,7 @@ export default function OnlineKioskPage() {
                       <Check className="w-7 h-7 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
                     </div>
                     <span className="text-xs font-bold text-[#0c831f] tracking-tight">
-                      OTP Verified! Dispensing prints...
+                      {isPaired ? "OTP Verified! Dispensing prints..." : "Terminal Paired Successfully!"}
                     </span>
                   </div>
                 ) : (
@@ -949,32 +1009,22 @@ export default function OnlineKioskPage() {
               )}
 
               {/* ── REMOTE NOTICE POPUP (Covering OTP Area) ── */}
-              {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupModal()}
+              {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupCard({
+                icon: remotePopup.icon,
+                title: remotePopup.title || "Notification",
+                description: remotePopup.description,
+                buttonEnabled: remotePopup.buttonEnabled !== false,
+                buttonText: remotePopup.buttonText,
+                onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+              })}
 
               {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering OTP Area, Sticky, No Button) ── */}
-              {isOffline && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
-                  <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
-                    <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
-                      <AlertCircle className="w-7 h-7" />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-                        Alert
-                      </h3>
-                      <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
-                        No internet connection, try after some time
-                      </p>
-                    </div>
-
-                    <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                      <span>Disconnected • Auto-reconnecting</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {isOffline && renderPopupCard({
+                icon: "alert",
+                title: "Alert",
+                description: "No internet connection, try after some time",
+                buttonEnabled: false,
+              })}
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
@@ -1054,12 +1104,26 @@ export default function OnlineKioskPage() {
                 )}
 
                 {/* ── REMOTE NOTICE POPUP (Covering Ad Area) ── */}
-                {isRemotePopupActive && remotePopup?.targetArea === "ad" && renderPopupModal()}
+                {isRemotePopupActive && remotePopup?.targetArea === "ad" && renderPopupCard({
+                  icon: remotePopup.icon,
+                  title: remotePopup.title || "Notification",
+                  description: remotePopup.description,
+                  buttonEnabled: remotePopup.buttonEnabled !== false,
+                  buttonText: remotePopup.buttonText,
+                  onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+                })}
               </div>
             </div>
 
             {/* ── REMOTE NOTICE POPUP (Covering Both Areas / Entire Card) ── */}
-            {isRemotePopupActive && remotePopup?.targetArea === "both" && renderPopupModal()}
+            {isRemotePopupActive && remotePopup?.targetArea === "both" && renderPopupCard({
+              icon: remotePopup.icon,
+              title: remotePopup.title || "Notification",
+              description: remotePopup.description,
+              buttonEnabled: remotePopup.buttonEnabled !== false,
+              buttonText: remotePopup.buttonText,
+              onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+            })}
           </div>
         ) : (
           /* Centered Card (No Ads, Strictly 3:4 Portrait Ratio) */
@@ -1074,7 +1138,7 @@ export default function OnlineKioskPage() {
 
             <div className="text-center">
               <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
-                ENTER YOUR OTP
+                {isPaired ? "ENTER YOUR OTP" : "ENTER PAIRING CODE"}
               </h1>
             </div>
 
@@ -1085,7 +1149,7 @@ export default function OnlineKioskPage() {
                     <Check className="w-7 h-7 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
                   </div>
                   <span className="text-xs font-bold text-[#0c831f] tracking-tight">
-                    OTP Verified! Dispensing prints...
+                    {isPaired ? "OTP Verified! Dispensing prints..." : "Terminal Paired Successfully!"}
                   </span>
                 </div>
               ) : (
@@ -1271,32 +1335,22 @@ export default function OnlineKioskPage() {
             )}
 
             {/* ── REMOTE NOTICE POPUP (Covering Centered Card) ── */}
-            {isRemotePopupActive && renderPopupModal()}
+            {isRemotePopupActive && renderPopupCard({
+              icon: remotePopup?.icon,
+              title: remotePopup?.title || "Notification",
+              description: remotePopup?.description || "",
+              buttonEnabled: remotePopup?.buttonEnabled !== false,
+              buttonText: remotePopup?.buttonText,
+              onDismiss: () => remotePopup && setDismissedRemotePopupAt(remotePopup.updatedAt),
+            })}
 
             {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering Centered Card, Sticky, No Button) ── */}
-            {isOffline && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
-                <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
-                  <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
-                    <AlertCircle className="w-7 h-7" />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-                      Alert
-                    </h3>
-                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
-                      No internet connection, try after some time
-                    </p>
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                    <span>Disconnected • Auto-reconnecting</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {isOffline && renderPopupCard({
+              icon: "alert",
+              title: "Alert",
+              description: "No internet connection, try after some time",
+              buttonEnabled: false,
+            })}
           </div>
         )}
       </main>

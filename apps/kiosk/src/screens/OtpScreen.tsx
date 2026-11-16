@@ -18,13 +18,15 @@ import {
 import { KioskNavbar } from "../components/KioskNavbar";
 import { VendingQrView } from "../components/VendingQrView";
 import { GuillocheAura } from "../components/GuillocheAura";
-import { database, ref, onValue } from "../firebase";
+import { database, ref, onValue, get } from "../firebase";
 
 interface OtpScreenProps {
   machineId: string;
   machineName: string;
   printerState: string;
   masterCode?: string;
+  isPaired?: boolean;
+  onPairSuccess?: (machine: any) => void;
   onVerifySuccess: (jobDetails: any) => void;
   onOpenConfig: () => void;
 }
@@ -57,6 +59,8 @@ export function OtpScreen({
   machineName,
   printerState,
   masterCode = "998877",
+  isPaired = true,
+  onPairSuccess,
   onVerifySuccess,
   onOpenConfig,
 }: OtpScreenProps) {
@@ -263,6 +267,63 @@ export function OtpScreen({
       return;
     }
 
+    // When unpaired, typing on keypad verifies the terminal pairing code
+    if (!isPaired) {
+      try {
+        setLoading(true);
+        setHasError(false);
+
+        const machinesSnap = await get(ref(database, "machines"));
+        if (!machinesSnap.exists()) {
+          setHasError(true);
+          setNoticeMessage("No vending machines registered in system. Contact Admin.");
+          setTimeout(() => setDigits([]), 350);
+          return;
+        }
+
+        const allMachines = machinesSnap.val();
+        let matched: any = null;
+
+        for (const [id, m] of Object.entries(allMachines)) {
+          const mach = m as any;
+          if (
+            mach.pairCode === otpStr ||
+            id === otpStr ||
+            mach.machineId === otpStr ||
+            (mach.pairCode && String(mach.pairCode).trim() === otpStr.trim())
+          ) {
+            matched = { ...mach, machineId: mach.machineId || id };
+            break;
+          }
+        }
+
+        if (matched) {
+          setIsSuccess(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kiosk_pair_code", otpStr);
+            localStorage.setItem("kiosk_machine_id", matched.machineId);
+            localStorage.setItem("kiosk_machine_name", matched.name || "Kiosk Terminal");
+          }
+          setTimeout(() => {
+            setIsSuccess(false);
+            setDigits([]);
+            if (onPairSuccess) onPairSuccess(matched);
+          }, 1200);
+        } else {
+          setHasError(true);
+          setNoticeMessage("Invalid Pair Code. Verify code in Admin > Vending Machines.");
+          setTimeout(() => setDigits([]), 350);
+        }
+      } catch (err: any) {
+        setHasError(true);
+        setNoticeMessage(err.message || "Unable to reach vending server. Try again.");
+        setTimeout(() => setDigits([]), 350);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       setLoading(true);
       setHasError(false);
@@ -365,11 +426,16 @@ export function OtpScreen({
     Boolean(remotePopup?.updatedAt) &&
     remotePopup!.updatedAt > (dismissedRemotePopupAt || 0);
 
-  // Render Notice Popup with targeted blur and customized icons
-  const renderPopupModal = () => {
-    if (!isRemotePopupActive || !remotePopup) return null;
-
-    const iconType = remotePopup.icon || "alert";
+  // Render Notice / Alert Popup (Exact shared UI for both Broadcast Popups and Offline Alerts)
+  const renderPopupCard = (popup: {
+    icon?: string;
+    title: string;
+    description: string;
+    buttonEnabled?: boolean;
+    buttonText?: string;
+    onDismiss?: () => void;
+  }) => {
+    const iconType = popup.icon || "alert";
     let IconComp = AlertCircle;
     let iconClass = "text-rose-600 bg-rose-50";
 
@@ -390,13 +456,13 @@ export function OtpScreen({
       iconClass = "text-amber-700 bg-amber-50";
     }
 
-    const canDismiss = remotePopup.buttonEnabled !== false;
+    const canDismiss = popup.buttonEnabled !== false && typeof popup.onDismiss === "function";
 
     return (
       <div
         className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none"
         onClick={() => {
-          if (canDismiss) setDismissedRemotePopupAt(remotePopup.updatedAt);
+          if (canDismiss && popup.onDismiss) popup.onDismiss();
         }}
       >
         <div
@@ -409,20 +475,20 @@ export function OtpScreen({
 
           <div className="space-y-1">
             <h4 className="font-bold text-sm sm:text-base text-neutral-900 leading-snug">
-              {remotePopup.title || "Notification"}
+              {popup.title}
             </h4>
             <p className="text-[11px] sm:text-xs text-neutral-600 leading-relaxed font-normal">
-              {remotePopup.description}
+              {popup.description}
             </p>
           </div>
 
           {canDismiss && (
             <button
               type="button"
-              onClick={() => setDismissedRemotePopupAt(remotePopup.updatedAt)}
+              onClick={popup.onDismiss}
               className="w-full h-9 bg-neutral-950 hover:bg-black text-white font-bold text-xs rounded-[8px] transition-all border-0 cursor-pointer shadow-xs"
             >
-              {remotePopup.buttonText || "Okay, Got It"}
+              {popup.buttonText || "Okay, Got It"}
             </button>
           )}
         </div>
@@ -430,38 +496,13 @@ export function OtpScreen({
     );
   };
 
-  // Offline Sticky Modal (Covering OTP Area, No Button)
-  const renderOfflineModal = () => (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-in fade-in select-none">
-      <div className="bg-white rounded-[18px] sm:rounded-[22px] max-w-xs sm:max-w-sm w-full p-6 sm:p-7 shadow-2xl border-0 text-center space-y-4 animate-in zoom-in-95">
-        <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs text-rose-600 bg-rose-50 border border-rose-200">
-          <AlertCircle className="w-7 h-7" />
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-            Alert
-          </h3>
-          <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
-            No internet connection, try after some time
-          </p>
-        </div>
-
-        <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-600 bg-rose-50/70 py-1.5 px-3 rounded-full border border-rose-100 mx-auto w-fit">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          <span>Disconnected • Auto-reconnecting</span>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fcd462] via-[#fae07c] to-[#f3f4f7] text-neutral-900 selection:bg-yellow-200 selection:text-neutral-900 relative overflow-hidden select-none font-sans">
       {/* ── Signature Navbar with iPhone Notch ── */}
       <KioskNavbar
-        machineName={machineName}
-        machineId={machineId}
-        printerState={printerState}
+        machineName={isPaired ? machineName : "Terminal Setup • Pairing Required"}
+        machineId={isPaired ? machineId : ""}
+        printerState={isPaired ? printerState : "PAIRING"}
         onOpenStaff={() => {
           setStaffPinInput("");
           setIsStaffModalOpen(true);
@@ -490,10 +531,10 @@ export function OtpScreen({
                 />
               </div>
 
-              {/* Title: ENTER YOUR OTP */}
+              {/* Title: ENTER YOUR OTP / ENTER PAIRING CODE */}
               <div className="text-center">
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
-                  ENTER YOUR OTP
+                  {isPaired ? "ENTER YOUR OTP" : "ENTER PAIRING CODE"}
                 </h1>
               </div>
 
@@ -506,7 +547,7 @@ export function OtpScreen({
                       <Check className="w-7 h-7 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
                     </div>
                     <span className="text-xs font-bold text-[#0c831f] tracking-tight">
-                      OTP Verified! Dispensing prints...
+                      {isPaired ? "OTP Verified! Dispensing prints..." : "Terminal Paired Successfully!"}
                     </span>
                   </div>
                 ) : (
@@ -699,10 +740,22 @@ export function OtpScreen({
               )}
 
               {/* ── REMOTE NOTICE POPUP (Covering OTP Area) ── */}
-              {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupModal()}
+              {isRemotePopupActive && remotePopup?.targetArea === "otp" && renderPopupCard({
+                icon: remotePopup.icon,
+                title: remotePopup.title || "Notification",
+                description: remotePopup.description,
+                buttonEnabled: remotePopup.buttonEnabled !== false,
+                buttonText: remotePopup.buttonText,
+                onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+              })}
 
               {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering OTP Area, Sticky, No Button) ── */}
-              {isOffline && renderOfflineModal()}
+              {isOffline && renderPopupCard({
+                icon: "alert",
+                title: "Alert",
+                description: "No internet connection, try after some time",
+                buttonEnabled: false,
+              })}
             </div>
 
             {/* RIGHT: AD AREA (Inside the outer box, with very low gap from top, bottom, and right) */}
@@ -783,12 +836,26 @@ export function OtpScreen({
                 )}
 
                 {/* ── REMOTE NOTICE POPUP (Covering Ad Area) ── */}
-                {isRemotePopupActive && remotePopup?.targetArea === "ad" && renderPopupModal()}
+                {isRemotePopupActive && remotePopup?.targetArea === "ad" && renderPopupCard({
+                  icon: remotePopup.icon,
+                  title: remotePopup.title || "Notification",
+                  description: remotePopup.description,
+                  buttonEnabled: remotePopup.buttonEnabled !== false,
+                  buttonText: remotePopup.buttonText,
+                  onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+                })}
               </div>
             </div>
 
             {/* ── REMOTE NOTICE POPUP (Covering Both Areas / Entire Card) ── */}
-            {isRemotePopupActive && remotePopup?.targetArea === "both" && renderPopupModal()}
+            {isRemotePopupActive && remotePopup?.targetArea === "both" && renderPopupCard({
+              icon: remotePopup.icon,
+              title: remotePopup.title || "Notification",
+              description: remotePopup.description,
+              buttonEnabled: remotePopup.buttonEnabled !== false,
+              buttonText: remotePopup.buttonText,
+              onDismiss: () => setDismissedRemotePopupAt(remotePopup.updatedAt),
+            })}
           </div>
         ) : (
           /* ══════════════════════════════════════════════════════════════════════
@@ -805,10 +872,10 @@ export function OtpScreen({
               />
             </div>
 
-            {/* Title: ENTER YOUR OTP */}
+            {/* Title: ENTER YOUR OTP / ENTER PAIRING CODE */}
             <div className="text-center">
               <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight leading-tight uppercase font-sans">
-                ENTER YOUR OTP
+                {isPaired ? "ENTER YOUR OTP" : "ENTER PAIRING CODE"}
               </h1>
             </div>
 
@@ -820,7 +887,7 @@ export function OtpScreen({
                     <Check className="w-7 h-7 text-white stroke-[3.5] animate-in zoom-in-50 duration-300" />
                   </div>
                   <span className="text-xs font-bold text-[#0c831f] tracking-tight">
-                    OTP Verified! Dispensing prints...
+                    {isPaired ? "OTP Verified! Dispensing prints..." : "Terminal Paired Successfully!"}
                   </span>
                 </div>
               ) : (
@@ -1008,10 +1075,22 @@ export function OtpScreen({
             )}
 
             {/* ── REMOTE NOTICE POPUP (Covering Centered Card) ── */}
-            {isRemotePopupActive && renderPopupModal()}
+            {isRemotePopupActive && renderPopupCard({
+              icon: remotePopup?.icon,
+              title: remotePopup?.title || "Notification",
+              description: remotePopup?.description || "",
+              buttonEnabled: remotePopup?.buttonEnabled !== false,
+              buttonText: remotePopup?.buttonText,
+              onDismiss: () => remotePopup && setDismissedRemotePopupAt(remotePopup.updatedAt),
+            })}
 
             {/* ── OFFLINE NO INTERNET STICKY POPUP (Covering Centered Card, Sticky, No Button) ── */}
-            {isOffline && renderOfflineModal()}
+            {isOffline && renderPopupCard({
+              icon: "alert",
+              title: "Alert",
+              description: "No internet connection, try after some time",
+              buttonEnabled: false,
+            })}
           </div>
         )}
       </main>

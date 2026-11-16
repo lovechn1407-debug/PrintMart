@@ -34,6 +34,8 @@ function createWindow() {
     mainWindow?.setAlwaysOnTop(false);
   }, 3000);
 
+  mainWindow.webContents.session.clearCache().catch(() => {});
+
   const devUrl = "http://localhost:5173";
   mainWindow.loadURL(devUrl).catch(() => {
     mainWindow?.loadFile(path.join(__dirname, "../dist/index.html"));

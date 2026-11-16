@@ -5,7 +5,6 @@ import { OtpScreen } from "./screens/OtpScreen";
 import { PrintingProgressScreen } from "./screens/PrintingProgressScreen";
 import { OverlayScreen } from "./screens/OverlayScreen";
 import { ConfigPanelScreen } from "./screens/ConfigPanelScreen";
-import { PairingCodeScreen } from "./screens/PairingCodeScreen";
 import { database, ref, onValue, get } from "./firebase";
 import { MachineOverlay } from "@printmart/shared";
 
@@ -216,23 +215,16 @@ export default function App() {
     );
   }
 
-  if (currentScreen === "pairing" || !isPaired) {
-    return (
-      <PairingCodeScreen
-        lastMachineName={machineName}
-        onPaired={handleTerminalPaired}
-      />
-    );
-  }
-
   return (
     <div className="w-screen h-screen flex flex-col bg-[#faf7ee] text-neutral-900 select-none overflow-hidden font-sans">
-      {currentScreen === "otp" && (
+      {(currentScreen === "otp" || currentScreen === "pairing" || !isPaired) && (
         <OtpScreen
           machineId={machineId}
           machineName={machineName}
           printerState={printerState}
           masterCode={masterCode}
+          isPaired={isPaired}
+          onPairSuccess={handleTerminalPaired}
           onVerifySuccess={(jobDetails) => {
             setActiveJob(jobDetails);
             setCurrentScreen("printing");

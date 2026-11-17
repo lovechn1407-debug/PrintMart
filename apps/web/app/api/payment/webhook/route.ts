@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyCashfreeSignature } from "@/lib/cashfree";
 import { generateAndStoreJobOTP } from "@/lib/otpService";
+import { sendOtpAndInvoiceEmail } from "@/lib/emailService";
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     if (paymentData?.payment_status === "SUCCESS") {
       // Generate OTP and trigger background preloading
-      await generateAndStoreJobOTP({
+      const otpRes = await generateAndStoreJobOTP({
         jobId,
         machineId: job.machineId,
         userId: job.userId,
@@ -50,6 +51,38 @@ export async function POST(req: NextRequest) {
       // Update payment ID
       if (paymentData.cf_payment_id) {
         await adminDb.ref(`printJobs/${jobId}/payment/cfPaymentId`).set(String(paymentData.cf_payment_id));
+      }
+
+      // Trigger EmailJS OTP & invoice email
+      if (!job.emailSent && job.customerEmail) {
+        try {
+          const subtotalRupees = `₹${((job.pricing?.subtotalPaise || 0) / 100).toFixed(2)}`;
+          const discountRupees = `-₹${((job.pricing?.discountPaise || 0) / 100).toFixed(2)}`;
+          const taxRupees = `₹${((job.pricing?.taxPaise || 0) / 100).toFixed(2)}`;
+          const totalAmountRupees = `₹${((job.pricing?.finalPayablePaise || 0) / 100).toFixed(2)}`;
+
+          const sent = await sendOtpAndInvoiceEmail({
+            toEmail: job.customerEmail,
+            toName: job.customerName || "Customer",
+            otpCode: otpRes.plainOtp,
+            orderId,
+            jobId,
+            documentName: job.documentName || "document.pdf",
+            pageCount: job.configuration?.totalPagesToPrint || 1,
+            colorMode: job.configuration?.colorMode || "bw",
+            copies: job.configuration?.copies || 1,
+            subtotalRupees,
+            discountRupees,
+            taxRupees,
+            totalAmountRupees,
+          });
+
+          if (sent) {
+            await adminDb.ref(`printJobs/${jobId}/emailSent`).set(true);
+          }
+        } catch (e) {
+          console.warn("Webhook email dispatch failed:", e);
+        }
       }
     } else {
       await adminDb.ref(`printJobs/${jobId}/payment/status`).set("FAILED");

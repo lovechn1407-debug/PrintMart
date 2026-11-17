@@ -121,9 +121,16 @@ export async function POST(req: NextRequest) {
       ? `${documents.length} Documents`
       : docData.originalFilename || "document.pdf";
 
-    const printJob: PrintJob = {
+    const printJob: PrintJob & {
+      customerEmail?: string;
+      customerName?: string;
+      emailSent?: boolean;
+    } = {
       jobId,
       userId,
+      customerEmail: customerEmail || "user@printmart.com",
+      customerName: customerName || "Customer",
+      emailSent: false,
       machineId: targetMachineId,
       documentId,
       documentName: resolvedDocName,

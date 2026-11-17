@@ -1,8 +1,8 @@
 import crypto from "crypto";
 
-const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID || "TEST10342133a886b7289f64923485833124301";
-const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY || "cfsk_ma_test_019283847564738291029384756_sandbox";
-const CASHFREE_ENV = process.env.CASHFREE_ENV || "SANDBOX";
+const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID || "";
+const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY || "";
+const CASHFREE_ENV = process.env.CASHFREE_ENV || "PRODUCTION";
 
 const BASE_URL =
   CASHFREE_ENV === "PRODUCTION"
@@ -14,8 +14,8 @@ export interface CreateOrderParams {
   orderAmountPaise: number;
   customerId: string;
   customerPhone?: string;
-  customerEmail: string;
-  customerName: string;
+  customerEmail?: string;
+  customerName?: string;
 }
 
 export interface CashfreeOrderResponse {
@@ -28,67 +28,79 @@ export interface CashfreeOrderResponse {
 /**
  * Creates an order on Cashfree Payment Gateway
  */
-export async function createCashfreeOrder(params: CreateOrderParams): Promise<CashfreeOrderResponse> {
-  const { orderId, orderAmountPaise, customerId, customerPhone, customerEmail, customerName } = params;
+export async function createCashfreeOrder(
+  params: CreateOrderParams
+): Promise<CashfreeOrderResponse> {
+  const {
+    orderId,
+    orderAmountPaise,
+    customerId,
+    customerPhone,
+    customerEmail,
+    customerName,
+  } = params;
 
   // Convert paise to rupees (Cashfree expects float string like "15.00")
-  const orderAmountRupees = (orderAmountPaise / 100).toFixed(2);
+  const orderAmountRupees = Math.max(1, orderAmountPaise / 100).toFixed(2);
+
+  // Validate phone: must be 10 digits
+  const validPhone =
+    customerPhone && /^[6-9]\d{9}$/.test(customerPhone.trim())
+      ? customerPhone.trim()
+      : "9876543210";
+
+  // Validate email
+  const validEmail =
+    customerEmail && customerEmail.includes("@")
+      ? customerEmail.trim()
+      : "customer@printmart.com";
+
+  // Customer ID: alphanumeric, underscore, hyphen, max 50 chars
+  const safeCustomerId = customerId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45);
 
   const payload = {
     order_id: orderId,
     order_amount: parseFloat(orderAmountRupees),
     order_currency: "INR",
     customer_details: {
-      customer_id: customerId,
-      customer_email: customerEmail,
-      customer_phone: customerPhone || "9999999999",
-      customer_name: customerName,
+      customer_id: safeCustomerId || "customer_guest",
+      customer_email: validEmail,
+      customer_phone: validPhone,
+      customer_name: (customerName || "PrintMart Customer").slice(0, 50),
     },
     order_meta: {
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/user/orders/${orderId}?status={order_status}`,
+      return_url: `${
+        process.env.NEXT_PUBLIC_APP_URL || "https://printmart.in"
+      }/user/print?order_id={order_id}&status={order_status}`,
     },
   };
 
-  try {
-    const response = await fetch(`${BASE_URL}/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-version": "2023-08-01",
-        "x-client-id": CASHFREE_APP_ID,
-        "x-client-secret": CASHFREE_SECRET_KEY,
-      },
-      body: JSON.stringify(payload),
-    });
+  const response = await fetch(`${BASE_URL}/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-version": "2023-08-01",
+      "x-client-id": CASHFREE_APP_ID,
+      "x-client-secret": CASHFREE_SECRET_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (response.ok && data.payment_session_id) {
-      return {
-        cfOrderId: String(data.cf_order_id),
-        orderId: data.order_id,
-        paymentSessionId: data.payment_session_id,
-        orderStatus: data.order_status,
-      };
-    }
-
-    // In local demo or fallback mode if sandbox gateway credentials are not yet whitelisted on cashfree merchant portal
-    console.warn("Cashfree live sandbox response:", data);
+  if (response.ok && data.payment_session_id) {
     return {
-      cfOrderId: `cf_mock_${Date.now()}`,
-      orderId,
-      paymentSessionId: `session_mock_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      orderStatus: "ACTIVE",
-    };
-  } catch (err) {
-    console.warn("Cashfree gateway unreachable, using sandbox fallback session:", err);
-    return {
-      cfOrderId: `cf_sandbox_${Date.now()}`,
-      orderId,
-      paymentSessionId: `session_sandbox_${Date.now()}`,
-      orderStatus: "ACTIVE",
+      cfOrderId: String(data.cf_order_id),
+      orderId: data.order_id,
+      paymentSessionId: data.payment_session_id,
+      orderStatus: data.order_status,
     };
   }
+
+  console.error("Cashfree order creation error response:", data);
+  throw new Error(
+    data.message || data.description || `Cashfree returned status ${response.status}`
+  );
 }
 
 /**
@@ -107,7 +119,10 @@ export function verifyCashfreeSignature(
     .update(data)
     .digest("base64");
 
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
 }
 
 /**
@@ -127,8 +142,8 @@ export async function fetchCashfreeOrderStatus(orderId: string): Promise<string>
     if (!response.ok) return "UNKNOWN";
     const data = await response.json();
     return data.order_status || "UNKNOWN";
-  } catch {
+  } catch (err) {
+    console.warn("fetchCashfreeOrderStatus error:", err);
     return "UNKNOWN";
   }
 }
-

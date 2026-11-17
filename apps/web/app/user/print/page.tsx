@@ -437,6 +437,28 @@ function UserPrintContent() {
     return () => unsub();
   }, []);
 
+  // Handle return redirect from Cashfree (e.g. mobile 3DS / UPI intent returns)
+  useEffect(() => {
+    const returnOrderId = searchParams.get("order_id");
+    if (returnOrderId) {
+      const jobId = returnOrderId.replace(/^CF_/, "");
+      fetch("/api/payment/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, orderId: returnOrderId }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.paid && data.otp) {
+            setGeneratedOtp(data.otp);
+            setIsOtpModalOpen(true);
+            setStep("confirmed");
+          }
+        })
+        .catch(console.warn);
+    }
+  }, [searchParams]);
+
   // State: Print Settings
   const [colorMode, setColorMode] = useState<ColorMode>("bw");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
@@ -924,27 +946,76 @@ function UserPrintContent() {
         throw new Error(orderData.error || "Failed to create order");
       }
 
-      const simRes = await fetch("/api/payment/simulate-success", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: orderData.jobId }),
-      });
+      // Check if Cashfree Session ID is available for live checkout
+      if (orderData.paymentSessionId && !orderData.paymentSessionId.startsWith("session_mock_")) {
+        // Load Cashfree v3 Web SDK dynamically
+        if (!(window as any).Cashfree) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Failed to load Cashfree Payment Gateway"));
+            document.head.appendChild(script);
+          });
+        }
 
-      let simData: any;
-      const simContentType = simRes.headers.get("content-type") || "";
-      if (simContentType.includes("application/json")) {
-        simData = await simRes.json();
+        const isProd =
+          process.env.NEXT_PUBLIC_CASHFREE_ENV === "PRODUCTION" ||
+          !orderData.paymentSessionId.includes("sandbox");
+
+        const cashfree = (window as any).Cashfree({
+          mode: isProd ? "production" : "sandbox",
+        });
+
+        // Launch Cashfree checkout popup / modal
+        await cashfree.checkout({
+          paymentSessionId: orderData.paymentSessionId,
+          redirectTarget: "_modal",
+        });
+
+        // Poll server for payment confirmation (handles both webhook and direct API verification)
+        let verified = false;
+        for (let attempt = 0; attempt < 12; attempt++) {
+          await new Promise((res) => setTimeout(res, 1500));
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId: orderData.jobId, orderId: orderData.orderId }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (verifyData.success && verifyData.paid && verifyData.otp) {
+            setGeneratedOtp(verifyData.otp);
+            setIsOtpModalOpen(true);
+            setStep("confirmed");
+            if (activeDraftId) {
+              removeDraftById(activeDraftId);
+              setActiveDraftId(null);
+            }
+            verified = true;
+            break;
+          }
+        }
+
+        if (!verified) {
+          throw new Error("Payment was not completed. Please try again or check your UPI app.");
+        }
       } else {
-        const text = await simRes.text();
-        throw new Error(`Payment confirmation server response error (${simRes.status}): ${text.slice(0, 150)}`);
-      }
-      if (simData.success && simData.otp) {
-        setGeneratedOtp(simData.otp);
-        setIsOtpModalOpen(true);
-        setStep("confirmed");
-        if (activeDraftId) {
-          removeDraftById(activeDraftId);
-          setActiveDraftId(null);
+        // Fallback for simulation / mock order if no live session returned
+        const simRes = await fetch("/api/payment/simulate-success", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: orderData.jobId }),
+        });
+        const simData = await simRes.json();
+        if (simData.success && simData.otp) {
+          setGeneratedOtp(simData.otp);
+          setIsOtpModalOpen(true);
+          setStep("confirmed");
+          if (activeDraftId) {
+            removeDraftById(activeDraftId);
+            setActiveDraftId(null);
+          }
         }
       }
     } catch (err: any) {
@@ -1659,7 +1730,7 @@ function UserPrintContent() {
                     <span>Universal Campus OTP</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-neutral-600">
-                    1. Pay securely via Cashfree Sandbox.<br />
+                    1. Pay securely via Cashfree (UPI, Cards, NetBanking).<br />
                     2. Receive a universal 6-digit release OTP.<br />
                     3. Walk up to <strong>any</strong> PrintMart kiosk on campus, enter OTP, and collect your prints instantly!
                   </p>

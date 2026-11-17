@@ -766,7 +766,7 @@ export default function PublicDocumentsPage() {
           </div>
         ) : filteredDocs.length === 0 ? (
           /* Empty State */
-          <div className="bg-white rounded-2xl p-8 sm:p-12 border-0 shadow-[0_2px_12px_rgba(0,0,0,0.04)] text-center my-4 flex flex-col items-center">
+          <div className="bg-white rounded-2xl p-8 sm:p-12 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] text-center my-4 flex flex-col items-center">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center mb-3">
               <FileText className="w-8 h-8 text-[#0c831f]" />
             </div>
@@ -826,12 +826,12 @@ export default function PublicDocumentsPage() {
                 return (
                   <div
                     key={doc.id}
-                    className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all border-0 flex flex-col justify-between group"
+                    className="bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
                   >
                     {/* Top Content: Thumbnail on Left, Metadata on Right */}
                     <div className="flex gap-3.5 items-start">
                       {/* Left: Document Thumbnail Preview Box */}
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 bg-neutral-100 rounded-lg overflow-hidden shrink-0 border-0 flex items-center justify-center relative shadow-2xs">
+                      <div className="w-18 h-24 sm:w-20 sm:h-26 bg-neutral-100 rounded-lg overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
                         {doc.thumbnailUrl ? (
                           <img
                             src={doc.thumbnailUrl}

@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
+import { database, ref, onValue } from "@/lib/firebase";
+import { uploadDocumentInChunks } from "@/lib/clientUploader";
 import { calculatePrintPrice, DEFAULT_GLOBAL_PRICING } from "@printmart/shared";
 import {
   PrintDraftItem,
@@ -409,7 +411,20 @@ function UserPrintContent() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadStatusText, setUploadStatusText] = useState<string>("");
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState<number>(100);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load configured max file size limit from systemSettings
+  useEffect(() => {
+    const settingsRef = ref(database, "systemSettings/maxFileSizeBytes");
+    const unsub = onValue(settingsRef, (snap) => {
+      if (snap.exists()) {
+        const mb = Number(snap.val());
+        if (mb > 0) setMaxFileSizeMb(Math.min(100, mb));
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // State: Print Settings
   const [colorMode, setColorMode] = useState<ColorMode>("bw");
@@ -656,14 +671,10 @@ function UserPrintContent() {
     }
   }, [colorMode, orientation, copies, pageRangeType, customRange]);
 
-  // Upload Multiple Files with Automatic Direct Cloud Fallback for Large Files (>4MB)
+  // Upload Multiple Files with Automatic 20MB Chunking into Telegram Vault (Supports up to 100MB)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
-
-    const TELEGRAM_BOT_TOKEN = "9146606886:AAGGou_zK4EUwvDAZi6vp2cchjGZhcKO-B8";
-    const TELEGRAM_CHANNEL_ID = "-1004357170113";
-    const DIRECT_UPLOAD_THRESHOLD_BYTES = 4 * 1024 * 1024; // 4MB (bypasses Vercel 4.5MB serverless limit)
 
     setUploading(true);
     setErrorMessage(null);
@@ -671,129 +682,23 @@ function UserPrintContent() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setUploadStatusText(`Uploading ${file.name} (${i + 1}/${files.length})...`);
-      setUploadProgress(Math.round(((i + 1) / files.length) * 85));
 
       try {
-        if (file.size > 20 * 1024 * 1024) {
-          throw new Error(`"${file.name}" exceeds the 20MB maximum limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please select a file under 20MB.`);
-        }
-
-        // Accurate client-side PDF page count detection
-        let estPages = 1;
-        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-          try {
-            const pdfjsLib = (window as any).pdfjsLib;
-            if (pdfjsLib) {
-              const arrayBuffer = await file.slice(0, Math.min(file.size, 15 * 1024 * 1024)).arrayBuffer();
-              const p = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-              if (p?.numPages > 0) {
-                estPages = p.numPages;
-              }
+        const uploadedDoc = await uploadDocumentInChunks({
+          file,
+          ownerUid: user?.uid || "anonymous",
+          maxFileSizeMb,
+          onProgress: (p) => {
+            const fraction = p.percent / 100;
+            const overall = Math.round(((i + fraction) / files.length) * 100);
+            setUploadProgress(Math.min(99, overall));
+            if (files.length > 1) {
+              setUploadStatusText(`[${i + 1}/${files.length}] ${p.statusText}`);
+            } else {
+              setUploadStatusText(p.statusText);
             }
-          } catch {
-            // Ignore error
-          }
-
-          if (estPages <= 1) {
-            try {
-              const slice = await file.slice(0, 200000).arrayBuffer();
-              const text = new TextDecoder("latin1").decode(slice);
-              const matches = text.match(/\/Type\s*\/Page[^s]/g);
-              if (matches && matches.length > 0) {
-                estPages = matches.length;
-              } else {
-                const countMatch = text.match(/\/Count\s+(\d+)/);
-                if (countMatch && countMatch[1]) {
-                  estPages = parseInt(countMatch[1], 10);
-                }
-              }
-            } catch {
-              estPages = 1;
-            }
-          }
-        }
-
-        let uploadedDoc: any = null;
-
-        // Fast-path for files > 4MB: direct upload to Telegram vault
-        if (file.size > DIRECT_UPLOAD_THRESHOLD_BYTES) {
-          setUploadStatusText(`Uploading large file ${file.name} to cloud vault...`);
-          const tgFormData = new FormData();
-          tgFormData.append("chat_id", TELEGRAM_CHANNEL_ID);
-          tgFormData.append("caption", `PrintMart Document Vault: ${file.name}\nTimestamp: ${new Date().toISOString()}`);
-          tgFormData.append("document", file, file.name);
-
-          const tgRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
-            method: "POST",
-            body: tgFormData,
-          });
-
-          const tgText = await tgRes.text();
-          let tgData: any;
-          try {
-            tgData = JSON.parse(tgText);
-          } catch {
-            throw new Error(`Cloud storage gateway error (${tgRes.status})`);
-          }
-
-          if (!tgRes.ok || !tgData.ok || !tgData.result?.document) {
-            throw new Error(`Upload failed: ${tgData.description || tgRes.statusText || "Unable to store document"}`);
-          }
-
-          const tgDoc = tgData.result.document;
-
-          const metaRes = await fetch("/api/upload", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              directUpload: true,
-              telegramFileId: tgDoc.file_id,
-              telegramMessageId: tgData.result.message_id,
-              originalFilename: file.name,
-              mimeType: file.type || "application/octet-stream",
-              fileSizeBytes: file.size,
-              pageCount: estPages,
-              ownerUid: user?.uid || "anonymous",
-            }),
-          });
-
-          const metaData = await metaRes.json();
-          if (!metaRes.ok || !metaData.success || !metaData.document) {
-            throw new Error(metaData.error || `Failed to register ${file.name}`);
-          }
-          uploadedDoc = metaData.document;
-        } else {
-          // Standard upload for files <= 4MB
-          const formData = new FormData();
-          formData.append("file", file);
-          if (user?.uid) {
-            formData.append("ownerUid", user.uid);
-          }
-
-          const res = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (res.status === 413) {
-            throw new Error("Payload too large. Please retry with direct upload.");
-          }
-
-          const contentType = res.headers.get("content-type") || "";
-          let data: any;
-          if (contentType.includes("application/json")) {
-            data = await res.json();
-          } else {
-            const text = await res.text();
-            throw new Error(`Server returned unexpected response (${res.status}): ${text.slice(0, 150)}`);
-          }
-
-          if (!res.ok || !data.success || !data.document) {
-            throw new Error(data.error || `Failed to process ${file.name}`);
-          }
-          uploadedDoc = data.document;
-        }
+          },
+        });
 
         // Generate local blob URL for instant current-session rendering
         const blobUrl = URL.createObjectURL(file);
@@ -802,7 +707,7 @@ function UserPrintContent() {
 
         newDocs.push({
           ...uploadedDoc,
-          pageCount: Math.max(uploadedDoc.pageCount || 1, estPages),
+          pageCount: Math.max(uploadedDoc.pageCount || 1, 1),
           fileId: docId,
           blobUrl,
           previewUrl: permanentPreview,
@@ -1216,7 +1121,7 @@ function UserPrintContent() {
                       Click to upload or drag & drop
                     </h3>
                     <p className="text-xs text-neutral-500 max-w-xs text-center mb-5">
-                      PDF, Word (.docx), PowerPoint (.pptx), or Images up to 25 MB
+                      PDF, Word (.docx), PowerPoint (.pptx), or Images up to {maxFileSizeMb} MB (chunked upload)
                     </p>
                     <button
                       type="button"

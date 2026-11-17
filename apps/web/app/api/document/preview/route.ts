@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { getTelegramFileDownloadUrl } from "@/lib/telegram";
+import { getTelegramFileDownloadUrl, downloadTelegramDocument } from "@/lib/telegram";
 
 // On Vercel / AWS Lambda, only /tmp is writable. NEVER write to process.cwd()!
 const TMP_CACHE_DIR = path.join(os.tmpdir(), "printmart_cache");
@@ -129,15 +129,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 3. Resolve direct download URL from Telegram vault
-    const downloadUrl = await getTelegramFileDownloadUrl(resolvedTelegramFileId);
-    const fileRes = await fetch(downloadUrl);
-    if (!fileRes.ok) {
-      throw new Error(`Failed to fetch file from Telegram storage: ${fileRes.statusText}`);
-    }
-
-    const arrayBuffer = await fileRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // 3. Resolve and download document (handles chunked multi-part files and single files)
+    const buffer = await downloadTelegramDocument({
+      telegramFileId: resolvedTelegramFileId,
+      chunks: targetDoc?.chunks,
+    });
     const finalMime = resolvedMime || getMimeType(resolvedFilename, buffer);
 
     // Cache in /tmp for subsequent requests within the same lambda instance

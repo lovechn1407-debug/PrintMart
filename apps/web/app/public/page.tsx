@@ -23,6 +23,7 @@ import {
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
 import { database, ref, onValue, set, update, remove } from "@/lib/firebase";
+import { uploadDocumentInChunks } from "@/lib/clientUploader";
 
 export interface PublicDocument {
   id: string;
@@ -188,8 +189,23 @@ export default function PublicDocumentsPage() {
   const [passwordInput, setPasswordInput] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStatusText, setUploadStatusText] = useState<string>("");
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState<number>(100);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load configured max file size limit from systemSettings
+  useEffect(() => {
+    const settingsRef = ref(database, "systemSettings/maxFileSizeBytes");
+    const unsub = onValue(settingsRef, (snap) => {
+      if (snap.exists()) {
+        const mb = Number(snap.val());
+        if (mb > 0) setMaxFileSizeMb(Math.min(100, mb));
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Delete Confirmation State
   const [docToDelete, setDocToDelete] = useState<PublicDocument | null>(null);
@@ -292,8 +308,8 @@ export default function PublicDocumentsPage() {
       setUploadError("Only PDF documents are supported for public sharing.");
       return;
     }
-    if (file.size > 25 * 1024 * 1024) {
-      setUploadError("File exceeds maximum allowed size of 25MB.");
+    if (file.size > maxFileSizeMb * 1024 * 1024) {
+      setUploadError(`File exceeds maximum allowed size of ${maxFileSizeMb}MB.`);
       return;
     }
     setSelectedFile(file);
@@ -318,23 +334,17 @@ export default function PublicDocumentsPage() {
     setUploadError(null);
 
     try {
-      // 1. Upload to /api/upload
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("ownerUid", user?.uid || "anonymous");
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      // 1. Upload in 20MB chunks to Telegram vault (supports up to 100MB)
+      const uploadedDoc = await uploadDocumentInChunks({
+        file: selectedFile,
+        ownerUid: user?.uid || "anonymous",
+        maxFileSizeMb,
+        onProgress: (p) => {
+          setUploadProgress(p.percent);
+          setUploadStatusText(p.statusText);
+        },
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || "Failed to upload document.");
-      }
-
-      const data = await res.json();
-      const uploadedDoc = data.document;
       const docFileId = uploadedDoc.documentId || uploadedDoc.fileId;
       const detectedPages = uploadedDoc.pageCount || 1;
 
@@ -914,7 +924,7 @@ export default function PublicDocumentsPage() {
                     <div className="space-y-1">
                       <UploadCloud className="w-7 h-7 text-neutral-400 mx-auto" />
                       <p className="text-xs font-semibold text-neutral-700">Tap to browse PDF file</p>
-                      <p className="text-[10px] text-neutral-400">PDF up to 25MB</p>
+                      <p className="text-[10px] text-neutral-400">PDF up to {maxFileSizeMb}MB (chunked)</p>
                     </div>
                   )}
                 </div>
@@ -963,6 +973,22 @@ export default function PublicDocumentsPage() {
                   If set, anyone clicking Print will have to enter this password first.
                 </p>
               </div>
+
+              {/* Upload Progress Bar */}
+              {uploading && (
+                <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#0c831f]">
+                    <span className="truncate pr-2">{uploadStatusText || "Uploading chunks to cloud vault..."}</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-emerald-200/60 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-[#0c831f] h-full transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Submit Button (Reduced Corner Radius) */}
               <div className="pt-2">

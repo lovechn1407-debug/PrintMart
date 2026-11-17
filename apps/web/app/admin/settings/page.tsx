@@ -17,7 +17,7 @@ import { database, ref, onValue, set } from "@/lib/firebase";
 
 export default function AdminSettingsPage() {
   const [retentionDays, setRetentionDays] = useState<number>(7);
-  const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number>(25);
+  const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number>(100);
   const [masterKioskCode, setMasterKioskCode] = useState<string>("998877");
   const [saving, setSaving] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
@@ -30,7 +30,7 @@ export default function AdminSettingsPage() {
       if (snap.exists()) {
         const val = snap.val();
         if (val.retentionDays) setRetentionDays(val.retentionDays);
-        if (val.maxFileSizeBytes) setMaxFileSizeBytes(val.maxFileSizeBytes);
+        if (val.maxFileSizeBytes) setMaxFileSizeBytes(Number(val.maxFileSizeBytes) || 100);
         if (val.masterKioskCode) setMasterKioskCode(val.masterKioskCode);
       }
     });
@@ -49,12 +49,14 @@ export default function AdminSettingsPage() {
     try {
       setSaving(true);
       const cleanCode = masterKioskCode.trim() || "998877";
+      const clampedMaxMb = Math.min(100, Math.max(5, Number(maxFileSizeBytes) || 100));
       await set(ref(database, "systemSettings"), {
         masterKioskCode: cleanCode,
         retentionDays: Number(retentionDays) || 7,
-        maxFileSizeBytes: Number(maxFileSizeBytes) || 25,
+        maxFileSizeBytes: clampedMaxMb,
         updatedAt: Date.now(),
       });
+      setMaxFileSizeBytes(clampedMaxMb);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3500);
     } catch (err: any) {
@@ -180,9 +182,14 @@ export default function AdminSettingsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-neutral-800 block">
-              Maximum File Size Limit (MB)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-neutral-800 block">
+                Maximum File Size Limit (MB)
+              </label>
+              <span className="text-[10px] font-bold text-[#0c831f] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Max 100 MB
+              </span>
+            </div>
             <input
               type="number"
               min="5"
@@ -191,8 +198,24 @@ export default function AdminSettingsPage() {
               onChange={(e) => setMaxFileSizeBytes(Number(e.target.value))}
               className="w-full h-11 px-3.5 bg-neutral-50 focus:bg-white rounded-xl border border-neutral-200 focus:border-[#0c831f] focus:ring-2 focus:ring-[#0c831f]/20 font-bold text-sm text-neutral-900 outline-none transition-all"
             />
-            <span className="text-[11px] text-neutral-400 block">
-              Protects spooler preloads against excessive network payload spikes.
+            <div className="flex items-center gap-1.5 pt-1">
+              {[25, 50, 75, 100].map((mb) => (
+                <button
+                  key={mb}
+                  type="button"
+                  onClick={() => setMaxFileSizeBytes(mb)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all ${
+                    maxFileSizeBytes === mb
+                      ? "bg-[#0c831f] text-white border-[#0c831f]"
+                      : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                  }`}
+                >
+                  {mb} MB
+                </button>
+              ))}
+            </div>
+            <span className="text-[11px] text-neutral-400 block pt-0.5">
+              Configurable up to 100 MB. Files larger than 20 MB are automatically chunked into 20 MB slices and securely vaulted in Telegram.
             </span>
           </div>
         </div>

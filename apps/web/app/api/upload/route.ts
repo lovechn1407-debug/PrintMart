@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { uploadDocumentToTelegram } from "@/lib/telegram";
+import os from "os";
+import {
+  uploadDocumentToTelegram,
+  uploadBufferInChunksToTelegram,
+} from "@/lib/telegram";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { DocumentMetadata, MAX_FILE_SIZE_BYTES } from "@printmart/shared";
+import { DocumentMetadata, DocumentChunk, MAX_FILE_SIZE_BYTES } from "@printmart/shared";
 
 function estimatePdfPageCount(buffer: Buffer): number {
   try {
@@ -25,16 +29,33 @@ function estimatePdfPageCount(buffer: Buffer): number {
   return 1;
 }
 
+async function getMaxAllowedFileSizeBytes(): Promise<{ maxBytes: number; maxMb: number }> {
+  try {
+    const snap = await adminDb.ref("systemSettings/maxFileSizeBytes").get();
+    if (snap.exists()) {
+      const mb = Number(snap.val());
+      if (mb > 0) {
+        return { maxBytes: mb * 1024 * 1024, maxMb: mb };
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to read systemSettings/maxFileSizeBytes, using MAX_FILE_SIZE_BYTES:", err);
+  }
+  return { maxBytes: MAX_FILE_SIZE_BYTES, maxMb: Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024)) };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
+    const { maxBytes, maxMb } = await getMaxAllowedFileSizeBytes();
 
-    // ── CASE 1: DIRECT UPLOAD METADATA (Bypasses Vercel 4.5MB Serverless Function payload limit) ──
+    // ── CASE 1: DIRECT UPLOAD METADATA (Client uploaded chunks directly to Telegram) ──
     if (contentType.includes("application/json")) {
       const body = await req.json();
       const {
         telegramFileId,
         telegramMessageId,
+        chunks,
         originalFilename,
         mimeType,
         fileSizeBytes,
@@ -43,8 +64,17 @@ export async function POST(req: NextRequest) {
         sha256 = "",
       } = body;
 
-      if (!telegramFileId || !originalFilename) {
-        return NextResponse.json({ error: "Missing required document metadata" }, { status: 400 });
+      const primaryFileId = telegramFileId || (Array.isArray(chunks) && chunks[0]?.telegramFileId);
+      if (!primaryFileId || !originalFilename) {
+        return NextResponse.json({ error: "Missing required document metadata or file identifier" }, { status: 400 });
+      }
+
+      const numFileSize = Number(fileSizeBytes) || 0;
+      if (numFileSize > maxBytes) {
+        return NextResponse.json(
+          { error: `File exceeds maximum allowed size of ${maxMb}MB` },
+          { status: 400 }
+        );
       }
 
       const documentId = `DOC_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
@@ -55,11 +85,12 @@ export async function POST(req: NextRequest) {
         ownerUid,
         originalFilename,
         mimeType: mimeType || "application/octet-stream",
-        fileSizeBytes: Number(fileSizeBytes) || 0,
+        fileSizeBytes: numFileSize,
         sha256: sha256 || crypto.randomBytes(16).toString("hex"),
         pageCount: Math.max(1, Number(pageCount) || 1),
-        telegramMessageId: Number(telegramMessageId) || 0,
-        telegramFileId,
+        telegramMessageId: Number(telegramMessageId) || (Array.isArray(chunks) && chunks[0]?.telegramMessageId) || 0,
+        telegramFileId: primaryFileId,
+        chunks: Array.isArray(chunks) && chunks.length > 0 ? (chunks as DocumentChunk[]) : undefined,
         retentionExpiresAt,
         createdAt: Date.now(),
       };
@@ -76,7 +107,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── CASE 2: STANDARD MULTIPART FORMDATA UPLOAD (Files <= 4MB) ──
+    // ── CASE 2: STANDARD MULTIPART FORMDATA UPLOAD ──
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const ownerUid = (formData.get("ownerUid") as string) || "anonymous";
@@ -85,9 +116,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (file.size > maxBytes) {
       return NextResponse.json(
-        { error: `File exceeds maximum allowed size of 25MB` },
+        { error: `File exceeds maximum allowed size of ${maxMb}MB` },
         { status: 400 }
       );
     }
@@ -109,7 +140,6 @@ export async function POST(req: NextRequest) {
 
     // 1. Save copy to temporary local cache first for instant preview & fallback
     try {
-      const os = await import("os");
       const tmpDir = path.join(os.tmpdir(), "printmart_cache");
       if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
@@ -119,16 +149,16 @@ export async function POST(req: NextRequest) {
       console.warn("Could not cache file locally:", cacheErr);
     }
 
-    // 2. Upload to Private Telegram Channel vault (with resilient fallback)
+    // 2. Upload to Private Telegram Channel vault (in 20MB chunks if > 20MB)
     let tgResult = {
       messageId: 0,
       fileId: `LOCAL_${documentId}`,
       fileUniqueId: `UID_${documentId}`,
       fileSizeBytes: file.size,
+      chunks: undefined as DocumentChunk[] | undefined,
     };
 
     try {
-      // Telegram bot API limit is 20MB for document uploads
       if (file.size <= 20 * 1024 * 1024) {
         const uploaded = await uploadDocumentToTelegram({
           fileBuffer: buffer,
@@ -140,9 +170,22 @@ export async function POST(req: NextRequest) {
           fileId: uploaded.fileId,
           fileUniqueId: uploaded.fileUniqueId,
           fileSizeBytes: uploaded.fileSizeBytes,
+          chunks: undefined,
         };
       } else {
-        console.info(`File size (${file.size} bytes) exceeds Telegram 20MB bot limit, stored in local cache.`);
+        // Multi-chunk upload for files > 20MB up to 100MB
+        const chunkRes = await uploadBufferInChunksToTelegram({
+          fileBuffer: buffer,
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+        });
+        tgResult = {
+          messageId: chunkRes.primaryMessageId,
+          fileId: chunkRes.primaryFileId,
+          fileUniqueId: `UID_${chunkRes.primaryFileId}`,
+          fileSizeBytes: file.size,
+          chunks: chunkRes.chunks,
+        };
       }
     } catch (tgErr) {
       console.warn("Telegram vault upload failed, stored in local cache fallback:", tgErr);
@@ -158,6 +201,7 @@ export async function POST(req: NextRequest) {
       pageCount,
       telegramMessageId: tgResult.messageId,
       telegramFileId: tgResult.fileId,
+      chunks: tgResult.chunks,
       retentionExpiresAt,
       createdAt: Date.now(),
     };
@@ -181,4 +225,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

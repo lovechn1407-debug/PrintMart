@@ -11,7 +11,8 @@ export const DEFAULT_GLOBAL_PRICING: GlobalPricing = {
   serviceChargePaise: 0,
 };
 
-export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB max allowed file size
+export const TELEGRAM_MAX_CHUNK_BYTES = 19.5 * 1024 * 1024; // 19.5 MB per chunk (safe under Telegram Bot API 20MB limit)
 
 export const SUPPORTED_MIME_TYPES = [
   "application/pdf",

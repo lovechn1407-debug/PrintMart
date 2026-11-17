@@ -77,6 +77,13 @@ export interface MachineCommand {
     executedAt?: number | null;
     result?: string | null;
 }
+export interface DocumentChunk {
+    chunkIndex: number;
+    totalChunks: number;
+    telegramFileId: string;
+    telegramMessageId?: number;
+    fileSizeBytes: number;
+}
 export interface DocumentMetadata {
     documentId: string;
     ownerUid: string;
@@ -87,6 +94,7 @@ export interface DocumentMetadata {
     pageCount: number;
     telegramMessageId?: number;
     telegramFileId?: string;
+    chunks?: DocumentChunk[];
     retentionExpiresAt: number;
     createdAt: number;
 }

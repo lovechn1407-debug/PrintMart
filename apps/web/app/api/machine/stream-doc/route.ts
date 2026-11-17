@@ -1,6 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+import os from "os";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { getTelegramFileDownloadUrl } from "@/lib/telegram";
+import { downloadTelegramDocument } from "@/lib/telegram";
+
+const TMP_CACHE_DIR = path.join(os.tmpdir(), "printmart_cache");
+
+function tryReadFromCache(filename: string): Buffer | null {
+  try {
+    const safeName = path.basename(filename);
+    const filePath = path.join(TMP_CACHE_DIR, safeName);
+    if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile() && stat.size > 0) {
+        return fs.readFileSync(filePath);
+      }
+    }
+  } catch {
+    // Disk cache is strictly optional
+  }
+  return null;
+}
+
+function trySaveToCache(filename: string, buffer: Buffer): void {
+  try {
+    const safeName = path.basename(filename);
+    if (!fs.existsSync(TMP_CACHE_DIR)) {
+      fs.mkdirSync(TMP_CACHE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(path.join(TMP_CACHE_DIR, safeName), buffer);
+  } catch {
+    // Disk cache is strictly optional
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,22 +67,20 @@ export async function GET(req: NextRequest) {
     }
 
     const doc = docSnap.val();
-    if (!doc.telegramFileId) {
-      return NextResponse.json({ error: "No Telegram file ID available" }, { status: 500 });
+    if (!doc.telegramFileId && (!doc.chunks || doc.chunks.length === 0)) {
+      return NextResponse.json({ error: "No Telegram file ID or chunks available" }, { status: 500 });
     }
 
-    // 3. Resolve Telegram download URL on server side
-    const downloadUrl = await getTelegramFileDownloadUrl(doc.telegramFileId);
+    // 3. Try reading from local /tmp cache first
+    let buffer = tryReadFromCache(job.documentId);
 
-    // 4. Fetch and stream document binary back to the authorized agent
-    const fileResponse = await fetch(downloadUrl);
-    if (!fileResponse.ok) {
-      throw new Error(`Failed to fetch file from Telegram storage: ${fileResponse.statusText}`);
+    // 4. If not cached, download and reassemble from Telegram (handles chunks automatically)
+    if (!buffer) {
+      buffer = await downloadTelegramDocument(doc);
+      trySaveToCache(job.documentId, buffer);
     }
 
-    const arrayBuffer = await fileResponse.arrayBuffer();
-
-    return new NextResponse(arrayBuffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": doc.mimeType || "application/pdf",

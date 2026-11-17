@@ -21,6 +21,7 @@ export interface CreateOrderParams {
   customerPhone?: string;
   customerEmail?: string;
   customerName?: string;
+  returnUrl?: string;
 }
 
 export interface CashfreeOrderResponse {
@@ -74,9 +75,16 @@ export async function createCashfreeOrder(
       customer_name: (customerName || "PrintMart Customer").slice(0, 50),
     },
     order_meta: {
-      return_url: `${
-        process.env.NEXT_PUBLIC_APP_URL || "https://printmart.in"
-      }/user/print?order_id={order_id}&status={order_status}`,
+      return_url:
+        params.returnUrl ||
+        `${
+          process.env.NEXT_PUBLIC_APP_URL ||
+          (process.env.VERCEL_PROJECT_PRODUCTION_URL
+            ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+            : process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : "https://itsprintmart.vercel.app")
+        }/user/print?order_id={order_id}&status={order_status}`,
     },
   };
 

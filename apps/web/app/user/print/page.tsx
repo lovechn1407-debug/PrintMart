@@ -369,12 +369,12 @@ function RealDocumentViewer({
         </div>
       )}
 
-      {/* Centered Rendering Buffer Indicator */}
+      {/* Centered Rendering Buffer Indicator without background box */}
       {loading && !pageCacheRef.current.has(pageIndex) && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[2px] transition-all">
-          <div className="flex flex-col items-center gap-2 p-3.5 rounded-2xl bg-white/95 border border-neutral-200/80 shadow-md">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none transition-all">
+          <div className="flex flex-col items-center gap-2">
             <RotateCw className="w-5 h-5 animate-spin text-[#0c831f]" />
-            <span className="text-xs font-bold text-neutral-700 tracking-tight">
+            <span className="text-xs font-medium text-neutral-600 tracking-tight">
               Rendering Page {pageIndex}...
             </span>
           </div>
@@ -404,6 +404,46 @@ function RealDocumentViewer({
   );
 }
 
+/**
+ * Safely removes any injected Cashfree modal overlays and iframes from the DOM
+ */
+function cleanupCashfreeDom() {
+  if (typeof document === "undefined") return;
+  try {
+    const selectors = [
+      'iframe[src*="cashfree"]',
+      'iframe[id*="cf-"]',
+      'iframe[id*="cashfree"]',
+      'div[id*="cf-"]',
+      'div[id*="cashfree"]',
+      'div[class*="cf-modal"]',
+      'div[class*="cashfree"]',
+    ];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        try {
+          const parent = el.parentElement;
+          if (
+            parent &&
+            parent !== document.body &&
+            parent !== document.documentElement &&
+            (parent.style.position === "fixed" ||
+              Number(parent.style.zIndex || 0) > 1000 ||
+              parent.getAttribute("id")?.includes("cf") ||
+              parent.className?.includes?.("cf"))
+          ) {
+            parent.remove();
+          } else {
+            el.remove();
+          }
+        } catch {}
+      });
+    });
+  } catch (e) {
+    console.warn("Cashfree DOM cleanup error:", e);
+  }
+}
+
 function UserPrintContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -412,6 +452,9 @@ function UserPrintContent() {
   const requestedDocId = searchParams.get("docId") || searchParams.get("publicDocId");
   const requestedTitle = searchParams.get("title") || "Public Document.pdf";
   const requestedPages = parseInt(searchParams.get("pages") || "1", 10);
+
+  // State: Checkout active tracking for back navigation interception
+  const isCheckoutActiveRef = useRef<boolean>(false);
 
   // State: Active Draft ID tracking
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
@@ -440,7 +483,16 @@ function UserPrintContent() {
   // Handle return redirect from Cashfree (e.g. mobile 3DS / UPI intent returns)
   useEffect(() => {
     const returnOrderId = searchParams.get("order_id");
+    const returnStatus = searchParams.get("status");
     if (returnOrderId) {
+      if (
+        returnStatus &&
+        ["FAILED", "CANCELLED", "USER_DROPPED"].includes(returnStatus.toUpperCase())
+      ) {
+        setErrorMessage("Payment was cancelled or failed. Please try again.");
+        window.history.replaceState({}, "", "/user/print");
+        return;
+      }
       const jobId = returnOrderId.replace(/^CF_/, "");
       fetch("/api/payment/verify", {
         method: "POST",
@@ -453,11 +505,21 @@ function UserPrintContent() {
             setGeneratedOtp(data.otp);
             setIsOtpModalOpen(true);
             setStep("confirmed");
+            if (activeDraftId) {
+              removeDraftById(activeDraftId);
+              setActiveDraftId(null);
+            }
+          } else {
+            setErrorMessage("Payment was not completed or failed. Please try again.");
           }
+          window.history.replaceState({}, "", "/user/print");
         })
-        .catch(console.warn);
+        .catch(() => {
+          setErrorMessage("Failed to verify payment status. Please try again.");
+          window.history.replaceState({}, "", "/user/print");
+        });
     }
-  }, [searchParams]);
+  }, [searchParams, activeDraftId]);
 
   // State: Print Settings
   const [colorMode, setColorMode] = useState<ColorMode>("bw");
@@ -967,38 +1029,98 @@ function UserPrintContent() {
           mode: isProd ? "production" : "sandbox",
         });
 
-        // Launch Cashfree checkout popup / modal
-        await cashfree.checkout({
-          paymentSessionId: orderData.paymentSessionId,
-          redirectTarget: "_modal",
-        });
+        // 1. Push checkout state to history so clicking the browser's Back button closes modal instead of exiting the site
+        window.history.pushState({ modal: "cashfree_checkout", orderId: orderData.orderId }, "");
+        isCheckoutActiveRef.current = true;
 
-        // Poll server for payment confirmation (handles both webhook and direct API verification)
-        let verified = false;
-        for (let attempt = 0; attempt < 12; attempt++) {
-          await new Promise((res) => setTimeout(res, 1500));
-          const verifyRes = await fetch("/api/payment/verify", {
+        const handlePopState = () => {
+          if (isCheckoutActiveRef.current) {
+            isCheckoutActiveRef.current = false;
+            cleanupCashfreeDom();
+            setPaying(false);
+            setErrorMessage("Payment was cancelled. You can try again whenever you're ready.");
+          }
+        };
+
+        window.addEventListener("popstate", handlePopState, { once: true });
+
+        // 2. Launch Cashfree checkout popup / modal
+        let checkoutResult: any = null;
+        try {
+          checkoutResult = await cashfree.checkout({
+            paymentSessionId: orderData.paymentSessionId,
+            redirectTarget: "_modal",
+          });
+        } catch (checkoutErr: any) {
+          console.warn("Cashfree checkout error:", checkoutErr);
+          checkoutResult = { error: { message: checkoutErr?.message || "Payment modal closed" } };
+        } finally {
+          window.removeEventListener("popstate", handlePopState);
+          // If modal closed via internal Leave/Cancel button rather than browser back button, cleanly pop the history state
+          if (isCheckoutActiveRef.current) {
+            isCheckoutActiveRef.current = false;
+            if (window.history.state?.modal === "cashfree_checkout") {
+              window.history.back();
+            }
+          }
+        }
+
+        // 3. If user cancelled, closed modal, or payment failed:
+        if (checkoutResult?.error) {
+          // Do a fast 1-time verification just in case money was debited right before closing
+          const quickVerify = await fetch("/api/payment/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ jobId: orderData.jobId, orderId: orderData.orderId }),
-          });
+          })
+            .then((r) => r.json())
+            .catch(() => null);
 
-          const verifyData = await verifyRes.json();
-          if (verifyData.success && verifyData.paid && verifyData.otp) {
-            setGeneratedOtp(verifyData.otp);
+          if (quickVerify?.success && quickVerify?.paid && quickVerify?.otp) {
+            setGeneratedOtp(quickVerify.otp);
             setIsOtpModalOpen(true);
             setStep("confirmed");
             if (activeDraftId) {
               removeDraftById(activeDraftId);
               setActiveDraftId(null);
             }
-            verified = true;
-            break;
+          } else {
+            // Immediately stop buffering & show cancellation/failed notice
+            setPaying(false);
+            setErrorMessage(
+              checkoutResult.error?.message ||
+                "Payment was cancelled or failed. Please try again."
+            );
+            return;
           }
-        }
+        } else {
+          // 4. Modal completed normally or redirected - poll server for verification
+          let verified = false;
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise((res) => setTimeout(res, 1200));
+            const verifyRes = await fetch("/api/payment/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jobId: orderData.jobId, orderId: orderData.orderId }),
+            });
 
-        if (!verified) {
-          throw new Error("Payment was not completed. Please try again or check your UPI app.");
+            const verifyData = await verifyRes.json();
+            if (verifyData.success && verifyData.paid && verifyData.otp) {
+              setGeneratedOtp(verifyData.otp);
+              setIsOtpModalOpen(true);
+              setStep("confirmed");
+              if (activeDraftId) {
+                removeDraftById(activeDraftId);
+                setActiveDraftId(null);
+              }
+              verified = true;
+              break;
+            }
+          }
+
+          if (!verified) {
+            throw new Error("Payment was not completed or failed. If money was debited, it will be refunded or please contact support.");
+          }
         }
       } else {
         // Fallback for simulation / mock order if no live session returned
@@ -1020,9 +1142,17 @@ function UserPrintContent() {
       }
     } catch (err: any) {
       console.error("Payment error:", err);
+      if (isCheckoutActiveRef.current) {
+        isCheckoutActiveRef.current = false;
+        cleanupCashfreeDom();
+        if (typeof window !== "undefined" && window.history.state?.modal === "cashfree_checkout") {
+          window.history.back();
+        }
+      }
       setErrorMessage(err.message || "Failed to process payment");
     } finally {
       setPaying(false);
+      isCheckoutActiveRef.current = false;
     }
   };
 
@@ -1128,7 +1258,11 @@ function UserPrintContent() {
                 <AlertCircle className="w-6 h-6 text-rose-600" />
               </div>
               <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-1.5">
-                Notice
+                {errorMessage.toLowerCase().includes("cancel")
+                  ? "Payment Cancelled"
+                  : errorMessage.toLowerCase().includes("payment") || errorMessage.toLowerCase().includes("failed")
+                  ? "Payment Failed"
+                  : "Notice"}
               </h3>
               <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed mb-5">
                 {errorMessage}

@@ -95,6 +95,16 @@ export async function POST(req: NextRequest) {
     const orderId = `CF_${jobId}`;
 
     // 5. Create Cashfree Order
+    const hostHeader = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+    const protoHeader = req.headers.get("x-forwarded-proto") || "https";
+    const origin =
+      req.headers.get("origin") ||
+      (hostHeader ? `${protoHeader}://${hostHeader}` : "");
+
+    const returnUrl = origin
+      ? `${origin}/user/print?order_id={order_id}&status={order_status}`
+      : undefined;
+
     const cfOrder = await createCashfreeOrder({
       orderId,
       orderAmountPaise: verifiedPricing.finalPayablePaise,
@@ -102,6 +112,7 @@ export async function POST(req: NextRequest) {
       customerEmail: customerEmail || "user@printmart.com",
       customerName: customerName || "PrintMart Customer",
       customerPhone,
+      returnUrl,
     });
 
     // 6. Register PrintJob in Firebase RTDB

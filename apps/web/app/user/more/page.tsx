@@ -941,11 +941,12 @@ export default function MorePage() {
               className="w-full h-12 bg-[#0c831f] hover:bg-[#0a6e1a] text-white font-bold text-xs sm:text-sm rounded-xl border-0 shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <LifeBuoy className="w-4 h-4 text-white" />
-              <span>
-                {showActiveTicketsList
-                  ? "Hide Active Tickets"
-                  : `My Active Tickets (${userTickets.length})`}
-              </span>
+              <span>{showActiveTicketsList ? "Hide Active Tickets" : "My Active Tickets"}</span>
+              {!showActiveTicketsList && userTickets.length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-white text-[#0c831f] text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {userTickets.length}
+                </span>
+              )}
             </button>
 
             {/* Active Tickets Drawer List */}

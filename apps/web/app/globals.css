@@ -317,3 +317,40 @@ body {
   pointer-events: none;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   PRINT STUDIO 1PX RENDER PROGRESS & MARQUEE BOUNCE
+   ───────────────────────────────────────────────────────────── */
+@keyframes render-progress-line {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(20%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-render-progress {
+  width: 45%;
+  animation: render-progress-line 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes marquee-bounce {
+  0%, 20% {
+    transform: translateX(0);
+  }
+  50%, 70% {
+    transform: translateX(var(--marquee-distance, -40px));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-bounce {
+  animation: marquee-bounce 5.5s ease-in-out infinite;
+}
+
+

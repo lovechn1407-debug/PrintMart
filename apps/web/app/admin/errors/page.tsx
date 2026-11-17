@@ -160,13 +160,28 @@ export default function AdminErrorsPage() {
             key={tab}
             type="button"
             onClick={() => setFilterStatus(tab)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-0 flex items-center gap-1.5 ${
               filterStatus === tab
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
-            {tab === "ALL" ? `All Logs (${errors.length})` : tab === "ACTIVE" ? `Active Faults (${activeErrors.length})` : `Resolved (${errors.filter((e) => e.resolved).length})`}
+            <span>
+              {tab === "ALL" ? "All Logs" : tab === "ACTIVE" ? "Active Faults" : "Resolved"}
+            </span>
+            <span
+              className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                filterStatus === tab
+                  ? "bg-[#0c831f] text-white"
+                  : "bg-neutral-200 text-neutral-700"
+              }`}
+            >
+              {tab === "ALL"
+                ? errors.length
+                : tab === "ACTIVE"
+                ? activeErrors.length
+                : errors.filter((e) => e.resolved).length}
+            </span>
           </button>
         ))}
       </div>

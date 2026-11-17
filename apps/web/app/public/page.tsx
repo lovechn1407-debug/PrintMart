@@ -108,8 +108,8 @@ function compressImageTo10Kb(fileOrUrl: File | string, maxDimension = 120): Prom
   });
 }
 
-// Generate Page 1 PDF thumbnail compressed to <= 10 KB
-async function generatePdfThumbnail(file: File): Promise<string> {
+// Generate Page 1 PDF thumbnail compressed to <= 10 KB with optional baked pixel blur
+async function generatePdfThumbnail(file: File, isProtected: boolean = false): Promise<string> {
   try {
     if (typeof window === "undefined") return "";
 
@@ -153,17 +153,90 @@ async function generatePdfThumbnail(file: File): Promise<string> {
 
     await page.render({ canvasContext: ctx, viewport }).promise;
 
+    let targetCanvas = canvas;
+
+    // If protected, bake the blur directly into the image pixel data before exporting to cloud
+    if (isProtected) {
+      const blurCanvas = document.createElement("canvas");
+      blurCanvas.width = canvas.width;
+      blurCanvas.height = canvas.height;
+      const bCtx = blurCanvas.getContext("2d");
+      if (bCtx) {
+        // Step 1: Low-res downscale pass to destroy small font glyph details
+        const lowResCanvas = document.createElement("canvas");
+        lowResCanvas.width = Math.max(16, Math.round(canvas.width / 6));
+        lowResCanvas.height = Math.max(20, Math.round(canvas.height / 6));
+        const lowCtx = lowResCanvas.getContext("2d");
+        if (lowCtx) {
+          lowCtx.imageSmoothingEnabled = true;
+          lowCtx.drawImage(canvas, 0, 0, lowResCanvas.width, lowResCanvas.height);
+
+          // Step 2: Draw low-res back with blur filter onto blurCanvas
+          bCtx.filter = "blur(6px)";
+          bCtx.drawImage(lowResCanvas, 0, 0, blurCanvas.width, blurCanvas.height);
+          targetCanvas = blurCanvas;
+        } else {
+          bCtx.filter = "blur(12px)";
+          bCtx.drawImage(canvas, 0, 0);
+          targetCanvas = blurCanvas;
+        }
+      }
+    }
+
     let quality = 0.65;
-    let dataUrl = canvas.toDataURL("image/jpeg", quality);
+    let dataUrl = targetCanvas.toDataURL("image/jpeg", quality);
     while (dataUrl.length > 13500 && quality > 0.15) {
       quality -= 0.1;
-      dataUrl = canvas.toDataURL("image/jpeg", quality);
+      dataUrl = targetCanvas.toDataURL("image/jpeg", quality);
     }
     return dataUrl;
   } catch (err) {
     console.warn("Could not generate PDF thumbnail:", err);
     return "";
   }
+}
+
+/**
+ * Single-line filename component with automatic back-and-forth marquee when text overflows
+ */
+function MarqueeTitle({ text }: { text: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflowDistance, setOverflowDistance] = useState<number>(0);
+
+  useEffect(() => {
+    const updateOverflow = () => {
+      if (containerRef.current && textRef.current) {
+        const diff = textRef.current.scrollWidth - containerRef.current.clientWidth;
+        setOverflowDistance(diff > 2 ? diff : 0);
+      }
+    };
+
+    updateOverflow();
+    window.addEventListener("resize", updateOverflow);
+    return () => window.removeEventListener("resize", updateOverflow);
+  }, [text]);
+
+  return (
+    <div ref={containerRef} className="w-full overflow-hidden whitespace-nowrap relative">
+      <span
+        ref={textRef}
+        title={text}
+        style={
+          overflowDistance > 0
+            ? ({
+                "--marquee-distance": `-${overflowDistance + 8}px`,
+              } as React.CSSProperties)
+            : undefined
+        }
+        className={`inline-block text-sm font-bold text-neutral-900 group-hover:text-[#0c831f] transition-colors leading-snug ${
+          overflowDistance > 0 ? "animate-marquee-bounce" : ""
+        }`}
+      >
+        {text}
+      </span>
+    </div>
+  );
 }
 
 export default function PublicDocumentsPage() {
@@ -348,10 +421,12 @@ export default function PublicDocumentsPage() {
       const docFileId = uploadedDoc.documentId || uploadedDoc.fileId;
       const detectedPages = uploadedDoc.pageCount || 1;
 
-      // 2. Generate Page 1 PDF thumbnail re-compressed to <= 10 KB
+      const hasPassword = Boolean(passwordInput.trim());
+
+      // 2. Generate Page 1 PDF thumbnail re-compressed to <= 10 KB (pixel-blurred if password protected)
       let thumbnailDataUrl = "";
       try {
-        thumbnailDataUrl = await generatePdfThumbnail(selectedFile);
+        thumbnailDataUrl = await generatePdfThumbnail(selectedFile, hasPassword);
       } catch (thumbErr) {
         console.warn("Thumbnail generation skipped:", thumbErr);
       }
@@ -371,7 +446,6 @@ export default function PublicDocumentsPage() {
 
       // 4. Prepare Public Document Record with NO undefined values (fixes issue 1)
       const newDocId = `pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const hasPassword = Boolean(passwordInput.trim());
 
       const publicDocRecord: any = {
         id: newDocId,
@@ -505,13 +579,13 @@ export default function PublicDocumentsPage() {
               </p>
             </div>
 
-            {/* Action Buttons: My Uploads & Upload File */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Action Buttons: My Uploads & Upload File on the right */}
+            <div className="flex items-center gap-2 sm:ml-auto shrink-0 justify-end">
               {user && (
                 <button
                   type="button"
                   onClick={() => setShowMyUploadsOnly((prev) => !prev)}
-                  className={`h-11 px-3.5 text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer ${
+                  className={`h-10 px-3.5 text-xs sm:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer ${
                     showMyUploadsOnly
                       ? "bg-neutral-900 text-white"
                       : "bg-white text-neutral-800 border border-neutral-200/90 hover:bg-neutral-50"
@@ -519,11 +593,16 @@ export default function PublicDocumentsPage() {
                   title="View your uploaded documents"
                 >
                   <FolderUser className="w-4 h-4" />
-                  <span>My Uploads {myUploadsCount > 0 ? `(${myUploadsCount})` : ""}</span>
+                  <span>My Uploads</span>
+                  {myUploadsCount > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-[#0c831f] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {myUploadsCount}
+                    </span>
+                  )}
                 </button>
               )}
 
-              {/* Upload File Button with Reduced Corner Radius */}
+              {/* Upload File Button on the right with slightly decreased corner radius (rounded-lg) */}
               <button
                 type="button"
                 onClick={() => {
@@ -533,7 +612,7 @@ export default function PublicDocumentsPage() {
                   setUploadError(null);
                   setIsUploadModalOpen(true);
                 }}
-                className="h-11 px-4.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                className="h-10 px-4 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer shrink-0"
               >
                 <UploadCloud className="w-4 h-4 text-white" />
                 <span>Upload File</span>
@@ -687,7 +766,7 @@ export default function PublicDocumentsPage() {
           </div>
         ) : filteredDocs.length === 0 ? (
           /* Empty State */
-          <div className="bg-white rounded-2xl p-8 sm:p-12 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] text-center my-4 flex flex-col items-center">
+          <div className="bg-white rounded-2xl p-8 sm:p-12 border-0 shadow-[0_2px_12px_rgba(0,0,0,0.04)] text-center my-4 flex flex-col items-center">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center mb-3">
               <FileText className="w-8 h-8 text-[#0c831f]" />
             </div>
@@ -747,12 +826,12 @@ export default function PublicDocumentsPage() {
                 return (
                   <div
                     key={doc.id}
-                    className="bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
+                    className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all border-0 flex flex-col justify-between group"
                   >
                     {/* Top Content: Thumbnail on Left, Metadata on Right */}
                     <div className="flex gap-3.5 items-start">
                       {/* Left: Document Thumbnail Preview Box */}
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 bg-neutral-100 rounded-lg overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
+                      <div className="w-18 h-24 sm:w-20 sm:h-26 bg-neutral-100 rounded-lg overflow-hidden shrink-0 border-0 flex items-center justify-center relative shadow-2xs">
                         {doc.thumbnailUrl ? (
                           <img
                             src={doc.thumbnailUrl}
@@ -765,6 +844,15 @@ export default function PublicDocumentsPage() {
                             <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
                               PDF
                             </span>
+                          </div>
+                        )}
+
+                        {/* Locked icon overlay on thumbnail if password protected */}
+                        {doc.hasPassword && (
+                          <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
+                            <div className="w-7 h-7 rounded-full bg-neutral-900/85 text-white flex items-center justify-center shadow-md">
+                              <Lock className="w-3.5 h-3.5 text-white" />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -789,26 +877,24 @@ export default function PublicDocumentsPage() {
                           )}
                         </div>
 
-                        {/* File Title */}
-                        <h3
-                          title={doc.title}
-                          className="text-sm font-bold text-neutral-900 group-hover:text-[#0c831f] transition-colors line-clamp-2 leading-snug"
-                        >
-                          {doc.title}
-                        </h3>
-
-                        {/* Metadata Row */}
-                        <div className="flex items-center gap-2 text-[11px] text-neutral-500 mt-2 font-medium">
-                          <span>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}</span>
-                          <span>•</span>
-                          <span>{formatBytes(doc.fileSizeBytes)}</span>
+                        {/* File Title (Marquee on overflow, strictly single line) */}
+                        <div className="mb-1">
+                          <MarqueeTitle text={doc.title} />
                         </div>
 
-                        {/* Prints Count */}
-                        <div className="inline-flex items-center gap-1 text-neutral-600 text-[11px] font-medium mt-1">
-                          <Download className="w-3 h-3 text-neutral-400" />
-                          <span className="font-bold text-neutral-800">{doc.printCount || 0}</span>
-                          <span>prints</span>
+                        {/* Metadata Row: Pages + Size on Left, Print Count on Right */}
+                        <div className="flex items-center justify-between text-[11px] text-neutral-500 mt-2 font-medium">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}</span>
+                            <span>•</span>
+                            <span>{formatBytes(doc.fileSizeBytes)}</span>
+                          </div>
+
+                          <div className="inline-flex items-center gap-1 text-neutral-600 font-medium shrink-0 ml-2">
+                            <Printer className="w-3 h-3 text-neutral-400" />
+                            <span className="font-bold text-neutral-800">{doc.printCount || 0}</span>
+                            <span>{doc.printCount === 1 ? "print" : "prints"}</span>
+                          </div>
                         </div>
                       </div>
                     </div>

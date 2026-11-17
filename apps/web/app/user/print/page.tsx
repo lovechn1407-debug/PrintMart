@@ -362,11 +362,22 @@ function RealDocumentViewer({
 
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-white overflow-hidden">
-      {/* Subtle non-blocking indicator only when a non-cached page is being prepared */}
+      {/* 1px Render Progress Line at the very top */}
       {loading && !pageCacheRef.current.has(pageIndex) && (
-        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-xs border border-neutral-200/60 shadow-2xs">
-          <RotateCw className="w-3 h-3 animate-spin text-[#0c831f]" />
-          <span className="text-[10px] font-semibold text-neutral-600">Page {pageIndex}</span>
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-emerald-100/70 z-30 overflow-hidden">
+          <div className="h-full bg-[#0c831f] animate-render-progress" />
+        </div>
+      )}
+
+      {/* Centered Rendering Buffer Indicator */}
+      {loading && !pageCacheRef.current.has(pageIndex) && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[2px] transition-all">
+          <div className="flex flex-col items-center gap-2 p-3.5 rounded-2xl bg-white/95 border border-neutral-200/80 shadow-md">
+            <RotateCw className="w-5 h-5 animate-spin text-[#0c831f]" />
+            <span className="text-xs font-bold text-neutral-700 tracking-tight">
+              Rendering Page {pageIndex}...
+            </span>
+          </div>
         </div>
       )}
 
@@ -1139,9 +1150,14 @@ function UserPrintContent() {
                 <div className="bg-white rounded-2xl p-5 sm:p-6 border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                     <div>
-                      <h2 className="font-bold text-base text-neutral-900">
-                        Selected Files ({documents.length})
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-bold text-base text-neutral-900">
+                          Selected Files
+                        </h2>
+                        <span className="w-5 h-5 rounded-full bg-[#0c831f] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {documents.length}
+                        </span>
+                      </div>
                       <p className="text-xs text-neutral-500">
                         Total {totalAllPages} {totalAllPages === 1 ? "page" : "pages"} across {documents.length} {documents.length === 1 ? "document" : "documents"}
                       </p>

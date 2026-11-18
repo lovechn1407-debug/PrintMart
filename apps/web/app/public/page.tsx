@@ -418,6 +418,14 @@ export default function PublicDocumentsPage() {
   const [isEditStudioOpen, setIsEditStudioOpen] = useState<boolean>(false);
   const [editStudioFile, setEditStudioFile] = useState<File | null>(null);
   const editableFileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditableUpload, setIsEditableUpload] = useState<boolean>(false);
+  const [editableUploadConfig, setEditableUploadConfig] = useState<{
+    fields: EditableField[];
+    watermarkText: string;
+    watermarkOpacity: number;
+    watermarkColor: string;
+    pageThumbnails?: string[];
+  } | null>(null);
 
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -432,6 +440,25 @@ export default function PublicDocumentsPage() {
   const [maxFileSizeMb, setMaxFileSizeMb] = useState<number>(100);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Callback from EditStudioModal when clicking "Publish Editable Doc"
+  const handleRequestPublishEditable = (config: {
+    fields: EditableField[];
+    watermarkText: string;
+    watermarkOpacity: number;
+    watermarkColor: string;
+    pageThumbnails?: string[];
+  }) => {
+    setIsEditableUpload(true);
+    setEditableUploadConfig(config);
+    if (editStudioFile) {
+      setSelectedFile(editStudioFile);
+      setTitleInput(editStudioFile.name.replace(/\.pdf$/i, ""));
+    }
+    setAdditionalFiles([]);
+    setUploadError(null);
+    setIsUploadModalOpen(true);
+  };
 
   // Verified creator upload states
   const [manualThumbnailFile, setManualThumbnailFile] = useState<File | null>(null);
@@ -745,10 +772,17 @@ export default function PublicDocumentsPage() {
       // 2. Custom thumbnail or auto-generated Page 1 PDF thumbnail
       let finalThumbnail = manualThumbnailPreview || "";
       if (!finalThumbnail) {
-        try {
-          finalThumbnail = await generatePdfThumbnail(selectedFile, hasPassword);
-        } catch (thumbErr) {
-          console.warn("Thumbnail generation skipped:", thumbErr);
+        if (isEditableUpload && editableUploadConfig?.pageThumbnails?.[0]) {
+          try {
+            finalThumbnail = await compressImageTo10Kb(editableUploadConfig.pageThumbnails[0], 120);
+          } catch (e) {}
+        }
+        if (!finalThumbnail) {
+          try {
+            finalThumbnail = await generatePdfThumbnail(selectedFile, hasPassword);
+          } catch (thumbErr) {
+            console.warn("Thumbnail generation skipped:", thumbErr);
+          }
         }
       }
 
@@ -786,6 +820,16 @@ export default function PublicDocumentsPage() {
         printCount: 0,
         createdAt: Date.now(),
       };
+
+      if (isEditableUpload && editableUploadConfig) {
+        publicDocRecord.isEditable = true;
+        publicDocRecord.editableFields = editableUploadConfig.fields || [];
+        if (editableUploadConfig.watermarkText) {
+          publicDocRecord.watermarkText = editableUploadConfig.watermarkText;
+          publicDocRecord.watermarkOpacity = editableUploadConfig.watermarkOpacity;
+          publicDocRecord.watermarkColor = editableUploadConfig.watermarkColor;
+        }
+      }
 
       if (isMultiDoc) {
         publicDocRecord.mainTitle = primaryBundleTitle;
@@ -827,7 +871,15 @@ export default function PublicDocumentsPage() {
       setTitleInput("");
       setMainTitleInput("");
       setPasswordInput("");
-      setSuccessMessage("Document shared to Public Library successfully!");
+      if (isEditableUpload) {
+        setIsEditStudioOpen(false);
+        setEditStudioFile(null);
+        setIsEditableUpload(false);
+        setEditableUploadConfig(null);
+        setSuccessMessage(`Editable template "${primaryBundleTitle}" published successfully!`);
+      } else {
+        setSuccessMessage("Document shared to Public Library successfully!");
+      }
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed. Please check your network and try again.");
@@ -1837,6 +1889,8 @@ export default function PublicDocumentsPage() {
                 type="button"
                 onClick={() => {
                   setIsUploadChoiceOpen(false);
+                  setIsEditableUpload(false);
+                  setEditableUploadConfig(null);
                   setSelectedFile(null);
                   setTitleInput("");
                   setPasswordInput("");
@@ -1898,6 +1952,8 @@ export default function PublicDocumentsPage() {
           onClose={() => {
             setIsEditStudioOpen(false);
             setEditStudioFile(null);
+            setIsEditableUpload(false);
+            setEditableUploadConfig(null);
           }}
           file={editStudioFile}
           user={user}
@@ -1908,6 +1964,7 @@ export default function PublicDocumentsPage() {
             setSuccessMessage(msg);
             setTimeout(() => setSuccessMessage(null), 4000);
           }}
+          onRequestPublish={handleRequestPublishEditable}
         />
       )}
 
@@ -1915,7 +1972,7 @@ export default function PublicDocumentsPage() {
           3. UPLOAD FILE MODAL / BOTTOM SHEET
           ───────────────────────────────────────────────────────────── */}
       {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 bg-neutral-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] bg-neutral-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
@@ -1930,7 +1987,13 @@ export default function PublicDocumentsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => !uploading && setIsUploadModalOpen(false)}
+                onClick={() => {
+                  if (uploading) return;
+                  setIsUploadModalOpen(false);
+                  if (!isEditableUpload) {
+                    setSelectedFile(null);
+                  }
+                }}
                 className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1951,16 +2014,26 @@ export default function PublicDocumentsPage() {
                   Select PDF Document <span className="text-rose-500">*</span>
                 </label>
                 <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-4 border-2 border-dashed border-neutral-200 hover:border-[#0c831f] bg-neutral-50/60 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors text-center"
+                  onClick={() => {
+                    if (!isEditableUpload) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`p-4 border-2 border-dashed border-neutral-200 rounded-xl flex flex-col items-center justify-center transition-colors text-center ${
+                    isEditableUpload
+                      ? "bg-emerald-50/20 border-emerald-300/80 cursor-default"
+                      : "hover:border-[#0c831f] bg-neutral-50/60 cursor-pointer"
+                  }`}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
+                  {!isEditableUpload && (
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  )}
                   {selectedFile ? (
                     <div className="space-y-1">
                       <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#0c831f] flex items-center justify-center mx-auto">
@@ -1970,7 +2043,13 @@ export default function PublicDocumentsPage() {
                         {selectedFile.name}
                       </p>
                       <p className="text-[10px] text-neutral-500">{formatBytes(selectedFile.size)}</p>
-                      <span className="text-[10px] font-bold text-[#0c831f] block mt-1">Tap to change file</span>
+                      {isEditableUpload ? (
+                        <span className="text-[10px] font-bold text-[#0c831f] block mt-1">
+                          {editableUploadConfig?.fields.length || 0} interactive field{(editableUploadConfig?.fields.length || 0) !== 1 ? "s" : ""} configured
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-[#0c831f] block mt-1">Tap to change file</span>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-1">
@@ -2072,55 +2151,57 @@ export default function PublicDocumentsPage() {
                     </span>
                   </div>
 
-                  {/* 1. Multi-document bundle upload */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-semibold text-neutral-700">
-                        Add More Documents (Bundle)
-                      </label>
-                      <span className="text-[10px] text-neutral-400">Optional</span>
-                    </div>
-                    <input
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      multiple
-                      onChange={handleAdditionalFilesChange}
-                      className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black cursor-pointer text-neutral-600"
-                    />
-                    {additionalFiles.length > 0 && (
-                      <div className="mt-2 space-y-1.5">
-                        <p className="text-[10px] font-bold text-[#0c831f]">
-                          {additionalFiles.length} additional document{additionalFiles.length > 1 ? "s" : ""} selected:
-                        </p>
-                        <div className="space-y-1 max-h-36 overflow-y-auto">
-                          {additionalFiles.map((f, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between px-2.5 py-1.5 bg-white/90 border border-emerald-200/80 rounded-lg text-xs"
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                                <span className="font-bold text-[10px] text-neutral-400">#{idx + 2}</span>
-                                <span className="truncate text-[11px] text-neutral-800 font-medium">
-                                  {f.name}
-                                </span>
-                                <span className="text-[10px] text-neutral-400 shrink-0">
-                                  ({formatBytes(f.size)})
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveAdditionalFile(idx)}
-                                className="text-neutral-400 hover:text-rose-600 text-xs font-bold px-1 cursor-pointer"
-                                title="Remove file"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                  {/* 1. Multi-document bundle upload (Hidden for editable templates) */}
+                  {!isEditableUpload && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold text-neutral-700">
+                          Add More Documents (Bundle)
+                        </label>
+                        <span className="text-[10px] text-neutral-400">Optional</span>
                       </div>
-                    )}
-                  </div>
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        multiple
+                        onChange={handleAdditionalFilesChange}
+                        className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black cursor-pointer text-neutral-600"
+                      />
+                      {additionalFiles.length > 0 && (
+                        <div className="mt-2 space-y-1.5">
+                          <p className="text-[10px] font-bold text-[#0c831f]">
+                            {additionalFiles.length} additional document{additionalFiles.length > 1 ? "s" : ""} selected:
+                          </p>
+                          <div className="space-y-1 max-h-36 overflow-y-auto">
+                            {additionalFiles.map((f, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between px-2.5 py-1.5 bg-white/90 border border-emerald-200/80 rounded-lg text-xs"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                  <span className="font-bold text-[10px] text-neutral-400">#{idx + 2}</span>
+                                  <span className="truncate text-[11px] text-neutral-800 font-medium">
+                                    {f.name}
+                                  </span>
+                                  <span className="text-[10px] text-neutral-400 shrink-0">
+                                    ({formatBytes(f.size)})
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveAdditionalFile(idx)}
+                                  className="text-neutral-400 hover:text-rose-600 text-xs font-bold px-1 cursor-pointer"
+                                  title="Remove file"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* 2. Manual Custom 3:4 Thumbnail */}
                   <div className="space-y-1">
@@ -2276,7 +2357,7 @@ export default function PublicDocumentsPage() {
                   ) : (
                     <>
                       <UploadCloud className="w-4 h-4 text-white" />
-                      <span>Upload & Share File</span>
+                      <span>{isEditableUpload ? "Publish Editable Doc" : "Upload & Share File"}</span>
                     </>
                   )}
                 </button>

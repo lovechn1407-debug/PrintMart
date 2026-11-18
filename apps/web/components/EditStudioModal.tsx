@@ -24,8 +24,6 @@ import {
   AlignCenter,
   AlignRight,
 } from "lucide-react";
-import { database, ref, set } from "@/lib/firebase";
-import { uploadDocumentInChunks } from "@/lib/clientUploader";
 
 export interface EditableField {
   id: string;
@@ -53,73 +51,13 @@ interface EditStudioModalProps {
   isVerified: boolean;
   maxFileSizeMb: number;
   onSuccess: (message: string) => void;
-}
-
-// Compress avatar/thumbnail
-function compressImageTo10Kb(fileOrUrl: File | string, maxDimension = 120): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      let width = img.width;
-      let height = img.height;
-      if (width > height) {
-        if (width > maxDimension) {
-          height = Math.round((height * maxDimension) / width);
-          width = maxDimension;
-        }
-      } else {
-        if (height > maxDimension) {
-          width = Math.round((width * maxDimension) / height);
-          height = maxDimension;
-        }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, width);
-      canvas.height = Math.max(1, height);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve("");
-      ctx.drawImage(img, 0, 0, width, height);
-
-      let quality = 0.7;
-      let dataUrl = canvas.toDataURL("image/jpeg", quality);
-      while (dataUrl.length > 13500 && quality > 0.15) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL("image/jpeg", quality);
-      }
-      resolve(dataUrl);
-    };
-    img.onerror = () => resolve("");
-    if (typeof fileOrUrl === "string") {
-      img.src = fileOrUrl;
-    } else {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(fileOrUrl);
-    }
-  });
-}
-
-function stripUndefined<T>(obj: T): T {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) {
-    return obj
-      .filter((v) => v !== undefined)
-      .map((v) => stripUndefined(v)) as unknown as T;
-  }
-  if (typeof obj === "object") {
-    const clean: Record<string, any> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (v !== undefined) {
-        clean[k] = stripUndefined(v);
-      }
-    }
-    return clean as unknown as T;
-  }
-  return obj;
+  onRequestPublish: (config: {
+    fields: EditableField[];
+    watermarkText: string;
+    watermarkOpacity: number;
+    watermarkColor: string;
+    pageThumbnails: string[];
+  }) => void;
 }
 
 export function EditStudioModal({
@@ -131,6 +69,7 @@ export function EditStudioModal({
   isVerified,
   maxFileSizeMb,
   onSuccess,
+  onRequestPublish,
 }: EditStudioModalProps) {
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageThumbnails, setPageThumbnails] = useState<string[]>([]);
@@ -150,27 +89,10 @@ export function EditStudioModal({
   const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.18);
   const [watermarkColor, setWatermarkColor] = useState<string>("#000000");
 
-  // Publish Dialog
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
-  const [publishTitle, setPublishTitle] = useState<string>("");
-  const [publishPassword, setPublishPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [uploadStatusText, setUploadStatusText] = useState<string>("");
-  const [publishError, setPublishError] = useState<string | null>(null);
-
   // Canvas Refs
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
-
-  // Initialize title
-  useEffect(() => {
-    if (file) {
-      setPublishTitle(file.name.replace(/\.pdf$/i, ""));
-    }
-  }, [file]);
 
   // Load PDF & generate thumbnails
   useEffect(() => {
@@ -455,89 +377,6 @@ export function EditStudioModal({
     setFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, color } : f)));
   };
 
-  // Submit Publish
-  const handlePublishSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!publishTitle.trim()) {
-      setPublishError("Please give this editable template a title.");
-      return;
-    }
-
-    setUploading(true);
-    setPublishError(null);
-
-    try {
-      setUploadStatusText("Securing base PDF in cloud vault...");
-      const uploadedDoc = await uploadDocumentInChunks({
-        file,
-        ownerUid: user?.uid || "anonymous",
-        maxFileSizeMb,
-        onProgress: (p) => {
-          setUploadProgress(p.percent);
-        },
-      });
-
-      const docFileId = String(
-        uploadedDoc?.documentId || uploadedDoc?.fileId || uploadedDoc?.id || `file_${Date.now()}`
-      );
-
-      // Generate page 1 thumbnail
-      let thumbnailUrl = "";
-      if (pageThumbnails.length > 0) {
-        thumbnailUrl = await compressImageTo10Kb(pageThumbnails[0]);
-      }
-
-      setUploadStatusText("Registering editable template in campus library...");
-      const newDocId = `pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const hasPassword = Boolean(publishPassword.trim());
-
-      const uploaderPhoto = profile?.photoURL || user?.photoURL || "";
-      const compressedPhoto = uploaderPhoto
-        ? await compressImageTo10Kb(uploaderPhoto).catch(() => "")
-        : "";
-
-      const publicDocRecord: any = {
-        id: newDocId,
-        fileId: docFileId,
-        title: publishTitle.trim(),
-        mainTitle: publishTitle.trim(),
-        originalFilename: file.name,
-        fileSizeBytes: Number(file.size) || 0,
-        pageCount: pdfDoc?.numPages || 1,
-        uploaderUid: user?.uid || "anonymous",
-        uploaderName: profile?.displayName || user?.displayName || "Campus Student",
-        uploaderPhotoURL: compressedPhoto || undefined,
-        uploaderVerified: isVerified,
-        thumbnailUrl: thumbnailUrl || undefined,
-        isEditable: true,
-        editableFields: fields,
-        hasPassword,
-        printCount: 0,
-        createdAt: Date.now(),
-      };
-
-      if (watermarkText) {
-        publicDocRecord.watermarkText = watermarkText;
-        publicDocRecord.watermarkOpacity = watermarkOpacity;
-        publicDocRecord.watermarkColor = watermarkColor;
-      }
-
-      if (hasPassword) {
-        publicDocRecord.password = publishPassword.trim();
-      }
-
-      const safePayload = stripUndefined(publicDocRecord);
-      await set(ref(database, `publicDocuments/${newDocId}`), safePayload);
-
-      onSuccess(`Editable template "${publishTitle.trim()}" published successfully!`);
-      onClose();
-    } catch (err: any) {
-      setPublishError(err.message || "Failed to publish editable document.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const activePageFields = fields.filter((f) => f.pageIndex === activePageIndex);
@@ -567,11 +406,19 @@ export function EditStudioModal({
           </div>
         </div>
 
-        {/* Action Button: Publish Editable Doc */}
+        {/* Action Button: Publish Editable Doc (Triggers Share Public PDF swipe up panel) */}
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsPublishModalOpen(true)}
+            onClick={() => {
+              onRequestPublish({
+                fields,
+                watermarkText,
+                watermarkOpacity,
+                watermarkColor,
+                pageThumbnails,
+              });
+            }}
             className="h-9 px-4 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -951,142 +798,6 @@ export function EditStudioModal({
           )}
         </div>
       </div>
-
-      {/* ──────────────── Publish Confirmation Dialog ──────────────── */}
-      {isPublishModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-[#0c831f]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-neutral-900">Publish Editable Document</h3>
-                  <p className="text-[11px] text-neutral-500">
-                    Campus students can fill your fields &amp; print
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => !uploading && setIsPublishModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <form onSubmit={handlePublishSubmit} className="space-y-3.5">
-              {publishError && (
-                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{publishError}</span>
-                </div>
-              )}
-
-              {/* Title Input */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-neutral-700 block">
-                  Template Title <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={publishTitle}
-                  onChange={(e) => setPublishTitle(e.target.value)}
-                  placeholder="e.g. Physics Assignment Cover, Admission Form"
-                  required
-                  className="w-full h-10 px-3 text-xs bg-neutral-50 rounded-xl text-neutral-900 border border-neutral-200 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
-                />
-              </div>
-
-              {/* Password Protection */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-neutral-700">Access Password</label>
-                  <span className="text-[10px] text-neutral-400">Optional</span>
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={publishPassword}
-                    onChange={(e) => setPublishPassword(e.target.value)}
-                    placeholder="Leave blank for public access"
-                    className="w-full h-10 pl-3 pr-10 text-xs bg-neutral-50 rounded-xl text-neutral-900 border border-neutral-200 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Summary Stats */}
-              <div className="p-3 bg-neutral-50 rounded-xl text-xs space-y-1 text-neutral-600 border border-neutral-100">
-                <div className="flex justify-between">
-                  <span>Total Pages:</span>
-                  <span className="font-bold text-neutral-900">{pdfDoc?.numPages || 1}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Interactive Fields:</span>
-                  <span className="font-bold text-neutral-900">{fields.length}</span>
-                </div>
-                {watermarkText && (
-                  <div className="flex justify-between">
-                    <span>Watermark:</span>
-                    <span className="font-bold text-neutral-900 truncate max-w-[150px]">
-                      &quot;{watermarkText}&quot; ({Math.round(watermarkOpacity * 100)}%)
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Upload Progress */}
-              {uploading && (
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-xs font-semibold text-[#0c831f]">
-                    <span>{uploadStatusText}</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#0c831f] h-full transition-all duration-200"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Form Buttons */}
-              <div className="pt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => setIsPublishModalOpen(false)}
-                  className="flex-1 h-10 bg-neutral-100 hover:bg-neutral-200 disabled:opacity-50 text-neutral-700 font-bold text-xs rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploading}
-                  className="flex-1 h-10 bg-[#0c831f] hover:bg-[#0a701a] disabled:opacity-50 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
-                >
-                  {uploading ? (
-                    <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
-                  <span>Publish</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

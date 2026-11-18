@@ -20,6 +20,9 @@ import {
   AlertCircle,
   Move,
   Maximize2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { database, ref, set } from "@/lib/firebase";
 import { uploadDocumentInChunks } from "@/lib/clientUploader";
@@ -36,6 +39,7 @@ export interface EditableField {
   height: number; // percentage height
   color: string; // text or accent color
   fontWeight?: string; // "normal" | "medium" | "semibold" | "bold" | "800"
+  textAlign?: "left" | "center" | "right";
   fontSize?: number;
   backgroundColor?: string;
 }
@@ -297,6 +301,7 @@ export function EditStudioModal({
       height: 5.5,
       color: "#0c831f",
       fontWeight: "bold",
+      textAlign: "center",
     };
     setFields((prev) => [...prev, newField]);
     setSelectedFieldId(newField.id);
@@ -328,6 +333,10 @@ export function EditStudioModal({
 
   const handleUpdateFieldWeight = (fieldId: string, fontWeight: string) => {
     setFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, fontWeight } : f)));
+  };
+
+  const handleUpdateFieldAlign = (fieldId: string, textAlign: "left" | "center" | "right") => {
+    setFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, textAlign } : f)));
   };
 
   // Dragging logic
@@ -630,9 +639,9 @@ export function EditStudioModal({
         </div>
       </div>
 
-      {/* ──────────────── TOOLS RIBBON (No gaps from left, right, top) ──────────────── */}
+      {/* ──────────────── TOOLS RIBBON (Row 1: Actions & Watermark) ──────────────── */}
       <div className="w-full bg-white border-b border-neutral-200 px-3 sm:px-4 py-1.5 flex items-center justify-between gap-2.5 overflow-x-auto shrink-0 select-none">
-        {/* Left: Tool buttons & Active Field Controls */}
+        {/* Left: Tool buttons */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Tool: Add Input Box */}
           <button
@@ -655,71 +664,6 @@ export function EditStudioModal({
             <ImageIcon className="w-3 h-3 text-purple-400" />
             <span>+ Image Box</span>
           </button>
-
-          {/* Active Field Properties when a box is selected */}
-          {selectedField && (
-            <>
-              <div className="w-px h-5 bg-neutral-200 mx-1 shrink-0" />
-
-              {/* Title input */}
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10px] text-neutral-400 font-normal">Label:</span>
-                <input
-                  type="text"
-                  value={selectedField.title}
-                  onChange={(e) => handleUpdateFieldTitle(selectedField.id, e.target.value)}
-                  className="h-6 px-1.5 text-[11px] font-normal border border-neutral-300 rounded-[3px] w-24 sm:w-32 bg-neutral-50 focus:bg-white focus:border-[#0c831f] outline-none"
-                  placeholder="Field label..."
-                />
-              </div>
-
-              {/* Text specific controls: Font Weight & Color */}
-              {selectedField.type === "text" && (
-                <>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-neutral-400 font-normal">Weight:</span>
-                    <select
-                      value={selectedField.fontWeight || "bold"}
-                      onChange={(e) => handleUpdateFieldWeight(selectedField.id, e.target.value)}
-                      className="h-6 px-1 text-[11px] font-normal border border-neutral-300 rounded-[3px] bg-neutral-50 focus:bg-white outline-none cursor-pointer"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="medium">Medium</option>
-                      <option value="semibold">Semi-Bold</option>
-                      <option value="bold">Bold</option>
-                      <option value="800">Extra Bold</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0 pl-1">
-                    {["#111827", "#0c831f", "#2563eb", "#dc2626", "#7c3aed"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => handleChangeColor(selectedField.id, c)}
-                        className={`w-4 h-4 rounded-[3px] border border-neutral-300 cursor-pointer ${
-                          selectedField.color === c ? "ring-1 ring-[#0c831f] scale-110" : ""
-                        }`}
-                        style={{ backgroundColor: c }}
-                        title={`Color ${c}`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Delete Box */}
-              <button
-                type="button"
-                onClick={() => handleDeleteField(selectedField.id)}
-                className="h-6 px-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] font-normal rounded-[3px] flex items-center gap-1 cursor-pointer transition-colors shrink-0"
-                title="Delete this box"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Delete</span>
-              </button>
-            </>
-          )}
         </div>
 
         {/* Right: Watermark inline control */}
@@ -747,6 +691,125 @@ export function EditStudioModal({
           )}
         </div>
       </div>
+
+      {/* ──────────────── ACTIVE FIELD CONFIGURATIONS RIBBON (Row 2: Dedicated row when a box is selected) ──────────────── */}
+      {selectedField && (
+        <div className="w-full bg-neutral-50/95 border-b border-neutral-200 px-3 sm:px-4 py-1.5 flex items-center justify-between gap-2.5 overflow-x-auto shrink-0 select-none animate-in slide-in-from-top-1 duration-150">
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Title / Label input */}
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] text-neutral-500 font-medium">Label:</span>
+              <input
+                type="text"
+                value={selectedField.title}
+                onChange={(e) => handleUpdateFieldTitle(selectedField.id, e.target.value)}
+                className="h-6 px-1.5 text-[11px] font-normal border border-neutral-300 rounded-[3px] w-28 sm:w-36 bg-white focus:border-[#0c831f] outline-none"
+                placeholder="Field label..."
+              />
+            </div>
+
+            {/* Text specific controls: Weight, Align, Color */}
+            {selectedField.type === "text" && (
+              <>
+                <div className="w-px h-4 bg-neutral-200 shrink-0" />
+
+                {/* Font Weight */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-neutral-500 font-medium">Weight:</span>
+                  <select
+                    value={selectedField.fontWeight || "bold"}
+                    onChange={(e) => handleUpdateFieldWeight(selectedField.id, e.target.value)}
+                    className="h-6 px-1 text-[11px] font-normal border border-neutral-300 rounded-[3px] bg-white outline-none cursor-pointer"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="medium">Medium</option>
+                    <option value="semibold">Semi-Bold</option>
+                    <option value="bold">Bold</option>
+                    <option value="800">Extra Bold</option>
+                  </select>
+                </div>
+
+                <div className="w-px h-4 bg-neutral-200 shrink-0" />
+
+                {/* Text Alignment */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-neutral-500 font-medium">Align:</span>
+                  <div className="flex items-center gap-0.5 border border-neutral-300 rounded-[3px] p-0.5 bg-white shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateFieldAlign(selectedField.id, "left")}
+                      className={`p-1 rounded-[2px] transition-colors cursor-pointer ${
+                        (selectedField.textAlign || "center") === "left"
+                          ? "bg-emerald-50 text-[#0c831f] ring-1 ring-[#0c831f]/30"
+                          : "text-neutral-500 hover:text-neutral-900"
+                      }`}
+                      title="Align Left"
+                    >
+                      <AlignLeft className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateFieldAlign(selectedField.id, "center")}
+                      className={`p-1 rounded-[2px] transition-colors cursor-pointer ${
+                        (selectedField.textAlign || "center") === "center"
+                          ? "bg-emerald-50 text-[#0c831f] ring-1 ring-[#0c831f]/30"
+                          : "text-neutral-500 hover:text-neutral-900"
+                      }`}
+                      title="Align Center"
+                    >
+                      <AlignCenter className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateFieldAlign(selectedField.id, "right")}
+                      className={`p-1 rounded-[2px] transition-colors cursor-pointer ${
+                        (selectedField.textAlign || "center") === "right"
+                          ? "bg-emerald-50 text-[#0c831f] ring-1 ring-[#0c831f]/30"
+                          : "text-neutral-500 hover:text-neutral-900"
+                      }`}
+                      title="Align Right"
+                    >
+                      <AlignRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="w-px h-4 bg-neutral-200 shrink-0" />
+
+                {/* Color Palette */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-neutral-500 font-medium">Color:</span>
+                  <div className="flex items-center gap-1">
+                    {["#111827", "#0c831f", "#2563eb", "#dc2626", "#7c3aed"].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handleChangeColor(selectedField.id, c)}
+                        className={`w-4 h-4 rounded-[3px] border border-neutral-300 cursor-pointer transition-transform ${
+                          selectedField.color === c ? "ring-2 ring-[#0c831f] ring-offset-1 scale-110" : ""
+                        }`}
+                        style={{ backgroundColor: c }}
+                        title={`Color ${c}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Delete Box Button */}
+          <button
+            type="button"
+            onClick={() => handleDeleteField(selectedField.id)}
+            className="h-6 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] font-normal rounded-[3px] flex items-center gap-1 cursor-pointer transition-colors shrink-0 ml-auto"
+            title="Delete this box"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>Delete Box</span>
+          </button>
+        </div>
+      )}
 
       {/* ──────────────── Main Canvas & Studio Body ──────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-neutral-900/40 relative">
@@ -798,6 +861,10 @@ export function EditStudioModal({
                 return (
                   <div
                     key={field.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFieldId(field.id);
+                    }}
                     onMouseDown={(e) => handleStartDrag(e, field.id)}
                     onTouchStart={(e) => handleStartDrag(e, field.id)}
                     className={`absolute cursor-move select-none transition-shadow ${
@@ -814,7 +881,13 @@ export function EditStudioModal({
                   >
                     {/* Content preview with container query: font size scales dynamically with box height */}
                     <div
-                      className="w-full h-full flex items-center justify-center p-0.5 overflow-hidden pointer-events-none"
+                      className={`w-full h-full flex items-center p-0.5 overflow-hidden pointer-events-none ${
+                        field.textAlign === "left"
+                          ? "justify-start"
+                          : field.textAlign === "right"
+                          ? "justify-end"
+                          : "justify-center"
+                      }`}
                       style={{
                         containerType: "size",
                       }}
@@ -826,8 +899,15 @@ export function EditStudioModal({
                             fontWeight: field.fontWeight || "bold",
                             fontSize: "58cqh",
                             lineHeight: "1.1",
+                            textAlign: field.textAlign || "center",
                           }}
-                          className="truncate block text-center max-w-full"
+                          className={`truncate block max-w-full ${
+                            field.textAlign === "left"
+                              ? "text-left pl-0.5"
+                              : field.textAlign === "right"
+                              ? "text-right pr-0.5"
+                              : "text-center"
+                          }`}
                         >
                           {field.defaultValue || "Text Here"}
                         </span>
@@ -846,9 +926,23 @@ export function EditStudioModal({
                       <div
                         onMouseDown={(e) => handleStartResize(e, field.id)}
                         onTouchStart={(e) => handleStartResize(e, field.id)}
+                        onClick={(e) => e.stopPropagation()}
                         className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-[#0c831f] text-white rounded-[2px] cursor-nwse-resize shadow-xs hover:scale-125 transition-transform z-40"
                         title="Drag to resize box"
                       />
+                    )}
+
+                    {/* Move Handle (Arrow in circle slightly below the input box) */}
+                    {isSelected && (
+                      <div
+                        onMouseDown={(e) => handleStartDrag(e, field.id)}
+                        onTouchStart={(e) => handleStartDrag(e, field.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white border border-neutral-300 shadow-md flex items-center justify-center cursor-move text-neutral-700 hover:text-[#0c831f] hover:border-[#0c831f] transition-colors z-40 active:scale-95"
+                        title="Drag to move box"
+                      >
+                        <Move className="w-3 h-3" />
+                      </div>
                     )}
                   </div>
                 );

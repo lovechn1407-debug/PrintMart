@@ -83,21 +83,30 @@ async function ensurePdfLib(): Promise<any> {
   if (typeof window === "undefined") return null;
   if ((window as any).PDFLib) return (window as any).PDFLib;
 
-  await new Promise<void>((resolve, reject) => {
-    const existing = document.getElementById("pdflib-cdn-script");
-    if (existing) {
-      if ((window as any).PDFLib) return resolve();
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load PDFLib")));
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "pdflib-cdn-script";
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load PDFLib script"));
-    document.head.appendChild(script);
-  });
+  const loadScript = (url: string) => {
+    return new Promise<void>((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${url}"]`);
+      if (existing) {
+        if ((window as any).PDFLib) return resolve();
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", () => reject(new Error(`Failed to load ${url}`)));
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = url;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load ${url}`));
+      document.head.appendChild(script);
+    });
+  };
+
+  try {
+    await loadScript("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js");
+  } catch (err) {
+    console.warn("Unpkg PDFLib failed, trying jsdelivr fallback:", err);
+    await loadScript("https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js");
+  }
+
   return (window as any).PDFLib;
 }
 
@@ -137,12 +146,14 @@ function RealDocumentViewer({
   colorMode,
   orientation,
   onTotalPagesDetected,
+  children,
 }: {
   doc?: UploadedDocumentRecord;
   pageIndex: number;
   colorMode: ColorMode;
   orientation: Orientation;
   onTotalPagesDetected?: (pages: number) => void;
+  children?: React.ReactNode;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -390,18 +401,21 @@ function RealDocumentViewer({
     return (
       <div className="w-full h-full flex items-center justify-center p-2 bg-white overflow-hidden">
         {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={doc?.originalFilename || "Document preview"}
-            className="max-w-full max-h-full object-contain"
-            onError={(e) => {
-              if (permanentApiUrl && (e.target as HTMLImageElement).src !== permanentApiUrl) {
-                (e.target as HTMLImageElement).src = permanentApiUrl;
-              } else {
-                setRenderError(true);
-              }
-            }}
-          />
+          <div className="relative inline-block max-w-full max-h-full">
+            <img
+              src={imgSrc}
+              alt={doc?.originalFilename || "Document preview"}
+              className="max-w-full max-h-full block object-contain"
+              onError={(e) => {
+                if (permanentApiUrl && (e.target as HTMLImageElement).src !== permanentApiUrl) {
+                  (e.target as HTMLImageElement).src = permanentApiUrl;
+                } else {
+                  setRenderError(true);
+                }
+              }}
+            />
+            {children}
+          </div>
         ) : (
           <div className="text-center p-4 text-xs text-neutral-400">
             Preview unavailable
@@ -446,10 +460,13 @@ function RealDocumentViewer({
           </div>
         )
       ) : (
-        <canvas
-          ref={canvasRef}
-          className="max-w-full max-h-full object-contain shadow-2xs transition-opacity duration-150"
-        />
+        <div className="relative inline-block max-w-full max-h-full">
+          <canvas
+            ref={canvasRef}
+            className="max-w-full max-h-full block object-contain shadow-2xs transition-opacity duration-150"
+          />
+          {children}
+        </div>
       )}
     </div>
   );
@@ -672,18 +689,29 @@ function UserPrintContent() {
           const isBold =
             field.fontWeight === "bold" ||
             field.fontWeight === "700" ||
-            field.fontWeight === "800";
+            field.fontWeight === "800" ||
+            field.fontWeight === "semibold";
           const useFont = isBold ? fontBold : font;
-          const fontSize = Math.max(8, Math.min(72, Math.round(fieldH * 0.65)));
+          const fontSize = Math.max(6, Math.min(72, Math.round(fieldH * 0.58)));
 
           const hex = field.color || "#0c831f";
           const r = parseInt(hex.slice(1, 3), 16) / 255 || 0;
           const g = parseInt(hex.slice(3, 5), 16) / 255 || 0;
           const b = parseInt(hex.slice(5, 7), 16) / 255 || 0;
 
+          const textWidth = useFont.widthOfTextAtSize(userVal, fontSize);
+          let drawX = fieldX + 2;
+          if (field.textAlign === "center") {
+            drawX = fieldX + Math.max(0, (fieldW - textWidth) / 2);
+          } else if (field.textAlign === "right") {
+            drawX = fieldX + Math.max(0, fieldW - textWidth - 2);
+          }
+
+          const drawY = fieldY + (fieldH - fontSize) / 2 + (fontSize * 0.12);
+
           page.drawText(userVal, {
-            x: fieldX + 2,
-            y: fieldY + (fieldH - fontSize) / 2,
+            x: drawX,
+            y: drawY,
             size: fontSize,
             font: useFont,
             color: PDFLib.rgb(r, g, b),
@@ -1963,79 +1991,116 @@ function UserPrintContent() {
                         colorMode={colorMode}
                         orientation={orientation}
                         onTotalPagesDetected={handleTotalPagesDetected}
-                      />
-
-                      {/* Editable Template Overlay (Live Watermark & Field Values before confirmation) */}
-                      {isEditableDoc && !isEditableConfirmed && (
-                        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-20">
-                          {/* Watermark across all pages */}
-                          {watermarkText && (
-                            <div
-                              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
-                              style={{ opacity: watermarkOpacity }}
-                            >
-                              <span
-                                className="text-xl sm:text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap"
-                                style={{ color: watermarkColor || "#000000" }}
+                      >
+                        {/* Editable Template Overlay (Live Watermark & Field Values before confirmation) */}
+                        {isEditableDoc && !isEditableConfirmed && (
+                          <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-20">
+                            {/* Watermark across all pages */}
+                            {watermarkText && (
+                              <div
+                                className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
+                                style={{ opacity: watermarkOpacity }}
                               >
-                                {watermarkText}
-                              </span>
-                            </div>
-                          )}
+                                <span
+                                  className="text-xl sm:text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap"
+                                  style={{ color: watermarkColor || "#000000" }}
+                                >
+                                  {watermarkText}
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Fields for current active preview page */}
-                          {editableFields
-                            .filter((f) => f.pageIndex === previewPageIndex - 1)
-                            .map((field) => {
-                              const val = filledValues[field.id];
-                              if (field.type === "text") {
-                                return (
-                                  <div
-                                    key={field.id}
-                                    style={{
-                                      left: `${field.x}%`,
-                                      top: `${field.y}%`,
-                                      width: `${field.width}%`,
-                                      height: `${field.height}%`,
-                                      color: field.color || "#0c831f",
-                                    }}
-                                    className="absolute flex items-center justify-center p-0.5 text-center leading-tight overflow-hidden break-words font-semibold text-[10px] sm:text-xs"
-                                  >
-                                    <span className="truncate w-full">
-                                      {val !== undefined && val !== "" ? val : (field.defaultValue || field.title)}
-                                    </span>
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <div
-                                    key={field.id}
-                                    style={{
-                                      left: `${field.x}%`,
-                                      top: `${field.y}%`,
-                                      width: `${field.width}%`,
-                                      height: `${field.height}%`,
-                                    }}
-                                    className="absolute flex items-center justify-center overflow-hidden p-0.5"
-                                  >
-                                    {val ? (
-                                      <img
-                                        src={val}
-                                        alt={field.title}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full border border-dashed border-neutral-300 rounded flex flex-col items-center justify-center text-[8px] text-neutral-400 bg-neutral-50/40">
-                                        <ImageIcon className="w-3 h-3 text-neutral-400" />
-                                        <span className="truncate max-w-full px-0.5">{field.title}</span>
+                            {/* Fields for current active preview page */}
+                            {editableFields
+                              .filter((f) => f.pageIndex === previewPageIndex - 1)
+                              .map((field) => {
+                                const val = filledValues[field.id];
+                                if (field.type === "text") {
+                                  return (
+                                    <div
+                                      key={field.id}
+                                      style={{
+                                        left: `${field.x}%`,
+                                        top: `${field.y}%`,
+                                        width: `${field.width}%`,
+                                        height: `${field.height}%`,
+                                      }}
+                                      className={`absolute flex items-center p-0.5 overflow-hidden leading-tight ${
+                                        field.textAlign === "left"
+                                          ? "justify-start text-left"
+                                          : field.textAlign === "right"
+                                          ? "justify-end text-right"
+                                          : "justify-center text-center"
+                                      }`}
+                                    >
+                                      <div
+                                        className="w-full h-full flex items-center overflow-hidden"
+                                        style={{
+                                          containerType: "size",
+                                          justifyContent:
+                                            field.textAlign === "left"
+                                              ? "flex-start"
+                                              : field.textAlign === "right"
+                                              ? "flex-end"
+                                              : "center",
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            color: field.color || "#0c831f",
+                                            fontWeight: field.fontWeight || "bold",
+                                            fontSize: "58cqh",
+                                            lineHeight: "1.1",
+                                            textAlign: field.textAlign || "center",
+                                          }}
+                                          className={`truncate block w-full ${
+                                            field.textAlign === "left"
+                                              ? "text-left pl-0.5"
+                                              : field.textAlign === "right"
+                                              ? "text-right pr-0.5"
+                                              : "text-center"
+                                          }`}
+                                        >
+                                          {val !== undefined && val !== ""
+                                            ? val
+                                            : field.defaultValue || field.title}
+                                        </span>
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              }
-                            })}
-                        </div>
-                      )}
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div
+                                      key={field.id}
+                                      style={{
+                                        left: `${field.x}%`,
+                                        top: `${field.y}%`,
+                                        width: `${field.width}%`,
+                                        height: `${field.height}%`,
+                                      }}
+                                      className="absolute flex items-center justify-center overflow-hidden p-0.5"
+                                    >
+                                      {val ? (
+                                        <img
+                                          src={val}
+                                          alt={field.title}
+                                          className="w-full h-full object-contain"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full border border-dashed border-neutral-300 rounded flex flex-col items-center justify-center text-[8px] text-neutral-400 bg-neutral-50/40">
+                                          <ImageIcon className="w-3 h-3 text-neutral-400" />
+                                          <span className="truncate max-w-full px-0.5">
+                                            {field.title}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                              })}
+                          </div>
+                        )}
+                      </RealDocumentViewer>
                     </div>
 
                     {/* Minimal Slide to Turn Page Hint */}

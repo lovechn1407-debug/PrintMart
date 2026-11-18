@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
-import { database, ref, onValue } from "@/lib/firebase";
+import { database, ref, onValue, get } from "@/lib/firebase";
 import { uploadDocumentInChunks } from "@/lib/clientUploader";
 import { calculatePrintPrice, DEFAULT_GLOBAL_PRICING } from "@printmart/shared";
 import {
@@ -613,20 +613,74 @@ function UserPrintContent() {
   useEffect(() => {
     // 0. If a document was clicked from the Public tab, load it directly into Print Studio
     if (requestedDocId) {
-      const publicDocRecord: UploadedDocumentRecord = {
-        fileId: requestedDocId,
-        originalFilename: requestedTitle,
-        fileSizeBytes: 0,
-        mimeType: "application/pdf",
-        pageCount: Math.max(1, requestedPages),
-        isColorDocument: false,
-        telegramFileId: requestedDocId,
-        previewUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
-        blobUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
-      };
-      setDocuments([publicDocRecord]);
-      setStep("studio");
-      setActiveDraftId(null);
+      // 0a. Check if a multi-document bundle was prepared in sessionStorage
+      let bundleLoaded = false;
+      try {
+        const storedBundle = sessionStorage.getItem("printmart_public_bundle");
+        if (storedBundle) {
+          const parsed = JSON.parse(storedBundle);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDocuments(parsed);
+            setStep("studio");
+            setActiveDraftId(null);
+            bundleLoaded = true;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load bundle from sessionStorage:", e);
+      }
+
+      if (!bundleLoaded) {
+        const publicDocRecord: UploadedDocumentRecord = {
+          fileId: requestedDocId,
+          originalFilename: requestedTitle,
+          fileSizeBytes: 0,
+          mimeType: "application/pdf",
+          pageCount: Math.max(1, requestedPages),
+          isColorDocument: false,
+          telegramFileId: requestedDocId,
+          previewUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
+          blobUrl: `/api/document/preview?documentId=${encodeURIComponent(requestedDocId)}`,
+        };
+        setDocuments([publicDocRecord]);
+        setStep("studio");
+        setActiveDraftId(null);
+
+        // 0b. Also check if this publicDocId has multiple files registered in Firebase RTDB
+        const targetPublicId =
+          searchParams.get("publicDocId") ||
+          (requestedDocId.startsWith("pub_") ? requestedDocId : null);
+
+        if (targetPublicId) {
+          get(ref(database, `publicDocuments/${targetPublicId}`))
+            .then((snap) => {
+              if (snap.exists()) {
+                const val = snap.val();
+                if (Array.isArray(val.files) && val.files.length > 0) {
+                  const multiDocs: UploadedDocumentRecord[] = val.files.map(
+                    (f: any, idx: number) => ({
+                      fileId: f.fileId,
+                      originalFilename: f.title
+                        ? f.title.toLowerCase().endsWith(".pdf")
+                          ? f.title
+                          : `${f.title}.pdf`
+                        : `Document ${idx + 1}.pdf`,
+                      fileSizeBytes: Number(f.fileSizeBytes) || 0,
+                      mimeType: "application/pdf",
+                      pageCount: Math.max(1, Number(f.pageCount) || 1),
+                      isColorDocument: false,
+                      telegramFileId: f.fileId,
+                      previewUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+                      blobUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+                    })
+                  );
+                  setDocuments(multiDocs);
+                }
+              }
+            })
+            .catch(() => {});
+        }
+      }
       return;
     }
 

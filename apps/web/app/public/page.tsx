@@ -24,16 +24,18 @@ import {
   List,
   Tag,
   Sparkles,
+  Layers,
 } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
 import { database, ref, onValue, set, update, remove } from "@/lib/firebase";
-import { uploadDocumentInChunks } from "@/lib/clientUploader";
+import { uploadDocumentInChunks, estimatePdfPageCount } from "@/lib/clientUploader";
 
 export interface PublicDocument {
   id: string;
   fileId: string;
   title: string;
+  mainTitle?: string;
   titles?: string[];
   documentsCount?: number;
   files?: {
@@ -84,6 +86,44 @@ function stripUndefined<T>(obj: T): T {
     return clean as unknown as T;
   }
   return obj;
+}
+
+async function ensurePdfJs(): Promise<any> {
+  if (typeof window === "undefined") return null;
+  if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("pdfjs-cdn-script");
+    if (existing) {
+      if ((window as any).pdfjsLib) return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load PDF.js")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "pdfjs-cdn-script";
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load PDF.js script"));
+    document.head.appendChild(script);
+  });
+  return (window as any).pdfjsLib;
+}
+
+async function getAccuratePdfPageCount(file: File): Promise<number> {
+  try {
+    const pdfjs = await ensurePdfJs();
+    if (pdfjs) {
+      const buffer = await file.slice(0, Math.min(file.size, 35 * 1024 * 1024)).arrayBuffer();
+      const p = await pdfjs.getDocument({ data: buffer }).promise;
+      if (p?.numPages > 0) {
+        return p.numPages;
+      }
+    }
+  } catch (err) {
+    console.warn("PDF.js page count failed, using estimate:", err);
+  }
+  return await estimatePdfPageCount(file);
 }
 
 function formatDate(timestamp: number): string {
@@ -370,6 +410,7 @@ export default function PublicDocumentsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [titleInput, setTitleInput] = useState<string>("");
+  const [mainTitleInput, setMainTitleInput] = useState<string>("");
   const [passwordInput, setPasswordInput] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -387,6 +428,9 @@ export default function PublicDocumentsPage() {
   const [isImportant, setIsImportant] = useState<boolean>(false);
   const [isPriority, setIsPriority] = useState<boolean>(false);
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+
+  // Bundle Info Modal State (when user clicks dotted underlined title)
+  const [selectedBundleDoc, setSelectedBundleDoc] = useState<PublicDocument | null>(null);
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim();
@@ -421,6 +465,14 @@ export default function PublicDocumentsPage() {
       (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
     );
     setAdditionalFiles(files);
+    if (files.length > 0 && !mainTitleInput) {
+      const base = selectedFile ? selectedFile.name.replace(/\.pdf$/i, "") : "Document";
+      setMainTitleInput(`${base} Bundle`);
+    }
+  };
+
+  const handleRemoveAdditionalFile = (idxToRemove: number) => {
+    setAdditionalFiles((prev) => prev.filter((_, idx) => idx !== idxToRemove));
   };
 
   // Load configured max file size limit from systemSettings
@@ -464,14 +516,14 @@ export default function PublicDocumentsPage() {
 
   // Prevent background scroll when modal open
   useEffect(() => {
-    if (isUploadModalOpen || passwordModalDoc || docToDelete) {
+    if (isUploadModalOpen || passwordModalDoc || docToDelete || selectedBundleDoc) {
       const origOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = origOverflow;
       };
     }
-  }, [isUploadModalOpen, passwordModalDoc, docToDelete]);
+  }, [isUploadModalOpen, passwordModalDoc, docToDelete, selectedBundleDoc]);
 
   // Load Public Documents in Real-Time
   useEffect(() => {
@@ -549,6 +601,9 @@ export default function PublicDocumentsPage() {
     setUploadError(null);
     const baseName = file.name.replace(/\.pdf$/i, "");
     setTitleInput(baseName);
+    if (additionalFiles.length > 0 && !mainTitleInput) {
+      setMainTitleInput(`${baseName} Bundle`);
+    }
   };
 
   // Submit Upload
@@ -558,7 +613,16 @@ export default function PublicDocumentsPage() {
       setUploadError("Please select a PDF document to upload.");
       return;
     }
-    if (!titleInput.trim()) {
+
+    const allFiles = [selectedFile, ...additionalFiles].filter(Boolean) as File[];
+    const isMultiDoc = allFiles.length > 1;
+
+    if (isMultiDoc && !mainTitleInput.trim() && !titleInput.trim()) {
+      setUploadError("Please enter a Main Title for this document bundle.");
+      return;
+    }
+
+    if (!titleInput.trim() && !mainTitleInput.trim()) {
       setUploadError("Please give this document a title or name.");
       return;
     }
@@ -567,11 +631,17 @@ export default function PublicDocumentsPage() {
     setUploadError(null);
 
     try {
-      const allFiles = [selectedFile, ...additionalFiles].filter(Boolean);
+      // Preload PDF.js before uploading so page counting is accurate
+      await ensurePdfJs().catch(() => {});
+
+      const primaryBundleTitle = isMultiDoc
+        ? (mainTitleInput.trim() || titleInput.trim() || selectedFile.name.replace(/\.pdf$/i, ""))
+        : (titleInput.trim() || selectedFile.name.replace(/\.pdf$/i, ""));
+
       const titles = [
-        titleInput.trim(),
+        titleInput.trim() || selectedFile.name.replace(/\.pdf$/i, ""),
         ...additionalFiles.map((f) => f.name.replace(/\.pdf$/i, "")),
-      ].filter(Boolean);
+      ];
 
       let totalBytes = 0;
       let totalPages = 0;
@@ -584,7 +654,12 @@ export default function PublicDocumentsPage() {
 
       for (let i = 0; i < allFiles.length; i++) {
         const fileToUpload = allFiles[i];
-        totalBytes += fileToUpload.size || 0;
+        totalBytes += Number(fileToUpload.size) || 0;
+
+        // Accurate page count using PDF.js
+        const accuratePages = await getAccuratePdfPageCount(fileToUpload);
+        totalPages += accuratePages;
+
         setUploadStatusText(
           allFiles.length > 1
             ? `Uploading document ${i + 1} of ${allFiles.length}: ${fileToUpload.name}`
@@ -606,15 +681,13 @@ export default function PublicDocumentsPage() {
           uploadedDoc?.documentId ||
           uploadedDoc?.fileId ||
           uploadedDoc?.id ||
-          `file_${Date.now()}_${i}`
+          `DOC_${Date.now()}_${i}`
         );
-        const detectedPages = Math.max(1, Number(uploadedDoc?.pageCount) || 1);
-        totalPages += detectedPages;
 
         uploadedFileRecords.push({
           fileId: docFileId,
           title: String(titles[i] || fileToUpload.name.replace(/\.pdf$/i, "") || `Document ${i + 1}`),
-          pageCount: detectedPages,
+          pageCount: accuratePages,
           fileSizeBytes: Number(fileToUpload.size) || 0,
         });
       }
@@ -653,24 +726,27 @@ export default function PublicDocumentsPage() {
       const publicDocRecord: Record<string, any> = {
         id: newDocId,
         fileId: primaryDocFileId,
-        title: titleInput.trim() || selectedFile.name.replace(/\.pdf$/i, "") || "Untitled Document",
+        title: primaryBundleTitle,
         documentsCount: allFiles.length,
         files: uploadedFileRecords,
         originalFilename: selectedFile.name || "document.pdf",
-        fileSizeBytes: Number(totalBytes) || selectedFile.size || 0,
-        pageCount: Math.max(1, Number(totalPages) || 1),
+        fileSizeBytes: totalBytes,
+        pageCount: totalPages,
         uploaderUid: user?.uid || "anonymous",
         uploaderName: uploaderName || "Campus Student",
         uploaderPhotoURL: uploaderPhoto || "",
         uploaderVerified: Boolean(isCurrentVerified),
         thumbnailUrl: finalThumbnail || "",
-        hasPassword,
+        hasPassword: Boolean(hasPassword),
         printCount: 0,
         createdAt: Date.now(),
       };
 
+      if (isMultiDoc) {
+        publicDocRecord.mainTitle = primaryBundleTitle;
+      }
       if (titles.length > 1) {
-        publicDocRecord.titles = titles;
+        publicDocRecord.titles = titles.filter(Boolean);
       }
       if (manualThumbnailPreview) {
         publicDocRecord.manualThumbnailUrl = manualThumbnailPreview;
@@ -704,6 +780,7 @@ export default function PublicDocumentsPage() {
       setIsImportant(false);
       setIsPriority(false);
       setTitleInput("");
+      setMainTitleInput("");
       setPasswordInput("");
       setSuccessMessage("Document shared to Public Library successfully!");
       setTimeout(() => setSuccessMessage(null), 4000);
@@ -772,9 +849,37 @@ export default function PublicDocumentsPage() {
       // Non-blocking
     }
 
-    const printUrl = `/user/print?docId=${encodeURIComponent(doc.fileId)}&title=${encodeURIComponent(
-      doc.title
-    )}&pages=${doc.pageCount}`;
+    // Save bundle records in sessionStorage for Print Studio
+    if (doc.files && doc.files.length > 0) {
+      const bundleRecords = doc.files.map((f, idx) => ({
+        fileId: f.fileId,
+        originalFilename: f.title
+          ? f.title.toLowerCase().endsWith(".pdf")
+            ? f.title
+            : `${f.title}.pdf`
+          : `Document ${idx + 1}.pdf`,
+        fileSizeBytes: Number(f.fileSizeBytes) || 0,
+        mimeType: "application/pdf",
+        pageCount: Math.max(1, Number(f.pageCount) || 1),
+        isColorDocument: false,
+        telegramFileId: f.fileId,
+        previewUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+        blobUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+      }));
+      try {
+        sessionStorage.setItem("printmart_public_bundle", JSON.stringify(bundleRecords));
+      } catch (err) {
+        console.warn("Could not save bundle to sessionStorage:", err);
+      }
+    } else {
+      try {
+        sessionStorage.removeItem("printmart_public_bundle");
+      } catch {}
+    }
+
+    const printUrl = `/user/print?publicDocId=${encodeURIComponent(doc.id)}&docId=${encodeURIComponent(
+      doc.fileId
+    )}&title=${encodeURIComponent(doc.mainTitle || doc.title)}&pages=${doc.pageCount}`;
     router.push(printUrl);
   };
 
@@ -1169,6 +1274,19 @@ export default function PublicDocumentsPage() {
                 );
                 const displayThumbnail = doc.manualThumbnailUrl || doc.thumbnailUrl;
 
+                // Bundle calculations & accurate metrics
+                const isBundle = Boolean(
+                  (doc.documentsCount && doc.documentsCount > 1) ||
+                  (doc.files && doc.files.length > 1)
+                );
+                const totalDocPages = (doc.files && doc.files.length > 0)
+                  ? doc.files.reduce((sum, f) => sum + (Number(f.pageCount) || 1), 0)
+                  : (Number(doc.pageCount) || 1);
+                const totalDocBytes = (doc.files && doc.files.length > 0)
+                  ? doc.files.reduce((sum, f) => sum + (Number(f.fileSizeBytes) || 0), 0)
+                  : (Number(doc.fileSizeBytes) || 0);
+                const displayTitle = doc.mainTitle || doc.title;
+
                 /* ─── GRID VIEW CARD (2 per row) ─── */
                 if (viewMode === "grid") {
                   return (
@@ -1186,7 +1304,7 @@ export default function PublicDocumentsPage() {
                           {displayThumbnail ? (
                             <img
                               src={displayThumbnail}
-                              alt={doc.title}
+                              alt={displayTitle}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -1203,13 +1321,6 @@ export default function PublicDocumentsPage() {
                             {formatDate(doc.createdAt)}
                           </span>
 
-                          {/* Multi-document Badge */}
-                          {doc.documentsCount && doc.documentsCount > 1 && (
-                            <span className="absolute top-1.5 right-1.5 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
-                              {doc.documentsCount} docs
-                            </span>
-                          )}
-
                           {/* Locked icon overlay on thumbnail if password protected */}
                           {doc.hasPassword && (
                             <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
@@ -1223,7 +1334,21 @@ export default function PublicDocumentsPage() {
                         {/* Title & Tags */}
                         <div className="mt-2.5 mb-1.5">
                           <div className="mb-1">
-                            <RotatingTitle titles={doc.titles} defaultTitle={doc.title} />
+                            {isBundle ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBundleDoc(doc)}
+                                className="text-left group/bundleTitle inline-flex items-center gap-1 cursor-pointer max-w-full"
+                                title="Click to view all documents in this bundle"
+                              >
+                                <span className="text-xs font-bold text-neutral-900 group-hover/bundleTitle:text-[#0c831f] transition-colors truncate underline decoration-dotted underline-offset-4 decoration-neutral-400 group-hover/bundleTitle:decoration-[#0c831f]">
+                                  {displayTitle}
+                                </span>
+                                <span className="text-[#0c831f] font-bold text-xs shrink-0 select-none">&gt;</span>
+                              </button>
+                            ) : (
+                              <MarqueeTitle text={displayTitle} />
+                            )}
                           </div>
 
                           {/* Tags with very small corner radius rounded-[3px] */}
@@ -1246,7 +1371,7 @@ export default function PublicDocumentsPage() {
                           )}
 
                           <div className="flex items-center justify-between text-[10px] text-neutral-500 font-medium pt-1">
-                            <span>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}</span>
+                            <span>{totalDocPages} {totalDocPages === 1 ? "page" : "pages"} • {formatBytes(totalDocBytes)}</span>
                             <span>{doc.printCount || 0} prints</span>
                           </div>
                         </div>
@@ -1281,14 +1406,14 @@ export default function PublicDocumentsPage() {
                           <button
                             type="button"
                             onClick={() => handlePrintClick(doc)}
-                            className="h-7 px-2.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer shrink-0"
+                            className="w-[106px] sm:w-[114px] h-7 px-2 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-[10.5px] sm:text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer shrink-0"
                           >
                             {doc.hasPassword ? (
-                              <Lock className="w-2.5 h-2.5 text-white" />
+                              <Lock className="w-2.5 h-2.5 text-white shrink-0" />
                             ) : (
-                              <Printer className="w-2.5 h-2.5 text-white" />
+                              <Printer className="w-2.5 h-2.5 text-white shrink-0" />
                             )}
-                            <span>Print</span>
+                            <span className="truncate">{isBundle ? "Print Bundle" : "Print"}</span>
                           </button>
                         </div>
                       </div>
@@ -1314,7 +1439,7 @@ export default function PublicDocumentsPage() {
                           {displayThumbnail ? (
                             <img
                               src={displayThumbnail}
-                              alt={doc.title}
+                              alt={displayTitle}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -1346,13 +1471,6 @@ export default function PublicDocumentsPage() {
                             </div>
 
                             <div className="flex items-center gap-1.5">
-                              {/* Multi-document Badge on the same row of date on right corner */}
-                              {doc.documentsCount && doc.documentsCount > 1 && (
-                                <span className="text-[10px] font-bold text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded-[4px] border border-neutral-200/60">
-                                  {doc.documentsCount} docs
-                                </span>
-                              )}
-
                               {/* Delete Button for User's Own Uploads */}
                               {isCurrentUser && (
                                 <button
@@ -1367,9 +1485,23 @@ export default function PublicDocumentsPage() {
                             </div>
                           </div>
 
-                          {/* File Title (Swipe up effect for multiple docs / marquee for single) */}
+                          {/* File Title */}
                           <div className="mb-1">
-                            <RotatingTitle titles={doc.titles} defaultTitle={doc.title} />
+                            {isBundle ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBundleDoc(doc)}
+                                className="text-left group/bundleTitle inline-flex items-center gap-1.5 cursor-pointer max-w-full"
+                                title="Click to view all documents in this bundle"
+                              >
+                                <span className="text-xs sm:text-[13px] font-bold text-neutral-900 group-hover/bundleTitle:text-[#0c831f] transition-colors truncate underline decoration-dotted underline-offset-4 decoration-neutral-400 group-hover/bundleTitle:decoration-[#0c831f]">
+                                  {displayTitle}
+                                </span>
+                                <span className="text-[#0c831f] font-bold text-xs shrink-0 select-none">&gt;</span>
+                              </button>
+                            ) : (
+                              <MarqueeTitle text={displayTitle} />
+                            )}
                           </div>
 
                           {/* Tags with very small corner radius */}
@@ -1390,10 +1522,10 @@ export default function PublicDocumentsPage() {
                           <div className="flex items-center justify-between text-[11px] text-neutral-500 mt-1 font-medium">
                             <div className="flex items-center gap-1.5 truncate">
                               <span>
-                                {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
+                                {totalDocPages} {totalDocPages === 1 ? "page" : "pages"}
                               </span>
                               <span>•</span>
-                              <span>{formatBytes(doc.fileSizeBytes)}</span>
+                              <span>{formatBytes(totalDocBytes)}</span>
                             </div>
 
                             <div className="inline-flex items-center gap-1 text-neutral-600 font-medium shrink-0 ml-2">
@@ -1436,18 +1568,18 @@ export default function PublicDocumentsPage() {
                           </div>
                         </div>
 
-                        {/* Print Button */}
+                        {/* Print Button (Extended uniform width) */}
                         <button
                           type="button"
                           onClick={() => handlePrintClick(doc)}
-                          className="h-8 px-3.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
+                          className="w-32 sm:w-36 h-8 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
                         >
                           {doc.hasPassword ? (
-                            <Lock className="w-3 h-3 text-white" />
+                            <Lock className="w-3 h-3 text-white shrink-0" />
                           ) : (
-                            <Printer className="w-3 h-3 text-white" />
+                            <Printer className="w-3 h-3 text-white shrink-0" />
                           )}
-                          <span>Print</span>
+                          <span>{isBundle ? "Print Bundle" : "Print"}</span>
                         </button>
                       </div>
                     </div>
@@ -1458,6 +1590,128 @@ export default function PublicDocumentsPage() {
           </div>
         )}
       </main>
+
+      {/* ─────────────────────────────────────────────────────────────
+          BUNDLE DOCUMENTS INFO MODAL (All Document Names & Pages)
+          ───────────────────────────────────────────────────────────── */}
+      {selectedBundleDoc && (
+        <div className="fixed inset-0 z-50 bg-neutral-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center shrink-0">
+                  <Layers className="w-4 h-4 text-[#0c831f]" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-neutral-900 truncate">
+                    Bundle Documents Info
+                  </h3>
+                  <p className="text-[11px] text-neutral-500">
+                    Uploaded by {selectedBundleDoc.uploaderName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBundleDoc(null)}
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Title & Summary Stats */}
+            <div className="p-3 bg-neutral-50 rounded-xl space-y-1.5 border border-neutral-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                  Main Title
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-neutral-900 leading-snug">
+                {selectedBundleDoc.mainTitle || selectedBundleDoc.title}
+              </h4>
+              <div className="flex items-center gap-2 text-[11px] text-neutral-600 font-semibold pt-1">
+                <span>
+                  {(selectedBundleDoc.files?.length || selectedBundleDoc.documentsCount || 1)} Documents
+                </span>
+                <span>•</span>
+                <span>
+                  {(selectedBundleDoc.files && selectedBundleDoc.files.length > 0)
+                    ? selectedBundleDoc.files.reduce((acc, f) => acc + (f.pageCount || 1), 0)
+                    : (selectedBundleDoc.pageCount || 1)}{" "}
+                  Pages Total
+                </span>
+                <span>•</span>
+                <span>
+                  {formatBytes(
+                    (selectedBundleDoc.files && selectedBundleDoc.files.length > 0)
+                      ? selectedBundleDoc.files.reduce((acc, f) => acc + (f.fileSizeBytes || 0), 0)
+                      : (selectedBundleDoc.fileSizeBytes || 0)
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* List of Documents with Name & Pages */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {(selectedBundleDoc.files && selectedBundleDoc.files.length > 0
+                ? selectedBundleDoc.files
+                : [
+                    {
+                      fileId: selectedBundleDoc.fileId,
+                      title: selectedBundleDoc.title,
+                      pageCount: selectedBundleDoc.pageCount || 1,
+                      fileSizeBytes: selectedBundleDoc.fileSizeBytes || 0,
+                    },
+                  ]
+              ).map((f, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2.5 bg-white border border-neutral-200/70 rounded-xl hover:border-emerald-200 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div className="w-6 h-6 rounded-md bg-emerald-50 text-[#0c831f] flex items-center justify-center shrink-0 font-bold text-[11px]">
+                      {idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-neutral-900 truncate">
+                        {f.title}
+                      </p>
+                      <p className="text-[10px] text-neutral-400">
+                        {f.pageCount} {f.pageCount === 1 ? "page" : "pages"} • {formatBytes(f.fileSizeBytes)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex items-center gap-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setSelectedBundleDoc(null)}
+                className="flex-1 h-10 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedBundleDoc;
+                  setSelectedBundleDoc(null);
+                  handlePrintClick(target);
+                }}
+                className="flex-1 h-10 bg-[#0c831f] hover:bg-[#0a701a] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Bundle</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           3. UPLOAD FILE MODAL / BOTTOM SHEET
@@ -1530,16 +1784,48 @@ export default function PublicDocumentsPage() {
                 </div>
               </div>
 
-              {/* Rename File Input */}
+              {/* Main Title Input (shown if verified user adds more than 1 doc) */}
+              {isCurrentVerified && additionalFiles.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-neutral-800">
+                      Main Title <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-[#0c831f] font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Shown on Library Card
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={mainTitleInput}
+                    onChange={(e) => setMainTitleInput(e.target.value)}
+                    placeholder="e.g. Physics Unit 1-3 Full Package, Maths PYQ (2020-2024)"
+                    className="w-full h-10 px-3.5 text-xs bg-neutral-50 rounded-xl text-neutral-900 border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
+                    required
+                  />
+                  <p className="text-[10px] text-neutral-400">
+                    This main title will appear on the card with a clickable &quot;&gt;&quot; link to view all documents.
+                  </p>
+                </div>
+              )}
+
+              {/* Rename File Input / Document 1 Title */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-neutral-700 block">
-                  Rename This File (Title) <span className="text-rose-500">*</span>
+                  {isCurrentVerified && additionalFiles.length > 0
+                    ? "Document 1 Title"
+                    : "Rename This File (Title)"}{" "}
+                  <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
-                  placeholder="e.g. Physics Unit 3 Notes, Maths PYQ 2024"
+                  placeholder={
+                    isCurrentVerified && additionalFiles.length > 0
+                      ? "e.g. Unit 1 Theory Notes"
+                      : "e.g. Physics Unit 3 Notes, Maths PYQ 2024"
+                  }
                   className="w-full h-10 px-3.5 text-xs bg-neutral-50 rounded-xl text-neutral-900 border-0 focus:ring-2 focus:ring-[#0c831f] focus:bg-white"
                   required
                 />
@@ -1604,9 +1890,37 @@ export default function PublicDocumentsPage() {
                       className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black cursor-pointer text-neutral-600"
                     />
                     {additionalFiles.length > 0 && (
-                      <p className="text-[10px] font-semibold text-[#0c831f] pt-0.5">
-                        +{additionalFiles.length} additional doc{additionalFiles.length > 1 ? "s" : ""} selected ({additionalFiles.map((f) => f.name).join(", ")})
-                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-[10px] font-bold text-[#0c831f]">
+                          {additionalFiles.length} additional document{additionalFiles.length > 1 ? "s" : ""} selected:
+                        </p>
+                        <div className="space-y-1 max-h-36 overflow-y-auto">
+                          {additionalFiles.map((f, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between px-2.5 py-1.5 bg-white/90 border border-emerald-200/80 rounded-lg text-xs"
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                <span className="font-bold text-[10px] text-neutral-400">#{idx + 2}</span>
+                                <span className="truncate text-[11px] text-neutral-800 font-medium">
+                                  {f.name}
+                                </span>
+                                <span className="text-[10px] text-neutral-400 shrink-0">
+                                  ({formatBytes(f.size)})
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAdditionalFile(idx)}
+                                className="text-neutral-400 hover:text-rose-600 text-xs font-bold px-1 cursor-pointer"
+                                title="Remove file"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
 

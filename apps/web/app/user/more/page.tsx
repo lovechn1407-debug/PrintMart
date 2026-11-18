@@ -627,16 +627,19 @@ export default function MorePage() {
                 )}
               </div>
             )}
-            <p className="text-xs font-medium text-neutral-600 mt-1 max-w-xs">
-              {subtext}
-            </p>
+            {/* Subtitle / Email - only shown when logged in */}
+            {user && (
+              <p className="text-xs font-medium text-neutral-600 mt-1 max-w-xs">
+                {subtext}
+              </p>
+            )}
 
             {/* If user is not logged in, ask to sign in */}
             {!user && (
               <button
                 type="button"
                 onClick={() => signInWithGoogle()}
-                className="mt-3.5 px-5 py-2 bg-neutral-950 hover:bg-neutral-800 active:scale-98 text-white text-xs font-semibold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                className="mt-3.5 px-5 py-2 bg-neutral-950 hover:bg-neutral-800 active:scale-98 text-white text-xs font-semibold rounded-lg shadow-xs transition-all flex items-center gap-2 cursor-pointer"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path

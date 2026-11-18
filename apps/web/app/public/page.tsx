@@ -25,11 +25,13 @@ import {
   Tag,
   Sparkles,
   Layers,
+  Edit3,
 } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
 import { database, ref, onValue, set, update, remove } from "@/lib/firebase";
 import { uploadDocumentInChunks, estimatePdfPageCount } from "@/lib/clientUploader";
+import { EditStudioModal, EditableField } from "@/components/EditStudioModal";
 
 export interface PublicDocument {
   id: string;
@@ -60,6 +62,11 @@ export interface PublicDocument {
   password?: string;
   printCount: number;
   createdAt: number;
+  isEditable?: boolean;
+  editableFields?: EditableField[];
+  watermarkText?: string;
+  watermarkOpacity?: number;
+  watermarkColor?: string;
 }
 
 function formatBytes(bytes: number = 0): string {
@@ -406,6 +413,12 @@ export default function PublicDocumentsPage() {
     profile?.isVerified || (user?.uid && verifiedUserMap[user.uid])
   );
 
+  // Upload Choice Modal & Edit Studio States
+  const [isUploadChoiceOpen, setIsUploadChoiceOpen] = useState<boolean>(false);
+  const [isEditStudioOpen, setIsEditStudioOpen] = useState<boolean>(false);
+  const [editStudioFile, setEditStudioFile] = useState<File | null>(null);
+  const editableFileInputRef = useRef<HTMLInputElement>(null);
+
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -516,14 +529,28 @@ export default function PublicDocumentsPage() {
 
   // Prevent background scroll when modal open
   useEffect(() => {
-    if (isUploadModalOpen || passwordModalDoc || docToDelete || selectedBundleDoc) {
+    if (
+      isUploadChoiceOpen ||
+      isEditStudioOpen ||
+      isUploadModalOpen ||
+      passwordModalDoc ||
+      docToDelete ||
+      selectedBundleDoc
+    ) {
       const origOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = origOverflow;
       };
     }
-  }, [isUploadModalOpen, passwordModalDoc, docToDelete, selectedBundleDoc]);
+  }, [
+    isUploadChoiceOpen,
+    isEditStudioOpen,
+    isUploadModalOpen,
+    passwordModalDoc,
+    docToDelete,
+    selectedBundleDoc,
+  ]);
 
   // Load Public Documents in Real-Time
   useEffect(() => {
@@ -584,6 +611,24 @@ export default function PublicDocumentsPage() {
   const myUploadsCount = user
     ? documents.filter((d) => d.uploaderUid === user.uid).length
     : 0;
+
+  // Handle Editable File Pick -> opens Edit Studio
+  const handleEditableFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setUploadError("Editable files only support PDF format.");
+      return;
+    }
+    if (file.size > maxFileSizeMb * 1024 * 1024) {
+      setUploadError(`File exceeds maximum allowed size of ${maxFileSizeMb}MB.`);
+      return;
+    }
+    setEditStudioFile(file);
+    setIsUploadChoiceOpen(false);
+    setIsEditStudioOpen(true);
+    e.target.value = "";
+  };
 
   // Handle File Pick
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -877,9 +922,33 @@ export default function PublicDocumentsPage() {
       } catch {}
     }
 
+    // Save editable config in sessionStorage for Print Studio
+    if (doc.isEditable) {
+      try {
+        sessionStorage.setItem(
+          "printmart_editable_config",
+          JSON.stringify({
+            isEditable: true,
+            editableFields: doc.editableFields || [],
+            watermarkText: doc.watermarkText || "",
+            watermarkOpacity: doc.watermarkOpacity ?? 0.18,
+            watermarkColor: doc.watermarkColor || "#000000",
+          })
+        );
+      } catch (err) {
+        console.warn("Could not save editable config to sessionStorage:", err);
+      }
+    } else {
+      try {
+        sessionStorage.removeItem("printmart_editable_config");
+      } catch {}
+    }
+
     const printUrl = `/user/print?publicDocId=${encodeURIComponent(doc.id)}&docId=${encodeURIComponent(
       doc.fileId
-    )}&title=${encodeURIComponent(doc.mainTitle || doc.title)}&pages=${doc.pageCount}`;
+    )}&title=${encodeURIComponent(doc.mainTitle || doc.title)}&pages=${doc.pageCount}&isEditable=${
+      doc.isEditable ? "1" : "0"
+    }`;
     router.push(printUrl);
   };
 
@@ -1021,7 +1090,7 @@ export default function PublicDocumentsPage() {
                   setTitleInput("");
                   setPasswordInput("");
                   setUploadError(null);
-                  setIsUploadModalOpen(true);
+                  setIsUploadChoiceOpen(true);
                 }}
                 className="h-10 px-4 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer shrink-0"
               >
@@ -1200,7 +1269,7 @@ export default function PublicDocumentsPage() {
               onClick={() => {
                 if (showMyUploadsOnly) setShowMyUploadsOnly(false);
                 else if (searchQuery) setSearchQuery("");
-                else setIsUploadModalOpen(true);
+                else setIsUploadChoiceOpen(true);
               }}
               className="px-5 py-2.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
             >
@@ -1320,6 +1389,13 @@ export default function PublicDocumentsPage() {
                           <span className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-xs">
                             {formatDate(doc.createdAt)}
                           </span>
+
+                          {/* Editable Badge on Top Corner */}
+                          {doc.isEditable && (
+                            <span className="absolute top-1.5 right-1.5 bg-purple-600 text-white text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-[3px] shadow-xs tracking-wider z-10">
+                              Editable
+                            </span>
+                          )}
 
                           {/* Locked icon overlay on thumbnail if password protected */}
                           {doc.hasPassword && (
@@ -1459,6 +1535,13 @@ export default function PublicDocumentsPage() {
                               </div>
                             </div>
                           )}
+
+                          {/* Editable Badge on Thumbnail */}
+                          {doc.isEditable && (
+                            <span className="absolute top-1 right-1 bg-purple-600 text-white text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-[3px] shadow-xs tracking-wider z-10">
+                              Editable
+                            </span>
+                          )}
                         </div>
 
                         {/* Right: Info */}
@@ -1468,6 +1551,11 @@ export default function PublicDocumentsPage() {
                               <span className="text-[10px] font-medium text-neutral-400">
                                 {formatDate(doc.createdAt)}
                               </span>
+                              {doc.isEditable && (
+                                <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-purple-600 text-white rounded-[3px] shadow-xs tracking-wider">
+                                  Editable
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1.5">
@@ -1711,6 +1799,126 @@ export default function PublicDocumentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Hidden file input for editable PDF upload */}
+      <input
+        ref={editableFileInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleEditableFileSelect}
+      />
+
+      {/* ─────────────────────────────────────────────────────────────
+          2.5 UPLOAD CHOICE MODAL (Option a: Normal vs Option b: Editable)
+          ───────────────────────────────────────────────────────────── */}
+      {isUploadChoiceOpen && (
+        <div className="fixed inset-0 z-50 bg-neutral-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#0c831f] flex items-center justify-center">
+                  <UploadCloud className="w-4 h-4 text-[#0c831f]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900">Upload to Public Docs</h3>
+                  <p className="text-[11px] text-neutral-500">Choose how you want to share your document</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadChoiceOpen(false)}
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Choice Options */}
+            <div className="space-y-2.5 pt-1">
+              {/* Option a: Upload Files (Normal) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUploadChoiceOpen(false);
+                  setSelectedFile(null);
+                  setTitleInput("");
+                  setPasswordInput("");
+                  setUploadError(null);
+                  setIsUploadModalOpen(true);
+                }}
+                className="w-full text-left p-4 rounded-xl border border-neutral-200 hover:border-[#0c831f] hover:bg-emerald-50/20 transition-all flex items-start gap-3.5 group cursor-pointer active:scale-99 shadow-2xs"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1.5 mb-1">
+                    <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-[#0c831f] transition-colors">
+                      a) Upload Files
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-neutral-100 text-neutral-600 rounded">
+                      Standard
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Share standard PDF documents or multi-file bundles for normal campus browsing and direct printing.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option b: Upload Editable File (PDF Only) */}
+              <button
+                type="button"
+                onClick={() => {
+                  editableFileInputRef.current?.click();
+                }}
+                className="w-full text-left p-4 rounded-xl border border-purple-200 hover:border-purple-600 bg-purple-50/20 hover:bg-purple-50/40 transition-all flex items-start gap-3.5 group cursor-pointer active:scale-99 shadow-2xs"
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1.5 mb-1">
+                    <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-purple-700 transition-colors">
+                      b) Upload Editable File
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-purple-600 text-white rounded-[3px] shadow-xs">
+                      PDF Only
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Launch Edit Studio to add fillable input boxes, image placeholders &amp; watermark. Users fill details before printing.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          2.6 EDIT STUDIO MODAL (Template Builder)
+          ───────────────────────────────────────────────────────────── */}
+      {editStudioFile && (
+        <EditStudioModal
+          isOpen={isEditStudioOpen}
+          onClose={() => {
+            setIsEditStudioOpen(false);
+            setEditStudioFile(null);
+          }}
+          file={editStudioFile}
+          user={user}
+          profile={profile}
+          isVerified={isCurrentVerified}
+          maxFileSizeMb={maxFileSizeMb}
+          onSuccess={(msg) => {
+            setSuccessMessage(msg);
+            setTimeout(() => setSuccessMessage(null), 4000);
+          }}
+        />
       )}
 
       {/* ─────────────────────────────────────────────────────────────

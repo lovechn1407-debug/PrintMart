@@ -35,11 +35,15 @@ import {
   Layers,
   FileCheck,
   X,
+  Type,
+  Edit3,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
 import { database, ref, onValue, get } from "@/lib/firebase";
 import { uploadDocumentInChunks } from "@/lib/clientUploader";
+import { EditableField } from "@/components/EditStudioModal";
 import { calculatePrintPrice, DEFAULT_GLOBAL_PRICING } from "@printmart/shared";
 import {
   PrintDraftItem,
@@ -534,6 +538,28 @@ function UserPrintContent() {
   const [previewDocIndex, setPreviewDocIndex] = useState<number>(0);
   const [previewPageIndex, setPreviewPageIndex] = useState<number>(1);
 
+  // State: Editable PDF Fields & Customization
+  const [isEditableDoc, setIsEditableDoc] = useState<boolean>(false);
+  const [editableFields, setEditableFields] = useState<EditableField[]>([]);
+  const [watermarkText, setWatermarkText] = useState<string>("");
+  const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.18);
+  const [watermarkColor, setWatermarkColor] = useState<string>("#000000");
+  const [filledValues, setFilledValues] = useState<Record<string, string>>({});
+  const [isEditableConfirmed, setIsEditableConfirmed] = useState<boolean>(false);
+
+  const handleImageFieldChange = (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setFilledValues((prev) => ({ ...prev, [fieldId]: dataUrl }));
+      setIsEditableConfirmed(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   // State: Minimal Page Turn Animation & Touch Slide Gestures
   const [pageTurnAnim, setPageTurnAnim] = useState<"next" | "prev" | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -630,6 +656,23 @@ function UserPrintContent() {
         console.warn("Could not load bundle from sessionStorage:", e);
       }
 
+      // 0b. Check if this document is an editable template
+      try {
+        const storedConfig = sessionStorage.getItem("printmart_editable_config");
+        if (storedConfig) {
+          const parsed = JSON.parse(storedConfig);
+          if (parsed.isEditable) {
+            setIsEditableDoc(true);
+            setEditableFields(parsed.editableFields || []);
+            setWatermarkText(parsed.watermarkText || "");
+            setWatermarkOpacity(parsed.watermarkOpacity ?? 0.18);
+            setWatermarkColor(parsed.watermarkColor || "#000000");
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load editable config from sessionStorage:", e);
+      }
+
       if (!bundleLoaded) {
         const publicDocRecord: UploadedDocumentRecord = {
           fileId: requestedDocId,
@@ -645,41 +688,53 @@ function UserPrintContent() {
         setDocuments([publicDocRecord]);
         setStep("studio");
         setActiveDraftId(null);
+      }
 
-        // 0b. Also check if this publicDocId has multiple files registered in Firebase RTDB
-        const targetPublicId =
-          searchParams.get("publicDocId") ||
-          (requestedDocId.startsWith("pub_") ? requestedDocId : null);
+      // 0c. Also check if this publicDocId has multiple files or editable config in Firebase RTDB
+      const targetPublicId =
+        searchParams.get("publicDocId") ||
+        (requestedDocId.startsWith("pub_") ? requestedDocId : null);
 
-        if (targetPublicId) {
-          get(ref(database, `publicDocuments/${targetPublicId}`))
-            .then((snap) => {
-              if (snap.exists()) {
-                const val = snap.val();
-                if (Array.isArray(val.files) && val.files.length > 0) {
-                  const multiDocs: UploadedDocumentRecord[] = val.files.map(
-                    (f: any, idx: number) => ({
-                      fileId: f.fileId,
-                      originalFilename: f.title
-                        ? f.title.toLowerCase().endsWith(".pdf")
-                          ? f.title
-                          : `${f.title}.pdf`
-                        : `Document ${idx + 1}.pdf`,
-                      fileSizeBytes: Number(f.fileSizeBytes) || 0,
-                      mimeType: "application/pdf",
-                      pageCount: Math.max(1, Number(f.pageCount) || 1),
-                      isColorDocument: false,
-                      telegramFileId: f.fileId,
-                      previewUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
-                      blobUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
-                    })
-                  );
-                  setDocuments(multiDocs);
+      if (targetPublicId) {
+        get(ref(database, `publicDocuments/${targetPublicId}`))
+          .then((snap) => {
+            if (snap.exists()) {
+              const val = snap.val();
+              if (Array.isArray(val.files) && val.files.length > 0 && !bundleLoaded) {
+                const multiDocs: UploadedDocumentRecord[] = val.files.map(
+                  (f: any, idx: number) => ({
+                    fileId: f.fileId,
+                    originalFilename: f.title
+                      ? f.title.toLowerCase().endsWith(".pdf")
+                        ? f.title
+                        : `${f.title}.pdf`
+                      : `Document ${idx + 1}.pdf`,
+                    fileSizeBytes: Number(f.fileSizeBytes) || 0,
+                    mimeType: "application/pdf",
+                    pageCount: Math.max(1, Number(f.pageCount) || 1),
+                    isColorDocument: false,
+                    telegramFileId: f.fileId,
+                    previewUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+                    blobUrl: `/api/document/preview?documentId=${encodeURIComponent(f.fileId)}`,
+                  })
+                );
+                setDocuments(multiDocs);
+              }
+
+              if (val.isEditable) {
+                setIsEditableDoc(true);
+                if (Array.isArray(val.editableFields)) {
+                  setEditableFields(val.editableFields);
+                }
+                if (val.watermarkText) {
+                  setWatermarkText(val.watermarkText);
+                  setWatermarkOpacity(val.watermarkOpacity ?? 0.18);
+                  setWatermarkColor(val.watermarkColor || "#000000");
                 }
               }
-            })
-            .catch(() => {});
-        }
+            }
+          })
+          .catch(() => {});
       }
       return;
     }
@@ -1027,6 +1082,13 @@ function UserPrintContent() {
       return;
     }
 
+    if (isEditableDoc && !isEditableConfirmed) {
+      setErrorMessage(
+        "Please fill in all editable fields and click 'Confirm & Finalize Document' before proceeding to payment."
+      );
+      return;
+    }
+
     try {
       setPaying(true);
       setErrorMessage(null);
@@ -1068,6 +1130,14 @@ function UserPrintContent() {
           customerPhone: "9999999999",
           customerName: user?.displayName || "Customer",
           customerEmail: user?.email || "user@printmart.com",
+          metadata: isEditableDoc
+            ? {
+                isEditable: true,
+                watermarkText: watermarkText || undefined,
+                watermarkOpacity,
+                filledValues,
+              }
+            : undefined,
         }),
       });
 
@@ -1682,7 +1752,7 @@ function UserPrintContent() {
                             : undefined,
                         transition: isDraggingPage ? "none" : "filter 250ms ease-in-out, transform 250ms ease-out",
                       }}
-                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm overflow-hidden flex items-center justify-center select-none touch-pan-y ${
+                      className={`bg-white border border-neutral-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-sm overflow-hidden flex items-center justify-center select-none touch-pan-y relative ${
                         currentDocTotalPages > 1 ? "cursor-grab active:cursor-grabbing" : ""
                       } ${
                         pageTurnAnim === "next"
@@ -1703,6 +1773,78 @@ function UserPrintContent() {
                         orientation={orientation}
                         onTotalPagesDetected={handleTotalPagesDetected}
                       />
+
+                      {/* Editable Template Overlay (Live Watermark & Field Values) */}
+                      {isEditableDoc && (
+                        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-20">
+                          {/* Watermark across all pages */}
+                          {watermarkText && (
+                            <div
+                              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
+                              style={{ opacity: watermarkOpacity }}
+                            >
+                              <span
+                                className="text-xl sm:text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap"
+                                style={{ color: watermarkColor || "#000000" }}
+                              >
+                                {watermarkText}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Fields for current active preview page */}
+                          {editableFields
+                            .filter((f) => f.pageIndex === previewPageIndex - 1)
+                            .map((field) => {
+                              const val = filledValues[field.id];
+                              if (field.type === "text") {
+                                return (
+                                  <div
+                                    key={field.id}
+                                    style={{
+                                      left: `${field.x}%`,
+                                      top: `${field.y}%`,
+                                      width: `${field.width}%`,
+                                      height: `${field.height}%`,
+                                      color: field.color || "#0c831f",
+                                    }}
+                                    className="absolute flex items-center justify-center p-0.5 text-center leading-tight overflow-hidden break-words font-semibold text-[10px] sm:text-xs"
+                                  >
+                                    <span className="truncate w-full">
+                                      {val !== undefined && val !== "" ? val : (field.defaultValue || field.title)}
+                                    </span>
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div
+                                    key={field.id}
+                                    style={{
+                                      left: `${field.x}%`,
+                                      top: `${field.y}%`,
+                                      width: `${field.width}%`,
+                                      height: `${field.height}%`,
+                                    }}
+                                    className="absolute flex items-center justify-center overflow-hidden p-0.5"
+                                  >
+                                    {val ? (
+                                      <img
+                                        src={val}
+                                        alt={field.title}
+                                        className="w-full h-full object-contain"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full border border-dashed border-neutral-300 rounded flex flex-col items-center justify-center text-[8px] text-neutral-400 bg-neutral-50/40">
+                                        <ImageIcon className="w-3 h-3 text-neutral-400" />
+                                        <span className="truncate max-w-full px-0.5">{field.title}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                            })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Minimal Slide to Turn Page Hint */}
@@ -1712,6 +1854,211 @@ function UserPrintContent() {
                       </div>
                     )}
                   </div>
+
+                  {/* ─────────────────────────────────────────────────────────────
+                      EDITABLE DOCUMENT FIELDS PANEL (Sectioned by Page Number)
+                      ───────────────────────────────────────────────────────────── */}
+                  {isEditableDoc && editableFields.length > 0 && (
+                    <div className="pt-3 border-t border-neutral-100 space-y-3.5">
+                      {/* Section Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                              Fill Document Fields
+                            </h4>
+                            <p className="text-[10px] text-neutral-500">
+                              Fill details below before printing. Live changes show on the sheet above.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Confirmation Status Pill */}
+                        {isEditableConfirmed ? (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-[#0c831f] border border-emerald-200 rounded-full flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 className="w-3 h-3 text-[#0c831f]" />
+                            Finalized
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full flex items-center gap-1 shadow-2xs">
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            Pending Confirm
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sections by Page Number */}
+                      <div className="space-y-3">
+                        {Array.from(new Set(editableFields.map((f) => f.pageIndex)))
+                          .sort((a, b) => a - b)
+                          .map((pIndex) => {
+                            const pageFields = editableFields.filter((f) => f.pageIndex === pIndex);
+                            const isCurrentActive = previewPageIndex === pIndex + 1;
+
+                            return (
+                              <div
+                                key={pIndex}
+                                className={`rounded-xl p-3 sm:p-3.5 border transition-all ${
+                                  isCurrentActive
+                                    ? "bg-purple-50/25 border-purple-200 shadow-2xs"
+                                    : "bg-neutral-50/50 border-neutral-200/80"
+                                }`}
+                              >
+                                {/* Page Section Header */}
+                                <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-neutral-200/60">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-md bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center">
+                                      {pIndex + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-800">
+                                      Page {pIndex + 1} Fields
+                                    </span>
+                                    <span className="text-[10px] text-neutral-400 font-medium">
+                                      ({pageFields.length} {pageFields.length === 1 ? "input" : "inputs"})
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewPageIndex(pIndex + 1)}
+                                    className="text-[11px] font-semibold text-[#0c831f] hover:underline cursor-pointer"
+                                  >
+                                    View Page {pIndex + 1} →
+                                  </button>
+                                </div>
+
+                                {/* Inputs Grid on this Page */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  {pageFields.map((field) => (
+                                    <div key={field.id} className="space-y-1">
+                                      <label className="text-[11px] font-bold text-neutral-700 flex items-center gap-1.5">
+                                        {field.type === "image" ? (
+                                          <ImageIcon className="w-3 h-3 text-purple-600 shrink-0" />
+                                        ) : (
+                                          <Type className="w-3 h-3 text-[#0c831f] shrink-0" />
+                                        )}
+                                        <span className="truncate">{field.title}</span>
+                                      </label>
+
+                                      {field.type === "text" ? (
+                                        <input
+                                          type="text"
+                                          value={filledValues[field.id] ?? ""}
+                                          placeholder={field.defaultValue || "Type text here..."}
+                                          onChange={(e) => {
+                                            setFilledValues((prev) => ({
+                                              ...prev,
+                                              [field.id]: e.target.value,
+                                            }));
+                                            setIsEditableConfirmed(false);
+                                          }}
+                                          onFocus={() => {
+                                            if (previewPageIndex !== field.pageIndex + 1) {
+                                              setPreviewPageIndex(field.pageIndex + 1);
+                                            }
+                                          }}
+                                          className="w-full h-9 px-3 text-xs bg-white rounded-lg text-neutral-900 border border-neutral-200/90 focus:ring-2 focus:ring-[#0c831f] focus:border-transparent transition-all"
+                                        />
+                                      ) : (
+                                        /* Image Field Uploader */
+                                        <div className="bg-white border border-neutral-200/90 rounded-lg p-2">
+                                          {filledValues[field.id] ? (
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <img
+                                                  src={filledValues[field.id]}
+                                                  alt={field.title}
+                                                  className="w-8 h-8 rounded object-cover border border-neutral-200 shrink-0"
+                                                />
+                                                <span className="text-[11px] text-neutral-600 truncate font-medium">
+                                                  Image attached
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-1.5 shrink-0">
+                                                <label className="text-[10px] font-bold text-[#0c831f] hover:underline cursor-pointer">
+                                                  Replace
+                                                  <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={(e) => handleImageFieldChange(field.id, e)}
+                                                  />
+                                                </label>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setFilledValues((prev) => {
+                                                      const updated = { ...prev };
+                                                      delete updated[field.id];
+                                                      return updated;
+                                                    });
+                                                    setIsEditableConfirmed(false);
+                                                  }}
+                                                  className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                                                >
+                                                  Clear
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <label className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-neutral-50 hover:bg-emerald-50/30 border border-dashed border-neutral-300 hover:border-[#0c831f] rounded text-[11px] font-semibold text-neutral-600 cursor-pointer transition-colors">
+                                              <UploadCloud className="w-3.5 h-3.5 text-neutral-400" />
+                                              <span>Upload {field.title}</span>
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => handleImageFieldChange(field.id, e)}
+                                              />
+                                            </label>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* Confirm & Finalize Button */}
+                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                        <div className="text-[11px] text-neutral-500">
+                          {isEditableConfirmed ? (
+                            <span className="text-[#0c831f] font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#0c831f]" />
+                              Document finalized! Pay button is now enabled.
+                            </span>
+                          ) : (
+                            <span>Confirm changes to finalize document and enable payment.</span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditableConfirmed(true);
+                          }}
+                          className={`w-full sm:w-auto h-9 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                            isEditableConfirmed
+                              ? "bg-neutral-900 hover:bg-neutral-800 text-white"
+                              : "bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white"
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>
+                            {isEditableConfirmed
+                              ? "Re-confirm Changes"
+                              : "Confirm & Finalize Document"}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. PRINT CONFIGURATION CARD */}
@@ -1943,11 +2290,18 @@ function UserPrintContent() {
                     </span>
                   </div>
 
+                  {isEditableDoc && !isEditableConfirmed && (
+                    <div className="bg-purple-50 border border-purple-200 text-purple-800 text-xs p-2.5 rounded-xl flex items-center gap-2 mt-3">
+                      <AlertCircle className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>Please fill the editable fields above and click &quot;Confirm &amp; Finalize Document&quot; before paying.</span>
+                    </div>
+                  )}
+
                   {/* In-Page Pay Button (Monitored by IntersectionObserver) */}
                   <button
                     ref={inPagePayButtonRef}
                     type="button"
-                    disabled={paying || calculatingPrice}
+                    disabled={paying || calculatingPrice || (isEditableDoc && !isEditableConfirmed)}
                     onClick={handleProceedToPayment}
                     className="w-full bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold rounded-xl py-3 px-4 shadow-md text-sm mt-3 transition-all active:scale-98 flex items-center justify-center gap-2"
                   >
@@ -1956,6 +2310,8 @@ function UserPrintContent() {
                         <RotateCw className="w-4 h-4 animate-spin" />
                         Processing...
                       </span>
+                    ) : isEditableDoc && !isEditableConfirmed ? (
+                      <span>Confirm Fields to Enable Pay</span>
                     ) : (
                       <span>Pay {formatRupees(pricing.finalPayablePaise)} & Get OTP</span>
                     )}
@@ -1999,12 +2355,16 @@ function UserPrintContent() {
             </div>
             <button
               type="button"
-              disabled={paying || calculatingPrice}
+              disabled={paying || calculatingPrice || (isEditableDoc && !isEditableConfirmed)}
               onClick={handleProceedToPayment}
               className="bg-[#0c831f] hover:bg-[#0a6e1a] disabled:opacity-50 text-white font-bold px-5 h-9 rounded-xl shadow-md text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
             >
               {paying ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : null}
-              <span>Pay & Get OTP</span>
+              <span>
+                {isEditableDoc && !isEditableConfirmed
+                  ? "Confirm Fields First"
+                  : "Pay & Get OTP"}
+              </span>
             </button>
           </div>
         )}

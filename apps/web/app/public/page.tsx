@@ -1390,13 +1390,6 @@ export default function PublicDocumentsPage() {
                             {formatDate(doc.createdAt)}
                           </span>
 
-                          {/* Editable Badge on Top Corner */}
-                          {doc.isEditable && (
-                            <span className="absolute top-1.5 right-1.5 bg-purple-600 text-white text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-[3px] shadow-xs tracking-wider z-10">
-                              Editable
-                            </span>
-                          )}
-
                           {/* Locked icon overlay on thumbnail if password protected */}
                           {doc.hasPassword && (
                             <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
@@ -1448,7 +1441,14 @@ export default function PublicDocumentsPage() {
 
                           <div className="flex items-center justify-between text-[10px] text-neutral-500 font-medium pt-1">
                             <span>{totalDocPages} {totalDocPages === 1 ? "page" : "pages"} • {formatBytes(totalDocBytes)}</span>
-                            <span>{doc.printCount || 0} prints</span>
+                            <div className="flex items-center gap-1.5">
+                              {doc.isEditable && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-medium bg-neutral-100 text-neutral-500 rounded-[3px] border border-neutral-200/70 leading-none">
+                                  Editable
+                                </span>
+                              )}
+                              <span>{doc.printCount || 0} prints</span>
+                            </div>
                           </div>
                         </div>
 
@@ -1535,13 +1535,6 @@ export default function PublicDocumentsPage() {
                               </div>
                             </div>
                           )}
-
-                          {/* Editable Badge on Thumbnail */}
-                          {doc.isEditable && (
-                            <span className="absolute top-1 right-1 bg-purple-600 text-white text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-[3px] shadow-xs tracking-wider z-10">
-                              Editable
-                            </span>
-                          )}
                         </div>
 
                         {/* Right: Info */}
@@ -1551,14 +1544,15 @@ export default function PublicDocumentsPage() {
                               <span className="text-[10px] font-medium text-neutral-400">
                                 {formatDate(doc.createdAt)}
                               </span>
-                              {doc.isEditable && (
-                                <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-purple-600 text-white rounded-[3px] shadow-xs tracking-wider">
-                                  Editable
-                                </span>
-                              )}
                             </div>
 
                             <div className="flex items-center gap-1.5">
+                              {/* Fade grey pill called Editable before trash icon */}
+                              {doc.isEditable && (
+                                <span className="px-2 py-0.5 text-[9.5px] font-medium bg-neutral-100 text-neutral-500 rounded-[3px] border border-neutral-200/70 leading-none">
+                                  Editable
+                                </span>
+                              )}
                               {/* Delete Button for User's Own Uploads */}
                               {isCurrentUser && (
                                 <button
@@ -1836,9 +1830,9 @@ export default function PublicDocumentsPage() {
               </button>
             </div>
 
-            {/* Choice Options */}
-            <div className="space-y-2.5 pt-1">
-              {/* Option a: Upload Files (Normal) */}
+            {/* Choice Options (2 Cards Centered) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {/* Option: Upload Files */}
               <button
                 type="button"
                 onClick={() => {
@@ -1849,50 +1843,46 @@ export default function PublicDocumentsPage() {
                   setUploadError(null);
                   setIsUploadModalOpen(true);
                 }}
-                className="w-full text-left p-4 rounded-xl border border-neutral-200 hover:border-[#0c831f] hover:bg-emerald-50/20 transition-all flex items-start gap-3.5 group cursor-pointer active:scale-99 shadow-2xs"
+                className="p-5 rounded-2xl border border-neutral-200 hover:border-[#0c831f] hover:bg-emerald-50/20 transition-all flex flex-col items-center text-center group cursor-pointer active:scale-98 shadow-2xs"
               >
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#0c831f] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <FileText className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#0c831f] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <FileText className="w-6 h-6" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1.5 mb-1">
-                    <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-[#0c831f] transition-colors">
-                      a) Upload Files
-                    </span>
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-neutral-100 text-neutral-600 rounded">
-                      Standard
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-neutral-500 leading-snug">
-                    Share standard PDF documents or multi-file bundles for normal campus browsing and direct printing.
-                  </p>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-sm font-bold text-neutral-900 group-hover:text-[#0c831f] transition-colors">
+                    Upload Files
+                  </span>
+                  <span className="px-1.5 py-0.5 text-[8.5px] font-bold bg-neutral-100 text-neutral-600 rounded">
+                    Standard
+                  </span>
                 </div>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Share standard PDF notes or bundles for direct campus reading &amp; printing.
+                </p>
               </button>
 
-              {/* Option b: Upload Editable File (PDF Only) */}
+              {/* Option: Upload Editable File */}
               <button
                 type="button"
                 onClick={() => {
                   editableFileInputRef.current?.click();
                 }}
-                className="w-full text-left p-4 rounded-xl border border-purple-200 hover:border-purple-600 bg-purple-50/20 hover:bg-purple-50/40 transition-all flex items-start gap-3.5 group cursor-pointer active:scale-99 shadow-2xs"
+                className="p-5 rounded-2xl border border-neutral-200 hover:border-purple-600 hover:bg-purple-50/20 transition-all flex flex-col items-center text-center group cursor-pointer active:scale-98 shadow-2xs"
               >
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Edit3 className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Edit3 className="w-6 h-6" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1.5 mb-1">
-                    <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-purple-700 transition-colors">
-                      b) Upload Editable File
-                    </span>
-                    <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-purple-600 text-white rounded-[3px] shadow-xs">
-                      PDF Only
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-neutral-500 leading-snug">
-                    Launch Edit Studio to add fillable input boxes, image placeholders &amp; watermark. Users fill details before printing.
-                  </p>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-sm font-bold text-neutral-900 group-hover:text-purple-700 transition-colors">
+                    Upload Editable File
+                  </span>
+                  <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-purple-100 text-purple-700 rounded-[3px]">
+                    PDF Only
+                  </span>
                 </div>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Create fillable forms with custom text boxes, image boxes &amp; watermark.
+                </p>
               </button>
             </div>
           </div>

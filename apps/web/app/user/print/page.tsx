@@ -79,6 +79,53 @@ interface PricingBreakdown {
   offerCode?: string | null;
 }
 
+async function ensurePdfLib(): Promise<any> {
+  if (typeof window === "undefined") return null;
+  if ((window as any).PDFLib) return (window as any).PDFLib;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("pdflib-cdn-script");
+    if (existing) {
+      if ((window as any).PDFLib) return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load PDFLib")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "pdflib-cdn-script";
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load PDFLib script"));
+    document.head.appendChild(script);
+  });
+  return (window as any).PDFLib;
+}
+
+function convertDataUrlToJpegBytes(dataUrl: string): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context failed"));
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Blob conversion failed"));
+          blob.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
+        },
+        "image/jpeg",
+        0.92
+      );
+    };
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = dataUrl;
+  });
+}
+
 /**
  * RealDocumentViewer Component
  * Renders the REAL uploaded PDF (with smart window pre-rendering for pages [page-10..page+10],
@@ -558,6 +605,150 @@ function UserPrintContent() {
     };
     reader.readAsDataURL(file);
     e.target.value = "";
+  };
+
+  const [isExportingFinalPdf, setIsExportingFinalPdf] = useState<boolean>(false);
+  const [exportProgressText, setExportProgressText] = useState<string>("");
+
+  const handleConfirmAndExportPdf = async () => {
+    if (documents.length === 0) return;
+    const currentDoc = documents[previewDocIndex] || documents[0];
+    if (!currentDoc) return;
+
+    setIsExportingFinalPdf(true);
+    setExportProgressText("Initializing PDF engine...");
+
+    try {
+      const PDFLib = await ensurePdfLib();
+      if (!PDFLib) throw new Error("Could not load PDF processing engine.");
+
+      setExportProgressText("Fetching base document...");
+      const pdfUrl =
+        currentDoc.blobUrl ||
+        currentDoc.previewUrl ||
+        `/api/document/preview?documentId=${encodeURIComponent(currentDoc.fileId)}`;
+
+      const response = await fetch(pdfUrl);
+      if (!response.ok) throw new Error("Could not load base PDF for export.");
+      const arrayBuffer = await response.arrayBuffer();
+
+      setExportProgressText("Merging inputs, images & watermark...");
+      const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+      const pages = pdfDoc.getPages();
+
+      // 1. Watermark across all pages
+      if (watermarkText) {
+        for (const page of pages) {
+          const { width, height } = page.getSize();
+          const wmSize = Math.max(16, Math.min(48, Math.round(width * 0.055)));
+          const textWidth = fontBold.widthOfTextAtSize(watermarkText, wmSize);
+          page.drawText(watermarkText, {
+            x: width / 2 - (textWidth / 2) * 0.7,
+            y: height / 2 - 20,
+            size: wmSize,
+            font: fontBold,
+            color: PDFLib.rgb(0.45, 0.45, 0.45),
+            opacity: watermarkOpacity ?? 0.18,
+            rotate: PDFLib.degrees(45),
+          });
+        }
+      }
+
+      // 2. Burn inputs into their respective pages
+      for (const field of editableFields) {
+        if (field.pageIndex < 0 || field.pageIndex >= pages.length) continue;
+        const page = pages[field.pageIndex];
+        const { width, height } = page.getSize();
+
+        const fieldX = (field.x / 100) * width;
+        const fieldW = (field.width / 100) * width;
+        const fieldH = (field.height / 100) * height;
+        const fieldY = height - ((field.y + field.height) / 100) * height;
+
+        if (field.type === "text") {
+          const userVal = filledValues[field.id] || field.defaultValue || "Text Here";
+          const isBold =
+            field.fontWeight === "bold" ||
+            field.fontWeight === "700" ||
+            field.fontWeight === "800";
+          const useFont = isBold ? fontBold : font;
+          const fontSize = Math.max(8, Math.min(72, Math.round(fieldH * 0.65)));
+
+          const hex = field.color || "#0c831f";
+          const r = parseInt(hex.slice(1, 3), 16) / 255 || 0;
+          const g = parseInt(hex.slice(3, 5), 16) / 255 || 0;
+          const b = parseInt(hex.slice(5, 7), 16) / 255 || 0;
+
+          page.drawText(userVal, {
+            x: fieldX + 2,
+            y: fieldY + (fieldH - fontSize) / 2,
+            size: fontSize,
+            font: useFont,
+            color: PDFLib.rgb(r, g, b),
+          });
+        } else if (field.type === "image") {
+          const imgDataUrl = filledValues[field.id];
+          if (imgDataUrl) {
+            try {
+              const jpegBytes = await convertDataUrlToJpegBytes(imgDataUrl);
+              const embeddedImage = await pdfDoc.embedJpg(jpegBytes);
+              page.drawImage(embeddedImage, {
+                x: fieldX,
+                y: fieldY,
+                width: fieldW,
+                height: fieldH,
+              });
+            } catch (imgErr) {
+              console.warn("Could not embed image field:", imgErr);
+            }
+          }
+        }
+      }
+
+      setExportProgressText("Generating finalized PDF file...");
+      const finalPdfBytes = await pdfDoc.save();
+      const finalBlob = new Blob([finalPdfBytes], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(finalBlob);
+      const cleanBaseName = currentDoc.originalFilename
+        .replace(/^final_/i, "")
+        .replace(/\.pdf$/i, "");
+      const finalFilename = `final_${cleanBaseName}.pdf`;
+      const finalFile = new File([finalBlob], finalFilename, { type: "application/pdf" });
+
+      setExportProgressText("Uploading finalized PDF to cloud vault...");
+      const uploaded = await uploadDocumentInChunks({
+        file: finalFile,
+        ownerUid: user?.uid || "guest_user",
+        maxFileSizeMb: 100,
+      });
+
+      const newFileId = String(
+        uploaded?.documentId || uploaded?.fileId || `final_${Date.now()}`
+      );
+
+      const finalizedDoc: UploadedDocumentRecord = {
+        fileId: newFileId,
+        originalFilename: finalFilename,
+        fileSizeBytes: finalBlob.size,
+        mimeType: "application/pdf",
+        pageCount: currentDoc.pageCount || pages.length,
+        isColorDocument: colorMode === "color",
+        telegramFileId: newFileId,
+        previewUrl: blobUrl,
+        blobUrl: blobUrl,
+      };
+
+      setDocuments([finalizedDoc]);
+      setIsEditableConfirmed(true);
+    } catch (err: any) {
+      console.error("Export error:", err);
+      setErrorMessage(err.message || "Failed to export finalized PDF.");
+    } finally {
+      setIsExportingFinalPdf(false);
+      setExportProgressText("");
+    }
   };
 
   // State: Minimal Page Turn Animation & Touch Slide Gestures
@@ -1774,8 +1965,8 @@ function UserPrintContent() {
                         onTotalPagesDetected={handleTotalPagesDetected}
                       />
 
-                      {/* Editable Template Overlay (Live Watermark & Field Values) */}
-                      {isEditableDoc && (
+                      {/* Editable Template Overlay (Live Watermark & Field Values before confirmation) */}
+                      {isEditableDoc && !isEditableConfirmed && (
                         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-20">
                           {/* Watermark across all pages */}
                           {watermarkText && (
@@ -1858,39 +2049,22 @@ function UserPrintContent() {
                   {/* ─────────────────────────────────────────────────────────────
                       EDITABLE DOCUMENT FIELDS PANEL (Sectioned by Page Number)
                       ───────────────────────────────────────────────────────────── */}
-                  {isEditableDoc && editableFields.length > 0 && (
+                  {isEditableDoc && editableFields.length > 0 && !isEditableConfirmed && (
                     <div className="pt-3 border-t border-neutral-100 space-y-3.5">
-                      {/* Section Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
-                              Fill Document Fields
-                            </h4>
-                            <p className="text-[10px] text-neutral-500">
-                              Fill details below before printing. Live changes show on the sheet above.
-                            </p>
-                          </div>
+                      {/* Section Header with Logo Matching Print Studio Style (No background box) */}
+                      <div className="flex items-center gap-2">
+                        <Edit3 className="w-4 h-4 text-[#0c831f] shrink-0" />
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                            Fill Document Fields
+                          </h4>
+                          <p className="text-[10px] text-neutral-500">
+                            Fill details below before printing. Live changes show on the sheet above.
+                          </p>
                         </div>
-
-                        {/* Confirmation Status Pill */}
-                        {isEditableConfirmed ? (
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-[#0c831f] border border-emerald-200 rounded-full flex items-center gap-1 shadow-2xs">
-                            <CheckCircle2 className="w-3 h-3 text-[#0c831f]" />
-                            Finalized
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full flex items-center gap-1 shadow-2xs">
-                            <AlertCircle className="w-3 h-3 text-amber-600" />
-                            Pending Confirm
-                          </span>
-                        )}
                       </div>
 
-                      {/* Sections by Page Number */}
+                      {/* Sections by Page Number — Main big boxes have NO border */}
                       <div className="space-y-3">
                         {Array.from(new Set(editableFields.map((f) => f.pageIndex)))
                           .sort((a, b) => a - b)
@@ -1901,10 +2075,10 @@ function UserPrintContent() {
                             return (
                               <div
                                 key={pIndex}
-                                className={`rounded-xl p-3 sm:p-3.5 border transition-all ${
+                                className={`rounded-xl p-3 sm:p-3.5 transition-all ${
                                   isCurrentActive
-                                    ? "bg-purple-50/25 border-purple-200 shadow-2xs"
-                                    : "bg-neutral-50/50 border-neutral-200/80"
+                                    ? "bg-purple-50/20 shadow-2xs"
+                                    : "bg-neutral-50/50"
                                 }`}
                               >
                                 {/* Page Section Header */}
@@ -1953,7 +2127,6 @@ function UserPrintContent() {
                                               ...prev,
                                               [field.id]: e.target.value,
                                             }));
-                                            setIsEditableConfirmed(false);
                                           }}
                                           onFocus={() => {
                                             if (previewPageIndex !== field.pageIndex + 1) {
@@ -1995,7 +2168,6 @@ function UserPrintContent() {
                                                       delete updated[field.id];
                                                       return updated;
                                                     });
-                                                    setIsEditableConfirmed(false);
                                                   }}
                                                   className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
                                                 >
@@ -2025,37 +2197,47 @@ function UserPrintContent() {
                           })}
                       </div>
 
-                      {/* Confirm & Finalize Button */}
+                      {/* Confirm & Save Button (Re-exports PDF and burns permanently) */}
                       <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                         <div className="text-[11px] text-neutral-500">
-                          {isEditableConfirmed ? (
-                            <span className="text-[#0c831f] font-semibold flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-[#0c831f]" />
-                              Document finalized! Pay button is now enabled.
-                            </span>
-                          ) : (
-                            <span>Confirm changes to finalize document and enable payment.</span>
-                          )}
+                          <span>Confirm to permanently burn inputs into the PDF and enable payment.</span>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => {
-                            setIsEditableConfirmed(true);
-                          }}
-                          className={`w-full sm:w-auto h-9 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-                            isEditableConfirmed
-                              ? "bg-neutral-900 hover:bg-neutral-800 text-white"
-                              : "bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white"
-                          }`}
+                          disabled={isExportingFinalPdf}
+                          onClick={handleConfirmAndExportPdf}
+                          className="w-full sm:w-auto h-9 px-4 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>
-                            {isEditableConfirmed
-                              ? "Re-confirm Changes"
-                              : "Confirm & Finalize Document"}
-                          </span>
+                          {isExportingFinalPdf ? (
+                            <>
+                              <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>{exportProgressText || "Exporting & Uploading..."}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Confirm &amp; Finalize Document</span>
+                            </>
+                          )}
                         </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Confirmed Banner (Inputs are hidden, cannot be re-edited) */}
+                  {isEditableDoc && isEditableConfirmed && (
+                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#0c831f] shrink-0" />
+                        <div>
+                          <span className="text-xs font-bold text-neutral-900 block leading-tight">
+                            Document Finalized &amp; Ready to Print
+                          </span>
+                          <span className="text-[11px] text-neutral-600">
+                            Your custom inputs and watermark are permanently saved. Proceed to payment below.
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}

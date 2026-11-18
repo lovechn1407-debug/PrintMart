@@ -7,6 +7,7 @@ export interface UserProfile {
     photoURL?: string;
     role: UserRole;
     accountStatus: AccountStatus;
+    isVerified?: boolean;
     stats: {
         totalDocuments: number;
         totalPages: number;

@@ -58,6 +58,10 @@ export default function AdminUsersPage() {
     await update(ref(database, `users/${uid}`), { role: newRole });
   };
 
+  const toggleVerifiedBadge = async (uid: string, currentStatus?: boolean) => {
+    await update(ref(database, `users/${uid}`), { isVerified: !currentStatus });
+  };
+
   // Stats
   const activeCount = users.filter((u) => u.accountStatus === "active").length;
   const adminCount = users.filter((u) => u.role === "admin").length;
@@ -180,9 +184,26 @@ export default function AdminUsersPage() {
                             </div>
                           )}
                           <div className="flex flex-col">
-                            <span className="font-bold text-neutral-900 text-xs sm:text-sm">
-                              {u.displayName || "Anonymous User"}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-neutral-900 text-xs sm:text-sm">
+                                {u.displayName || "Anonymous User"}
+                              </span>
+                              {u.isVerified && (
+                                <span title="Verified Campus Creator">
+                                  <svg
+                                    className="w-4 h-4 text-[#0c831f] shrink-0"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[11px] text-neutral-500 flex items-center gap-1">
                               <Mail className="w-3 h-3 text-neutral-400" />
                               {u.email || "No email linked"}
@@ -233,6 +254,21 @@ export default function AdminUsersPage() {
 
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Toggle Verified Badge */}
+                          <button
+                            type="button"
+                            onClick={() => toggleVerifiedBadge(u.uid, u.isVerified)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border flex items-center gap-1 ${
+                              u.isVerified
+                                ? "bg-emerald-50 text-[#0c831f] border-emerald-200 hover:bg-emerald-100"
+                                : "bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-200"
+                            }`}
+                            title={u.isVerified ? "Revoke Verified Badge" : "Assign Verified Badge"}
+                          >
+                            <CheckCircle2 className="w-3 h-3 text-[#0c831f]" />
+                            <span>{u.isVerified ? "Verified" : "Verify"}</span>
+                          </button>
+
                           {/* Toggle Admin Role */}
                           <button
                             type="button"

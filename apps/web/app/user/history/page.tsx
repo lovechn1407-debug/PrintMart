@@ -225,13 +225,22 @@ export default function UserHistoryPage() {
           <button
             type="button"
             onClick={() => setActiveTab("all")}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition-all text-center ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-1.5 ${
               activeTab === "all"
-                ? "bg-white text-neutral-900 shadow-2xs"
+                ? "bg-white text-neutral-900 shadow-2xs font-bold"
                 : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
-            All ({jobs.length})
+            <span>All</span>
+            <span
+              className={`min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                activeTab === "all"
+                  ? "bg-neutral-900 text-white"
+                  : "bg-neutral-200/80 text-neutral-600"
+              }`}
+            >
+              {jobs.length}
+            </span>
           </button>
           <button
             type="button"
@@ -242,21 +251,36 @@ export default function UserHistoryPage() {
                 : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
-            {activeCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-[#0c831f] animate-ping" />
-            )}
-            <span>Active OTPs ({activeCount})</span>
+            <span>Active OTPs</span>
+            <span
+              className={`min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                activeTab === "active"
+                  ? "bg-[#0c831f] text-white"
+                  : "bg-neutral-200/80 text-neutral-600"
+              }`}
+            >
+              {activeCount}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("completed")}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition-all text-center ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-1.5 ${
               activeTab === "completed"
-                ? "bg-white text-neutral-900 shadow-2xs"
+                ? "bg-white text-neutral-900 shadow-2xs font-bold"
                 : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
-            Completed ({completedCount})
+            <span>Completed</span>
+            <span
+              className={`min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                activeTab === "completed"
+                  ? "bg-neutral-900 text-white"
+                  : "bg-neutral-200/80 text-neutral-600"
+              }`}
+            >
+              {completedCount}
+            </span>
           </button>
         </div>
 

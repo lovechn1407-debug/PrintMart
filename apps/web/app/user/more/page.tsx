@@ -612,8 +612,13 @@ export default function MorePage() {
             ) : (
               <div className="flex items-center justify-center gap-1.5 max-w-full px-2">
                 {user && <span className="w-5 h-5 invisible shrink-0" aria-hidden="true" />}
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight text-center truncate max-w-[260px]">
-                  {displayName}
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1c1c1c] tracking-tight text-center truncate max-w-[260px] inline-flex items-center justify-center gap-1.5">
+                  <span className="truncate">{displayName}</span>
+                  {profile?.isVerified && (
+                    <svg className="w-5 h-5 text-[#0c831f] shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </h1>
                 {user && (
                   <button
@@ -1202,7 +1207,7 @@ export default function MorePage() {
           }}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92dvh] h-[85dvh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
             onClick={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
@@ -1228,7 +1233,7 @@ export default function MorePage() {
 
             {/* Modal Body: Isolated touch scroll */}
             <div
-              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y divide-y divide-neutral-100 flex-1"
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y divide-y divide-neutral-100 flex-1 min-h-0 pb-12"
               style={{ WebkitOverflowScrolling: "touch" }}
               onTouchMove={(e) => e.stopPropagation()}
             >
@@ -1326,7 +1331,7 @@ export default function MorePage() {
           }}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92dvh] h-[85dvh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
             onClick={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
@@ -1352,7 +1357,7 @@ export default function MorePage() {
 
             {/* Body */}
             <div
-              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2.5 flex-1"
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2.5 flex-1 min-h-0 pb-12"
               style={{ WebkitOverflowScrolling: "touch" }}
               onTouchMove={(e) => e.stopPropagation()}
             >
@@ -1454,7 +1459,7 @@ export default function MorePage() {
           }}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92dvh] h-[85dvh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
             onClick={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
@@ -1480,7 +1485,7 @@ export default function MorePage() {
 
             {/* Body */}
             <div
-              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2 flex-1"
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-2 flex-1 min-h-0 pb-12"
               style={{ WebkitOverflowScrolling: "touch" }}
               onTouchMove={(e) => e.stopPropagation()}
             >
@@ -1531,7 +1536,7 @@ export default function MorePage() {
           }}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92dvh] h-[85dvh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl border-0 overflow-hidden touch-auto overscroll-contain animate-in slide-in-from-bottom duration-200"
             onClick={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
@@ -1557,7 +1562,7 @@ export default function MorePage() {
 
             {/* Body */}
             <div
-              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-3.5 flex-1"
+              className="p-4 sm:p-5 overflow-y-auto overscroll-contain touch-pan-y space-y-3.5 flex-1 min-h-0 pb-12"
               style={{ WebkitOverflowScrolling: "touch" }}
               onTouchMove={(e) => e.stopPropagation()}
             >

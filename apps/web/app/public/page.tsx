@@ -20,6 +20,10 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Globe,
+  LayoutGrid,
+  List,
+  Tag,
+  Sparkles,
 } from "lucide-react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/lib/authContext";
@@ -30,13 +34,26 @@ export interface PublicDocument {
   id: string;
   fileId: string;
   title: string;
+  titles?: string[];
+  documentsCount?: number;
+  files?: {
+    fileId: string;
+    title: string;
+    pageCount: number;
+    fileSizeBytes: number;
+  }[];
   originalFilename: string;
   fileSizeBytes: number;
   pageCount: number;
   uploaderUid: string;
   uploaderName: string;
   uploaderPhotoURL?: string;
+  uploaderVerified?: boolean;
   thumbnailUrl?: string;
+  manualThumbnailUrl?: string;
+  tags?: string[];
+  isImportant?: boolean;
+  isPriority?: boolean;
   hasPassword?: boolean;
   password?: string;
   printCount: number;
@@ -240,6 +257,54 @@ function MarqueeTitle({ text }: { text: string }) {
   );
 }
 
+function RotatingTitle({
+  titles,
+  defaultTitle,
+}: {
+  titles?: string[];
+  defaultTitle: string;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const list = titles && titles.length > 0 ? titles : [defaultTitle];
+
+  useEffect(() => {
+    if (list.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % list.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [list.length]);
+
+  if (list.length <= 1) {
+    return <MarqueeTitle text={defaultTitle} />;
+  }
+
+  return (
+    <div className="relative h-5 overflow-hidden w-full">
+      {list.map((t, idx) => {
+        const isCurrent = idx === currentIndex;
+        const isPrev = idx === (currentIndex - 1 + list.length) % list.length;
+        return (
+          <div
+            key={idx}
+            className={`absolute inset-0 flex items-center transition-all duration-500 ease-out ${
+              isCurrent
+                ? "translate-y-0 opacity-100 pointer-events-auto"
+                : isPrev
+                ? "-translate-y-full opacity-0 pointer-events-none"
+                : "translate-y-full opacity-0 pointer-events-none"
+            }`}
+          >
+            <span className="text-xs sm:text-[13px] font-bold text-neutral-900 truncate block group-hover:text-[#0c831f] transition-colors">
+              {t}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PublicDocumentsPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading, signInWithGoogle } = useAuth();
@@ -256,6 +321,32 @@ export default function PublicDocumentsPage() {
   const [sortBy, setSortBy] = useState<"newest" | "prints">("newest");
   const filterRef = useRef<HTMLDivElement>(null);
 
+  // View mode: 'list' (default) or 'grid' (2 box per row)
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Verified creators lookup map
+  const [verifiedUserMap, setVerifiedUserMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const usersRef = ref(database, "users");
+    const unsub = onValue(usersRef, (snap) => {
+      if (snap.exists()) {
+        const map: Record<string, boolean> = {};
+        Object.entries(snap.val()).forEach(([uid, val]: [string, any]) => {
+          if (val.isVerified) {
+            map[uid] = true;
+          }
+        });
+        setVerifiedUserMap(map);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isCurrentVerified = Boolean(
+    profile?.isVerified || (user?.uid && verifiedUserMap[user.uid])
+  );
+
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -268,6 +359,50 @@ export default function PublicDocumentsPage() {
   const [maxFileSizeMb, setMaxFileSizeMb] = useState<number>(100);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Verified creator upload states
+  const [manualThumbnailFile, setManualThumbnailFile] = useState<File | null>(null);
+  const [manualThumbnailPreview, setManualThumbnailPreview] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState<string>("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [isImportant, setIsImportant] = useState<boolean>(false);
+  const [isPriority, setIsPriority] = useState<boolean>(false);
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+
+  const handleAddTag = () => {
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+    if (!tags.includes(trimmed)) {
+      setTags((prev) => [...prev, trimmed]);
+    }
+    setTagInput("");
+  };
+
+  const handleRemoveTag = (indexToRemove: number) => {
+    setTags((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleManualThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    setManualThumbnailFile(file);
+    try {
+      const compressed = await compressImageTo10Kb(file, 200);
+      setManualThumbnailPreview(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => setManualThumbnailPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAdditionalFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files).filter(
+      (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
+    );
+    setAdditionalFiles(files);
+  };
 
   // Load configured max file size limit from systemSettings
   useEffect(() => {
@@ -364,6 +499,11 @@ export default function PublicDocumentsPage() {
       );
     })
     .sort((a, b) => {
+      // 1. Priority pin: Priority documents always show on top
+      if (a.isPriority && !b.isPriority) return -1;
+      if (!a.isPriority && b.isPriority) return 1;
+
+      // 2. Sort by prints or newest
       if (sortBy === "prints") {
         return (b.printCount || 0) - (a.printCount || 0);
       }
@@ -408,28 +548,64 @@ export default function PublicDocumentsPage() {
     setUploadError(null);
 
     try {
-      // 1. Upload in 20MB chunks to Telegram vault (supports up to 100MB)
-      const uploadedDoc = await uploadDocumentInChunks({
-        file: selectedFile,
-        ownerUid: user?.uid || "anonymous",
-        maxFileSizeMb,
-        onProgress: (p) => {
-          setUploadProgress(p.percent);
-          setUploadStatusText(p.statusText);
-        },
-      });
+      const allFiles = [selectedFile, ...additionalFiles];
+      const titles = [
+        titleInput.trim(),
+        ...additionalFiles.map((f) => f.name.replace(/\.pdf$/i, "")),
+      ];
 
-      const docFileId = uploadedDoc.documentId || uploadedDoc.fileId;
-      const detectedPages = uploadedDoc.pageCount || 1;
+      let totalBytes = 0;
+      let totalPages = 0;
+      const uploadedFileRecords: {
+        fileId: string;
+        title: string;
+        pageCount: number;
+        fileSizeBytes: number;
+      }[] = [];
 
+      for (let i = 0; i < allFiles.length; i++) {
+        const fileToUpload = allFiles[i];
+        totalBytes += fileToUpload.size;
+        setUploadStatusText(
+          allFiles.length > 1
+            ? `Uploading document ${i + 1} of ${allFiles.length}: ${fileToUpload.name}`
+            : "Encrypting into cloud vault..."
+        );
+
+        const uploadedDoc = await uploadDocumentInChunks({
+          file: fileToUpload,
+          ownerUid: user?.uid || "anonymous",
+          maxFileSizeMb,
+          onProgress: (p) => {
+            const fraction = p.percent / 100;
+            const overall = Math.round(((i + fraction) / allFiles.length) * 100);
+            setUploadProgress(overall);
+          },
+        });
+
+        const docFileId = uploadedDoc.documentId || uploadedDoc.fileId;
+        const detectedPages = Math.max(1, uploadedDoc.pageCount || 1);
+        totalPages += detectedPages;
+
+        uploadedFileRecords.push({
+          fileId: docFileId,
+          title: titles[i],
+          pageCount: detectedPages,
+          fileSizeBytes: fileToUpload.size,
+        });
+      }
+
+      const primaryDocFileId = uploadedFileRecords[0].fileId;
       const hasPassword = Boolean(passwordInput.trim());
 
-      // 2. Generate Page 1 PDF thumbnail re-compressed to <= 10 KB (pixel-blurred if password protected)
-      let thumbnailDataUrl = "";
-      try {
-        thumbnailDataUrl = await generatePdfThumbnail(selectedFile, hasPassword);
-      } catch (thumbErr) {
-        console.warn("Thumbnail generation skipped:", thumbErr);
+      // 2. Custom thumbnail or auto-generated Page 1 PDF thumbnail
+      let finalThumbnail = manualThumbnailPreview || "";
+      if (!finalThumbnail) {
+        try {
+          finalThumbnail = await generatePdfThumbnail(selectedFile, hasPassword);
+        } catch (thumbErr) {
+          console.warn("Thumbnail generation skipped:", thumbErr);
+        }
       }
 
       // 3. User Avatar re-compressed to <= 10 KB
@@ -445,24 +621,38 @@ export default function PublicDocumentsPage() {
       const uploaderName =
         profile?.displayName || user?.displayName || user?.email?.split("@")[0] || "Campus Student";
 
-      // 4. Prepare Public Document Record with NO undefined values (fixes issue 1)
+      // 4. Prepare Public Document Record
       const newDocId = `pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const publicDocRecord: any = {
         id: newDocId,
-        fileId: docFileId,
+        fileId: primaryDocFileId,
         title: titleInput.trim(),
+        titles: titles.length > 1 ? titles : undefined,
+        documentsCount: allFiles.length,
+        files: uploadedFileRecords,
         originalFilename: selectedFile.name,
-        fileSizeBytes: selectedFile.size,
-        pageCount: Math.max(1, detectedPages),
+        fileSizeBytes: totalBytes,
+        pageCount: totalPages,
         uploaderUid: user?.uid || "anonymous",
         uploaderName,
         uploaderPhotoURL: uploaderPhoto || "",
-        thumbnailUrl: thumbnailDataUrl || "",
+        uploaderVerified: Boolean(isCurrentVerified),
+        thumbnailUrl: finalThumbnail || "",
         hasPassword,
         printCount: 0,
         createdAt: Date.now(),
       };
+
+      if (tags.length > 0) {
+        publicDocRecord.tags = tags;
+      }
+      if (isImportant) {
+        publicDocRecord.isImportant = true;
+      }
+      if (isPriority) {
+        publicDocRecord.isPriority = true;
+      }
 
       // Only attach password key if user specified one (avoids Firebase "value argument contains undefined" error)
       if (hasPassword && passwordInput.trim()) {
@@ -475,6 +665,12 @@ export default function PublicDocumentsPage() {
       // Clean up & Close Modal
       setIsUploadModalOpen(false);
       setSelectedFile(null);
+      setAdditionalFiles([]);
+      setManualThumbnailFile(null);
+      setManualThumbnailPreview(null);
+      setTags([]);
+      setIsImportant(false);
+      setIsPriority(false);
       setTitleInput("");
       setPasswordInput("");
       setSuccessMessage("Document shared to Public Library successfully!");
@@ -886,10 +1082,46 @@ export default function PublicDocumentsPage() {
                 {filteredDocs.length} {filteredDocs.length === 1 ? "document" : "documents"}{" "}
                 {showMyUploadsOnly ? "in your uploads" : "available"}
               </span>
-              <span>Updated in real time</span>
+
+              {/* View Slider Toggle (List vs Grid 2 box per row) */}
+              <div className="inline-flex items-center bg-neutral-200/70 p-0.5 rounded-lg border border-neutral-300/40 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    viewMode === "list"
+                      ? "bg-white text-neutral-900 shadow-2xs font-bold"
+                      : "text-neutral-500 hover:text-neutral-800"
+                  }`}
+                  title="List View"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>List</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    viewMode === "grid"
+                      ? "bg-white text-neutral-900 shadow-2xs font-bold"
+                      : "text-neutral-500 hover:text-neutral-800"
+                  }`}
+                  title="Grid View (2 per row)"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Grid</span>
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Document Cards Container (List view or 2-column Grid view) */}
+            <div
+              className={
+                viewMode === "grid"
+                  ? "grid grid-cols-2 gap-2.5 sm:gap-3.5"
+                  : "grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+              }
+            >
               {filteredDocs.map((doc) => {
                 // Ensure live user profile is shown if this is the active user's document
                 const isCurrentUser = user && doc.uploaderUid === user.uid;
@@ -900,120 +1132,316 @@ export default function PublicDocumentsPage() {
                   ? profile?.photoURL || doc.uploaderPhotoURL
                   : doc.uploaderPhotoURL;
                 const uploaderInitial = (liveName || "C").charAt(0).toUpperCase();
+                const isUploaderVerified = Boolean(
+                  verifiedUserMap[doc.uploaderUid] || doc.uploaderVerified
+                );
+                const displayThumbnail = doc.manualThumbnailUrl || doc.thumbnailUrl;
 
-                return (
-                  <div
-                    key={doc.id}
-                    className="bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
-                  >
-                    {/* Top Content: Thumbnail on Left, Metadata on Right */}
-                    <div className="flex gap-3.5 items-start">
-                      {/* Left: Document Thumbnail Preview Box */}
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 bg-neutral-100 rounded-lg overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
-                        {doc.thumbnailUrl ? (
-                          <img
-                            src={doc.thumbnailUrl}
-                            alt={doc.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center gap-1 text-neutral-400 p-2">
-                            <FileText className="w-7 h-7 text-neutral-400" />
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
-                              PDF
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Locked icon overlay on thumbnail if password protected */}
-                        {doc.hasPassword && (
-                          <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
-                            <div className="w-7 h-7 rounded-full bg-neutral-900/85 text-white flex items-center justify-center shadow-md">
-                              <Lock className="w-3.5 h-3.5 text-white" />
+                /* ─── GRID VIEW CARD (2 per row) ─── */
+                if (viewMode === "grid") {
+                  return (
+                    <div
+                      key={doc.id}
+                      className={
+                        doc.isImportant
+                          ? "relative rounded-2xl p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
+                          : "bg-white rounded-2xl p-3 sm:p-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
+                      }
+                    >
+                      <div className={doc.isImportant ? "bg-white rounded-[14.5px] p-3 sm:p-3.5 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
+                        {/* 3:4 Thumbnail Preview on top */}
+                        <div className="w-full aspect-[3/4] bg-neutral-100 rounded-xl overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
+                          {displayThumbnail ? (
+                            <img
+                              src={displayThumbnail}
+                              alt={doc.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-1 text-neutral-400 p-2">
+                              <FileText className="w-7 h-7 text-neutral-400" />
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
+                                PDF
+                              </span>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
 
-                      {/* Right: Info */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between">
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <span className="text-[10px] font-medium text-neutral-400">
+                          {/* Floating Date Badge */}
+                          <span className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-xs">
                             {formatDate(doc.createdAt)}
                           </span>
 
-                          {/* Delete Button for User's Own Uploads */}
-                          {isCurrentUser && (
-                            <button
-                              type="button"
-                              onClick={() => setDocToDelete(doc)}
-                              title="Delete from Public"
-                              className="p-1 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          {/* Multi-document Badge */}
+                          {doc.documentsCount && doc.documentsCount > 1 && (
+                            <span className="absolute top-1.5 right-1.5 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                              {doc.documentsCount} docs
+                            </span>
+                          )}
+
+                          {/* Priority Badge */}
+                          {doc.isPriority && (
+                            <span className="absolute bottom-1.5 left-1.5 bg-amber-500 text-white text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-xs">
+                              Priority
+                            </span>
+                          )}
+
+                          {/* Locked icon overlay on thumbnail if password protected */}
+                          {doc.hasPassword && (
+                            <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
+                              <div className="w-6 h-6 rounded-full bg-neutral-900/85 text-white flex items-center justify-center shadow-md">
+                                <Lock className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
                           )}
                         </div>
 
-                        {/* File Title (Marquee on overflow, strictly single line) */}
-                        <div className="mb-1">
-                          <MarqueeTitle text={doc.title} />
+                        {/* Title & Tags */}
+                        <div className="mt-2.5 mb-1.5">
+                          <div className="mb-1">
+                            <RotatingTitle titles={doc.titles} defaultTitle={doc.title} />
+                          </div>
+
+                          {/* Tags with very small corner radius rounded-[3px] */}
+                          {doc.tags && doc.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                              {doc.tags.slice(0, 2).map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-1.5 py-0.5 text-[9px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200/70 rounded-[3px] leading-tight truncate max-w-[80px]"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                              {doc.tags.length > 2 && (
+                                <span className="text-[8.5px] text-neutral-400 font-bold self-center">
+                                  +{doc.tags.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[10px] text-neutral-500 font-medium pt-1">
+                            <span>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}</span>
+                            <span>{doc.printCount || 0} prints</span>
+                          </div>
                         </div>
 
-                        {/* Metadata Row: Pages + Size on Left, Print Count on Right */}
-                        <div className="flex items-center justify-between text-[11px] text-neutral-500 mt-2 font-medium">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <span>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}</span>
-                            <span>•</span>
-                            <span>{formatBytes(doc.fileSizeBytes)}</span>
+                        {/* Bottom Row */}
+                        <div className="pt-2 border-t border-neutral-100 flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {livePhoto ? (
+                              <img
+                                src={livePhoto}
+                                alt={liveName}
+                                referrerPolicy="no-referrer"
+                                className="w-5 h-5 rounded-full object-cover shrink-0 border border-neutral-200"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-neutral-900 text-white font-bold text-[8.5px] flex items-center justify-center shrink-0">
+                                {uploaderInitial}
+                              </div>
+                            )}
+                            <p className="text-[11px] font-semibold text-neutral-800 truncate leading-tight flex items-center gap-0.5">
+                              <span className="truncate max-w-[65px]">{liveName}</span>
+                              {isUploaderVerified && (
+                                <svg
+                                  className="w-3 h-3 text-[#0c831f] shrink-0"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                            </p>
                           </div>
 
-                          <div className="inline-flex items-center gap-1 text-neutral-600 font-medium shrink-0 ml-2">
-                            <Printer className="w-3 h-3 text-neutral-400" />
-                            <span className="font-bold text-neutral-800">{doc.printCount || 0}</span>
-                            <span>{doc.printCount === 1 ? "print" : "prints"}</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintClick(doc)}
+                            className="h-7 px-2.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer shrink-0"
+                          >
+                            {doc.hasPassword ? (
+                              <Lock className="w-2.5 h-2.5 text-white" />
+                            ) : (
+                              <Printer className="w-2.5 h-2.5 text-white" />
+                            )}
+                            <span>Print</span>
+                          </button>
                         </div>
                       </div>
                     </div>
+                  );
+                }
 
-                    {/* Bottom Row: Uploader Account & Print Button */}
-                    <div className="mt-3.5 pt-3 border-t border-neutral-100 flex items-center justify-between gap-3">
-                      {/* Uploader Account Info */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        {livePhoto ? (
-                          <img
-                            src={livePhoto}
-                            alt={liveName}
-                            referrerPolicy="no-referrer"
-                            className="w-7 h-7 rounded-full object-cover shrink-0 border border-neutral-200"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
-                            {uploaderInitial}
+                /* ─── LIST VIEW CARD (Default) ─── */
+                return (
+                  <div
+                    key={doc.id}
+                    className={
+                      doc.isImportant
+                        ? "relative rounded-2xl p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
+                        : "bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
+                    }
+                  >
+                    <div className={doc.isImportant ? "bg-white rounded-[14.5px] p-3.5 sm:p-4 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
+                      {/* Top Content: Thumbnail on Left, Metadata on Right */}
+                      <div className="flex gap-3 items-start">
+                        {/* Left: Document Thumbnail Preview Box in 3:4 ratio */}
+                        <div className="w-14 sm:w-16 aspect-[3/4] bg-neutral-100 rounded-lg overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
+                          {displayThumbnail ? (
+                            <img
+                              src={displayThumbnail}
+                              alt={doc.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-1 text-neutral-400 p-1.5">
+                              <FileText className="w-6 h-6 text-neutral-400" />
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-neutral-500">
+                                PDF
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Locked icon overlay on thumbnail if password protected */}
+                          {doc.hasPassword && (
+                            <div className="absolute inset-0 bg-neutral-950/25 flex items-center justify-center pointer-events-none">
+                              <div className="w-6 h-6 rounded-full bg-neutral-900/85 text-white flex items-center justify-center shadow-md">
+                                <Lock className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Info */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-medium text-neutral-400">
+                                {formatDate(doc.createdAt)}
+                              </span>
+                              {doc.isPriority && (
+                                <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-amber-50 text-amber-700 border border-amber-200/70 rounded-[3px]">
+                                  Priority
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {/* Multi-document Badge on the same row of date on right corner */}
+                              {doc.documentsCount && doc.documentsCount > 1 && (
+                                <span className="text-[10px] font-bold text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded-[4px] border border-neutral-200/60">
+                                  {doc.documentsCount} docs
+                                </span>
+                              )}
+
+                              {/* Delete Button for User's Own Uploads */}
+                              {isCurrentUser && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDocToDelete(doc)}
+                                  title="Delete from Public"
+                                  className="p-1 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-neutral-800 truncate leading-tight">
-                            {liveName}
-                          </p>
-                          <p className="text-[10px] text-neutral-400 leading-none">Shared PDF</p>
+
+                          {/* File Title (Swipe up effect for multiple docs / marquee for single) */}
+                          <div className="mb-1">
+                            <RotatingTitle titles={doc.titles} defaultTitle={doc.title} />
+                          </div>
+
+                          {/* Tags with very small corner radius */}
+                          {doc.tags && doc.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                              {doc.tags.map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200/70 rounded-[3px] leading-tight"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Metadata Row: Pages + Size on Left, Print Count on Right */}
+                          <div className="flex items-center justify-between text-[11px] text-neutral-500 mt-1 font-medium">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span>
+                                {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
+                              </span>
+                              <span>•</span>
+                              <span>{formatBytes(doc.fileSizeBytes)}</span>
+                            </div>
+
+                            <div className="inline-flex items-center gap-1 text-neutral-600 font-medium shrink-0 ml-2">
+                              <Printer className="w-3 h-3 text-neutral-400" />
+                              <span className="font-bold text-neutral-800">{doc.printCount || 0}</span>
+                              <span>{doc.printCount === 1 ? "print" : "prints"}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Print Button (Corner Radius Reduced to rounded-lg) */}
-                      <button
-                        type="button"
-                        onClick={() => handlePrintClick(doc)}
-                        className="h-8 px-3.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
-                      >
-                        {doc.hasPassword ? (
-                          <Lock className="w-3 h-3 text-white" />
-                        ) : (
-                          <Printer className="w-3 h-3 text-white" />
-                        )}
-                        <span>Print</span>
-                      </button>
+                      {/* Bottom Row: Uploader Account & Print Button */}
+                      <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between gap-3">
+                        {/* Uploader Account Info with Verified Badge */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          {livePhoto ? (
+                            <img
+                              src={livePhoto}
+                              alt={liveName}
+                              referrerPolicy="no-referrer"
+                              className="w-7 h-7 rounded-full object-cover shrink-0 border border-neutral-200"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {uploaderInitial}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-neutral-800 truncate leading-tight flex items-center gap-1">
+                              <span className="truncate">{liveName}</span>
+                              {isUploaderVerified && (
+                                <svg
+                                  className="w-3.5 h-3.5 text-[#0c831f] shrink-0"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                            </p>
+                            <p className="text-[10px] text-neutral-400 leading-none">Shared PDF</p>
+                          </div>
+                        </div>
+
+                        {/* Print Button */}
+                        <button
+                          type="button"
+                          onClick={() => handlePrintClick(doc)}
+                          className="h-8 px-3.5 bg-[#0c831f] hover:bg-[#0a701a] active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
+                        >
+                          {doc.hasPassword ? (
+                            <Lock className="w-3 h-3 text-white" />
+                          ) : (
+                            <Printer className="w-3 h-3 text-white" />
+                          )}
+                          <span>Print</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1137,6 +1565,161 @@ export default function PublicDocumentsPage() {
                   If set, anyone clicking Print will have to enter this password first.
                 </p>
               </div>
+
+              {/* ── VERIFIED CREATOR OPTIONS ── */}
+              {isCurrentVerified && (
+                <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 via-amber-50/30 to-white rounded-xl border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-[#0c831f]" />
+                    <span className="text-xs font-bold text-neutral-900">
+                      Verified Creator Settings
+                    </span>
+                  </div>
+
+                  {/* 1. Multi-document bundle upload */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-neutral-700">
+                        Add More Documents (Bundle)
+                      </label>
+                      <span className="text-[10px] text-neutral-400">Optional</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      multiple
+                      onChange={handleAdditionalFilesChange}
+                      className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black cursor-pointer text-neutral-600"
+                    />
+                    {additionalFiles.length > 0 && (
+                      <p className="text-[10px] font-semibold text-[#0c831f] pt-0.5">
+                        +{additionalFiles.length} additional doc{additionalFiles.length > 1 ? "s" : ""} selected ({additionalFiles.map((f) => f.name).join(", ")})
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 2. Manual Custom 3:4 Thumbnail */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-neutral-700">
+                        Upload Manual 3:4 Thumbnail
+                      </label>
+                      <span className="text-[10px] text-neutral-400">Optional (Image)</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleManualThumbnailChange}
+                      className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-neutral-100 file:text-neutral-800 hover:file:bg-neutral-200 cursor-pointer text-neutral-600"
+                    />
+                    {manualThumbnailPreview && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <img
+                          src={manualThumbnailPreview}
+                          alt="Custom Thumbnail"
+                          className="w-8 aspect-[3/4] object-cover rounded border border-neutral-200"
+                        />
+                        <span className="text-[10px] text-emerald-700 font-semibold">Custom thumbnail active</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualThumbnailFile(null);
+                            setManualThumbnailPreview(null);
+                          }}
+                          className="text-[10px] text-rose-600 hover:underline cursor-pointer ml-auto"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Add Tags */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 block">
+                      Add Tags (e.g. PYQ, Notes, Unit 1)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
+                        placeholder="Type tag & press enter"
+                        className="flex-1 h-8 px-2.5 text-xs bg-white rounded-lg text-neutral-900 border border-neutral-200 focus:ring-1 focus:ring-[#0c831f]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTag}
+                        className="h-8 px-2.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-black shrink-0"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {tags.map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-white text-neutral-800 border border-neutral-200 rounded-[3px] flex items-center gap-1"
+                          >
+                            {t}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(idx)}
+                              className="text-neutral-400 hover:text-rose-600 text-[10px] leading-none"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Important Checkbox & 5. Priority Checkbox */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-100/80">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isImportant}
+                        onChange={(e) => setIsImportant(e.target.checked)}
+                        className="w-4 h-4 text-[#0c831f] rounded focus:ring-[#0c831f] border-neutral-300"
+                      />
+                      <div>
+                        <span className="text-[11px] font-bold text-neutral-900 block leading-tight">
+                          Important Document
+                        </span>
+                        <span className="text-[9.5px] text-neutral-500 block">
+                          Card gets gradient border
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isPriority}
+                        onChange={(e) => setIsPriority(e.target.checked)}
+                        className="w-4 h-4 text-[#0c831f] rounded focus:ring-[#0c831f] border-neutral-300"
+                      />
+                      <div>
+                        <span className="text-[11px] font-bold text-neutral-900 block leading-tight">
+                          Priority Placement
+                        </span>
+                        <span className="text-[9.5px] text-neutral-500 block">
+                          Pinned on top of library
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Upload Progress Bar */}
               {uploading && (

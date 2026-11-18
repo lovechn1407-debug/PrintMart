@@ -101,18 +101,20 @@ export function AppNavbar() {
               )}
               <span>Home</span>
             </Link>
-            <Link
-              href="/user/print"
-              onClick={(e) => handleNavClick(e, "/user/print")}
-              className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                pathname === "/user/print" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
-              }`}
-            >
-              {pendingPath === "/user/print" && (
-                <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
-              )}
-              <span>Start Printing</span>
-            </Link>
+            {user && (
+              <Link
+                href="/user/print"
+                onClick={(e) => handleNavClick(e, "/user/print")}
+                className={`text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                  pathname === "/user/print" ? "text-neutral-950 font-bold" : "text-neutral-800 hover:text-neutral-950"
+                }`}
+              >
+                {pendingPath === "/user/print" && (
+                  <div className="w-3 h-3 rounded-full border-2 border-neutral-400 border-t-[#0c831f] animate-spin" />
+                )}
+                <span>Start Printing</span>
+              </Link>
+            )}
             <Link
               href="/public"
               onClick={(e) => handleNavClick(e, "/public")}
@@ -286,22 +288,24 @@ export function AppNavbar() {
           </div>
           <span>Home</span>
         </Link>
-        <Link
-          href="/user/print"
-          onClick={(e) => handleNavClick(e, "/user/print")}
-          className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
-            pathname === "/user/print" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
-          }`}
-        >
-          <div className="relative w-5 h-5 flex items-center justify-center">
-            {pendingPath === "/user/print" ? (
-              <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
-            ) : (
-              <Printer className="w-5 h-5" />
-            )}
-          </div>
-          <span>Print</span>
-        </Link>
+        {user && (
+          <Link
+            href="/user/print"
+            onClick={(e) => handleNavClick(e, "/user/print")}
+            className={`flex flex-col items-center gap-0.5 text-[11px] font-medium transition-colors ${
+              pathname === "/user/print" ? "text-[#0c831f] font-bold" : "text-neutral-500 hover:text-neutral-900"
+            }`}
+          >
+            <div className="relative w-5 h-5 flex items-center justify-center">
+              {pendingPath === "/user/print" ? (
+                <div className="w-4 h-4 rounded-full border-2 border-emerald-100 border-t-[#0c831f] border-r-[#0c831f] animate-spin" />
+              ) : (
+                <Printer className="w-5 h-5" />
+              )}
+            </div>
+            <span>Print</span>
+          </Link>
+        )}
         <Link
           href="/public"
           onClick={(e) => handleNavClick(e, "/public")}

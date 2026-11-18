@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, X, FileText, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 import { AppNavbar } from "@/components/AppNavbar";
@@ -14,12 +15,31 @@ import {
 } from "@/lib/draftStorage";
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, signInWithGoogle } = useAuth();
   const [drafts, setDrafts] = useState<PrintDraftItem[]>([]);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
   const [previewImgErrors, setPreviewImgErrors] = useState<Record<string, boolean>>({});
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
+  const [isAuthUploading, setIsAuthUploading] = useState<boolean>(false);
+
+  const handleUploadFilesClick = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (user) {
+      router.push("/user/print");
+      return;
+    }
+    try {
+      setIsAuthUploading(true);
+      await signInWithGoogle();
+      router.push("/user/print");
+    } catch (err) {
+      console.error("Sign in failed:", err);
+    } finally {
+      setIsAuthUploading(false);
+    }
+  };
 
   const loadDrafts = () => {
     const stored = getStoredDrafts();
@@ -163,13 +183,18 @@ export default function HomePage() {
                   <span>Single side prints</span>
                 </li>
               </ul>
-              <Link
-                href="/user/print"
-                prefetch={true}
-                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center"
+              <button
+                type="button"
+                onClick={handleUploadFilesClick}
+                disabled={isAuthUploading}
+                className="mt-3.5 w-36 h-9 sm:h-10 inline-flex items-center justify-center bg-[#0c831f] hover:bg-[#0a6e1a] text-white text-xs sm:text-[13px] font-semibold rounded-lg shadow-xs active:scale-95 transition-all text-center cursor-pointer disabled:opacity-75"
               >
-                Upload Files
-              </Link>
+                {isAuthUploading ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                ) : (
+                  "Upload Files"
+                )}
+              </button>
             </div>
 
             {/* Graphic: 3 Layered Documents */}
@@ -569,14 +594,14 @@ export default function HomePage() {
 
               {/* Footer */}
               <div className="p-3 px-4 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between text-xs">
-                <Link
-                  href="/user/print"
-                  prefetch={true}
-                  className="text-[#0c831f] hover:text-[#0a6e1a] font-bold flex items-center gap-1.5 py-1 transition-colors"
+                <button
+                  type="button"
+                  onClick={handleUploadFilesClick}
+                  className="text-[#0c831f] hover:text-[#0a6e1a] font-bold flex items-center gap-1.5 py-1 transition-colors cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Upload New Document</span>
-                </Link>
+                </button>
 
                 <button
                   type="button"

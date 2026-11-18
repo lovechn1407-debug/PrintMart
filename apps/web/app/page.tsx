@@ -198,44 +198,13 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Graphic: 3 Layered Documents */}
+            {/* Icon: Documents */}
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
-              {/* Back Left Page */}
-              <div className="absolute w-20 h-26 bg-white border border-slate-200 rounded-sm shadow-xs -rotate-12 -translate-x-3.5 p-1.5 flex flex-col justify-between">
-                <div className="w-5 h-5 rounded-full bg-cyan-100 flex items-center justify-center text-[7px] text-cyan-700 font-bold">
-                  DOC
-                </div>
-                <div className="space-y-1">
-                  <div className="h-1 bg-slate-200 rounded w-full" />
-                  <div className="h-1 bg-slate-200 rounded w-4/5" />
-                  <div className="h-1 bg-slate-200 rounded w-2/3" />
-                </div>
-              </div>
-
-              {/* Back Right Page */}
-              <div className="absolute w-20 h-26 bg-white border border-slate-200 rounded-sm shadow-xs rotate-12 translate-x-3.5 p-1.5 flex flex-col justify-between">
-                <div className="h-2.5 bg-sky-100 rounded w-3/4" />
-                <div className="space-y-1">
-                  <div className="h-1 bg-slate-200 rounded w-full" />
-                  <div className="h-1 bg-slate-200 rounded w-3/4" />
-                </div>
-              </div>
-
-              {/* Front Page with 'Lorem' Header */}
-              <div className="absolute w-22 h-28 bg-white border border-slate-200/90 rounded-sm shadow-md rotate-2 p-2 flex flex-col z-10">
-                <div className="bg-[#7e22ce] text-white font-bold text-[8px] px-1.5 py-0.5 rounded-xs tracking-wider mb-2 flex items-center justify-between">
-                  <span>Lorem</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
-                </div>
-                <div className="space-y-1.5 flex-1">
-                  <div className="h-1 bg-slate-300 rounded w-full" />
-                  <div className="h-1 bg-slate-200 rounded w-11/12" />
-                  <div className="h-1 bg-slate-200 rounded w-4/5" />
-                  <div className="h-1 bg-slate-200 rounded w-full" />
-                  <div className="h-1 bg-slate-200 rounded w-3/4" />
-                  <div className="h-1 bg-slate-200 rounded w-5/6" />
-                </div>
-              </div>
+              <img
+                src="/home/documents-icon.webp"
+                alt="Documents"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
 
@@ -268,39 +237,13 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Graphic: Fanned Passport Photos with Portrait */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none opacity-80">
-              {/* Back Left Passport Photo */}
-              <div className="absolute w-14 h-19 bg-white p-1 border border-slate-200 rounded-sm shadow-xs -rotate-12 -translate-x-4">
-                <div className="w-full h-full bg-[#bfdbfe] rounded-xs flex flex-col items-center justify-end overflow-hidden">
-                  <div className="w-6 h-6 rounded-full bg-[#60a5fa] mb-1" />
-                  <div className="w-10 h-6 bg-[#1d4ed8] rounded-t-lg" />
-                </div>
-              </div>
-
-              {/* Back Right Passport Photo */}
-              <div className="absolute w-14 h-19 bg-white p-1 border border-slate-200 rounded-sm shadow-xs rotate-12 translate-x-4">
-                <div className="w-full h-full bg-[#bfdbfe] rounded-xs flex flex-col items-center justify-end overflow-hidden">
-                  <div className="w-6 h-6 rounded-full bg-[#60a5fa] mb-1" />
-                  <div className="w-10 h-6 bg-[#1d4ed8] rounded-t-lg" />
-                </div>
-              </div>
-
-              {/* Front Main Passport Portrait */}
-              <div className="absolute w-18 h-24 bg-white p-1 border border-slate-200/90 rounded-sm shadow-md z-10 flex flex-col items-center">
-                <div className="w-full h-full bg-gradient-to-b from-[#e0f2fe] to-[#bae6fd] rounded-xs relative overflow-hidden flex flex-col items-center justify-end">
-                  <svg className="w-14 h-20 text-slate-700" viewBox="0 0 60 70" fill="none">
-                    <path d="M16 35 C 14 12, 46 12, 44 35 C 48 48, 52 65, 52 70 L 8 70 C 8 65, 12 48, 16 35 Z" fill="#1e293b" />
-                    <ellipse cx="30" cy="30" rx="10" ry="12" fill="#d97706" opacity="0.4" />
-                    <ellipse cx="30" cy="30" rx="9" ry="11" fill="#fde68a" />
-                    <path d="M26 34 Q 30 38 34 34" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="26" cy="28" r="1.2" fill="#1e293b" />
-                    <circle cx="34" cy="28" r="1.2" fill="#1e293b" />
-                    <path d="M12 70 L 22 46 L 30 52 L 38 46 L 48 70 Z" fill="#2563eb" />
-                    <path d="M26 48 L 30 54 L 34 48" stroke="#ffffff" strokeWidth="1.5" />
-                  </svg>
-                </div>
-              </div>
+            {/* Icon: Passport Photos */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              <img
+                src="/home/passport-photos-icon.webp"
+                alt="Passport photos"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
 
@@ -333,39 +276,13 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Graphic: Cluster of Sunflowers Photos */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex flex-col justify-between p-1 select-none pointer-events-none opacity-80">
-              {/* Top Horizontal Photo */}
-              <div className="w-full h-11 rounded-md bg-[#38bdf8] border border-white shadow-xs overflow-hidden relative flex items-center justify-around px-1">
-                <div className="relative w-8 h-8 flex items-center justify-center">
-                  <div className="absolute w-7 h-7 rounded-full bg-yellow-400" />
-                  <div className="absolute w-3.5 h-3.5 rounded-full bg-[#78350f]" />
-                </div>
-                <div className="relative w-7 h-7 flex items-center justify-center">
-                  <div className="absolute w-6 h-6 rounded-full bg-yellow-400" />
-                  <div className="absolute w-3 h-3 rounded-full bg-[#78350f]" />
-                </div>
-              </div>
-
-              {/* Bottom 2 Photos */}
-              <div className="flex gap-1.5 h-13 mt-1">
-                <div className="flex-1 bg-[#0284c7] rounded-md border border-white shadow-xs overflow-hidden flex items-center justify-center p-0.5">
-                  <div className="relative w-6 h-6 flex items-center justify-center">
-                    <div className="absolute w-5.5 h-5.5 rounded-full bg-yellow-400" />
-                    <div className="absolute w-2.5 h-2.5 rounded-full bg-[#78350f]" />
-                  </div>
-                </div>
-
-                <div className="flex-1 bg-white p-0.5 rounded-md border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex-1 bg-[#38bdf8] rounded-xs flex items-center justify-center overflow-hidden">
-                    <div className="relative w-5 h-5 flex items-center justify-center">
-                      <div className="absolute w-4.5 h-4.5 rounded-full bg-yellow-400" />
-                      <div className="absolute w-2.5 h-2.5 rounded-full bg-[#78350f]" />
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-white" />
-                </div>
-              </div>
+            {/* Icon: Photos */}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              <img
+                src="/home/photos-icon.webp"
+                alt="Photos"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
 

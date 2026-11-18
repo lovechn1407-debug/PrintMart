@@ -67,6 +67,25 @@ function formatBytes(bytes: number = 0): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
+function stripUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((v) => v !== undefined)
+      .map((v) => stripUndefined(v)) as unknown as T;
+  }
+  if (typeof obj === "object") {
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== undefined) {
+        clean[k] = stripUndefined(v);
+      }
+    }
+    return clean as unknown as T;
+  }
+  return obj;
+}
+
 function formatDate(timestamp: number): string {
   if (!timestamp) return "Recently";
   const date = new Date(timestamp);
@@ -548,11 +567,11 @@ export default function PublicDocumentsPage() {
     setUploadError(null);
 
     try {
-      const allFiles = [selectedFile, ...additionalFiles];
+      const allFiles = [selectedFile, ...additionalFiles].filter(Boolean);
       const titles = [
         titleInput.trim(),
         ...additionalFiles.map((f) => f.name.replace(/\.pdf$/i, "")),
-      ];
+      ].filter(Boolean);
 
       let totalBytes = 0;
       let totalPages = 0;
@@ -565,7 +584,7 @@ export default function PublicDocumentsPage() {
 
       for (let i = 0; i < allFiles.length; i++) {
         const fileToUpload = allFiles[i];
-        totalBytes += fileToUpload.size;
+        totalBytes += fileToUpload.size || 0;
         setUploadStatusText(
           allFiles.length > 1
             ? `Uploading document ${i + 1} of ${allFiles.length}: ${fileToUpload.name}`
@@ -583,19 +602,26 @@ export default function PublicDocumentsPage() {
           },
         });
 
-        const docFileId = uploadedDoc.documentId || uploadedDoc.fileId;
-        const detectedPages = Math.max(1, uploadedDoc.pageCount || 1);
+        const docFileId = String(
+          uploadedDoc?.documentId ||
+          uploadedDoc?.fileId ||
+          uploadedDoc?.id ||
+          `file_${Date.now()}_${i}`
+        );
+        const detectedPages = Math.max(1, Number(uploadedDoc?.pageCount) || 1);
         totalPages += detectedPages;
 
         uploadedFileRecords.push({
           fileId: docFileId,
-          title: titles[i],
+          title: String(titles[i] || fileToUpload.name.replace(/\.pdf$/i, "") || `Document ${i + 1}`),
           pageCount: detectedPages,
-          fileSizeBytes: fileToUpload.size,
+          fileSizeBytes: Number(fileToUpload.size) || 0,
         });
       }
 
-      const primaryDocFileId = uploadedFileRecords[0].fileId;
+      const primaryDocFileId = String(
+        uploadedFileRecords[0]?.fileId || `pub_${Date.now()}`
+      );
       const hasPassword = Boolean(passwordInput.trim());
 
       // 2. Custom thumbnail or auto-generated Page 1 PDF thumbnail
@@ -624,18 +650,17 @@ export default function PublicDocumentsPage() {
       // 4. Prepare Public Document Record
       const newDocId = `pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      const publicDocRecord: any = {
+      const publicDocRecord: Record<string, any> = {
         id: newDocId,
         fileId: primaryDocFileId,
-        title: titleInput.trim(),
-        titles: titles.length > 1 ? titles : undefined,
+        title: titleInput.trim() || selectedFile.name.replace(/\.pdf$/i, "") || "Untitled Document",
         documentsCount: allFiles.length,
         files: uploadedFileRecords,
-        originalFilename: selectedFile.name,
-        fileSizeBytes: totalBytes,
-        pageCount: totalPages,
+        originalFilename: selectedFile.name || "document.pdf",
+        fileSizeBytes: Number(totalBytes) || selectedFile.size || 0,
+        pageCount: Math.max(1, Number(totalPages) || 1),
         uploaderUid: user?.uid || "anonymous",
-        uploaderName,
+        uploaderName: uploaderName || "Campus Student",
         uploaderPhotoURL: uploaderPhoto || "",
         uploaderVerified: Boolean(isCurrentVerified),
         thumbnailUrl: finalThumbnail || "",
@@ -644,8 +669,14 @@ export default function PublicDocumentsPage() {
         createdAt: Date.now(),
       };
 
+      if (titles.length > 1) {
+        publicDocRecord.titles = titles;
+      }
+      if (manualThumbnailPreview) {
+        publicDocRecord.manualThumbnailUrl = manualThumbnailPreview;
+      }
       if (tags.length > 0) {
-        publicDocRecord.tags = tags;
+        publicDocRecord.tags = tags.filter(Boolean);
       }
       if (isImportant) {
         publicDocRecord.isImportant = true;
@@ -659,8 +690,9 @@ export default function PublicDocumentsPage() {
         publicDocRecord.password = passwordInput.trim();
       }
 
-      // 5. Save to Firebase Realtime Database
-      await set(ref(database, `publicDocuments/${newDocId}`), publicDocRecord);
+      // 5. Clean all undefined values before saving to Firebase Realtime Database
+      const safeRecord = stripUndefined(publicDocRecord);
+      await set(ref(database, `publicDocuments/${newDocId}`), safeRecord);
 
       // Clean up & Close Modal
       setIsUploadModalOpen(false);
@@ -1118,8 +1150,8 @@ export default function PublicDocumentsPage() {
             <div
               className={
                 viewMode === "grid"
-                  ? "grid grid-cols-2 gap-2.5 sm:gap-3.5"
-                  : "grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+                  ? "grid grid-cols-2 gap-2 sm:gap-2.5"
+                  : "grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3"
               }
             >
               {filteredDocs.map((doc) => {
@@ -1144,11 +1176,11 @@ export default function PublicDocumentsPage() {
                       key={doc.id}
                       className={
                         doc.isImportant
-                          ? "relative rounded-2xl p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
-                          : "bg-white rounded-2xl p-3 sm:p-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
+                          ? "relative rounded-[14px] p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
+                          : "bg-white rounded-[14px] p-3 sm:p-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
                       }
                     >
-                      <div className={doc.isImportant ? "bg-white rounded-[14.5px] p-3 sm:p-3.5 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
+                      <div className={doc.isImportant ? "bg-white rounded-[12.5px] p-3 sm:p-3.5 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
                         {/* 3:4 Thumbnail Preview on top */}
                         <div className="w-full aspect-[3/4] bg-neutral-100 rounded-xl overflow-hidden shrink-0 border border-neutral-200/70 flex items-center justify-center relative shadow-2xs">
                           {displayThumbnail ? (
@@ -1175,13 +1207,6 @@ export default function PublicDocumentsPage() {
                           {doc.documentsCount && doc.documentsCount > 1 && (
                             <span className="absolute top-1.5 right-1.5 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
                               {doc.documentsCount} docs
-                            </span>
-                          )}
-
-                          {/* Priority Badge */}
-                          {doc.isPriority && (
-                            <span className="absolute bottom-1.5 left-1.5 bg-amber-500 text-white text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-xs">
-                              Priority
                             </span>
                           )}
 
@@ -1241,20 +1266,14 @@ export default function PublicDocumentsPage() {
                                 {uploaderInitial}
                               </div>
                             )}
-                            <p className="text-[11px] font-semibold text-neutral-800 truncate leading-tight flex items-center gap-0.5">
+                            <p className="text-[11px] font-semibold text-neutral-800 truncate leading-tight flex items-center gap-1">
                               <span className="truncate max-w-[65px]">{liveName}</span>
                               {isUploaderVerified && (
-                                <svg
-                                  className="w-3 h-3 text-[#0c831f] shrink-0"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
+                                <img
+                                  src="/brand/verified-badge.webp"
+                                  alt="Verified"
+                                  className="w-3.5 h-3.5 object-contain shrink-0 inline-block align-middle"
+                                />
                               )}
                             </p>
                           </div>
@@ -1283,11 +1302,11 @@ export default function PublicDocumentsPage() {
                     key={doc.id}
                     className={
                       doc.isImportant
-                        ? "relative rounded-2xl p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
-                        : "bg-white rounded-2xl p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
+                        ? "relative rounded-[14px] p-[1.5px] bg-gradient-to-r from-amber-400 via-rose-400 to-[#0c831f] shadow-xs hover:shadow-md transition-all group flex flex-col"
+                        : "bg-white rounded-[14px] p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all border border-neutral-100 flex flex-col justify-between group"
                     }
                   >
-                    <div className={doc.isImportant ? "bg-white rounded-[14.5px] p-3.5 sm:p-4 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
+                    <div className={doc.isImportant ? "bg-white rounded-[12.5px] p-3.5 sm:p-4 flex flex-col justify-between h-full" : "flex flex-col justify-between h-full"}>
                       {/* Top Content: Thumbnail on Left, Metadata on Right */}
                       <div className="flex gap-3 items-start">
                         {/* Left: Document Thumbnail Preview Box in 3:4 ratio */}
@@ -1324,11 +1343,6 @@ export default function PublicDocumentsPage() {
                               <span className="text-[10px] font-medium text-neutral-400">
                                 {formatDate(doc.createdAt)}
                               </span>
-                              {doc.isPriority && (
-                                <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase bg-amber-50 text-amber-700 border border-amber-200/70 rounded-[3px]">
-                                  Priority
-                                </span>
-                              )}
                             </div>
 
                             <div className="flex items-center gap-1.5">
@@ -1411,17 +1425,11 @@ export default function PublicDocumentsPage() {
                             <p className="text-xs font-semibold text-neutral-800 truncate leading-tight flex items-center gap-1">
                               <span className="truncate">{liveName}</span>
                               {isUploaderVerified && (
-                                <svg
-                                  className="w-3.5 h-3.5 text-[#0c831f] shrink-0"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
+                                <img
+                                  src="/brand/verified-badge.webp"
+                                  alt="Verified"
+                                  className="w-3.5 h-3.5 object-contain shrink-0 inline-block align-middle"
+                                />
                               )}
                             </p>
                             <p className="text-[10px] text-neutral-400 leading-none">Shared PDF</p>
@@ -1570,7 +1578,11 @@ export default function PublicDocumentsPage() {
               {isCurrentVerified && (
                 <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 via-amber-50/30 to-white rounded-xl border border-emerald-200/80 space-y-3">
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-[#0c831f]" />
+                    <img
+                      src="/brand/verified-badge.webp"
+                      alt="Verified"
+                      className="w-4 h-4 object-contain shrink-0 inline-block align-middle"
+                    />
                     <span className="text-xs font-bold text-neutral-900">
                       Verified Creator Settings
                     </span>

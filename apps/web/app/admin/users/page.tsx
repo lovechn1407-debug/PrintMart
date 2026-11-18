@@ -189,18 +189,12 @@ export default function AdminUsersPage() {
                                 {u.displayName || "Anonymous User"}
                               </span>
                               {u.isVerified && (
-                                <span title="Verified Campus Creator">
-                                  <svg
-                                    className="w-4 h-4 text-[#0c831f] shrink-0"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
+                                <span title="Verified Campus Creator" className="inline-flex items-center shrink-0">
+                                  <img
+                                    src="/brand/verified-badge.webp"
+                                    alt="Verified"
+                                    className="w-4 h-4 object-contain shrink-0 inline-block align-middle"
+                                  />
                                 </span>
                               )}
                             </div>
